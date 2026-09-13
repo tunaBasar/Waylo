@@ -10,8 +10,75 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
-          lower-case-service-id: true
+          enabled: false
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: "http://localhost:3000"
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowed-headers: "*"
+            allow-credentials: true
+            max-age: 3600
+      routes:
+        # --- Domain Services ---
+        - id: flight-service
+          uri: lb://flight-service
+          predicates:
+            - Path=/api/flights/**,/api/airports/**
+        - id: flight-seat-inventory-service
+          uri: lb://flight-seat-inventory-service
+          predicates:
+            - Path=/api/seat-inventory/**
+        - id: hotel-service
+          uri: lb://hotel-service
+          predicates:
+            - Path=/api/hotels/**,/api/rooms/**
+        - id: car-rental-service
+          uri: lb://car-rental-service
+          predicates:
+            - Path=/api/vehicles/**,/api/rentals/**
+        - id: package-booking-service
+          uri: lb://package-booking-service
+          predicates:
+            - Path=/api/bookings/**
+        - id: pricing-service
+          uri: lb://pricing-service
+          predicates:
+            - Path=/api/pricing/**
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payments/**
+        - id: crm-service
+          uri: lb://crm-service
+          predicates:
+            - Path=/api/customers/**,/api/loyalty/**
+        - id: checkin-service
+          uri: lb://checkin-service
+          predicates:
+            - Path=/api/checkin/**
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+        # --- Health (custom) per service ---
+        - id: flight-service-health
+          uri: lb://flight-service
+          predicates:
+            - Path=/services/flight/health
+          filters:
+            - RewritePath=/services/flight/health, /api/health
+        - id: saga-orchestrator
+          uri: lb://package-booking-saga-orchestrator
+          predicates:
+            - Path=/api/saga/**
 
 eureka:
   client:
@@ -26,3 +93,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.server: INFO
