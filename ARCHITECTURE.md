@@ -78,7 +78,25 @@ package-booking-saga-orchestrator servisi, Kafka event'leri ile diğer servisler
 Choreography yerine orchestration tercih edildi: daha kolay debug, merkezi hata yönetimi,
 kompanse eden transaction'ların açık tanımı.
 
-### 7. Spring Boot 4.x Artifact Değişiklikleri
+### 7. Saga Compensation Sırası
+
+Compensation her zaman tamamlanmış adımların ters sırasında çalışır.
+Saga adım sırası: RESERVE_SEATS → RESERVE_HOTEL → RESERVE_CAR → PROCESS_PAYMENT → CONFIRM_BOOKING.
+Bir adım başarısız olduğunda, yalnızca o adımdan önceki başarılı adımlar geri alınır ve geri alma
+ters sırada yapılır. Örnek: PROCESS_PAYMENT başarısız olursa compensation sırası
+car→hotel→seat'tir (payment hiç başarılı olmadığı için refund gerekmez). Refund yalnızca payment
+başarılı olduktan sonra bir adımda (CONFIRM_BOOKING) hata olursa devreye girer.
+
+### 8. Idempotency: Tek Enjeksiyon Noktası
+
+Kafka consumer idempotency altyapısı (processed_events tablosu, ortak base consumer veya
+aspect/interceptor) tüm servislerden önce, ortak altyapı fazında kurulur. Her yeni consumer
+bunu baştan kullanır; geriye dönük ekleme yapılmaz. DLQ ve retry policy ayrı bir fazda
+servis-özel ince ayarlarla tamamlanır.
+Gerekçe: bill_project'teki "tek enjeksiyon noktası" prensibi. Cross-cutting concern'ler merkezi
+olarak bir kez tanımlanır, her servis aynı altyapıyı devralır.
+
+### 9. Spring Boot 4.x Artifact Değişiklikleri
 
 Spring Boot 4.x'te (Spring Framework 7 tabanlı) bazı artifact isimleri değişti:
 - `spring-boot-starter-web` → `spring-boot-starter-webmvc`
