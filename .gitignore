@@ -29,3 +29,4 @@ application-local.yml
 
 # Docker
 docker-compose.override.yml
+graphify-out/
