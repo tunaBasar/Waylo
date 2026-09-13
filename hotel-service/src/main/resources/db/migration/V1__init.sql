@@ -1,0 +1,2 @@
+-- hotel-service initial schema
+-- Placeholder: add tables here when implementing business logic
