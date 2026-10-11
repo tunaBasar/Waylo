@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+*.iml
+.vscode
+
+# Build cache (only libs needed)
+*/build/classes
+*/build/generated
+*/build/resources
+*/build/tmp
+
+# Graphify
+graphify-out
+
+# Docs
+*.md
+!infra/*.sh
+
+# Source (not needed for pre-built JAR Dockerfiles)
+*/src
+
+# Gradle caches
+.gradle
+build

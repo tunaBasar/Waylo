@@ -96,14 +96,16 @@ services:
   # ──────────────────────────────────────────────
 
   config-service:
-    build: ./config-service
+    build:
+      context: .
+      dockerfile: config-service/Dockerfile
     container_name: waylo-config-service
     ports:
       - "8888:8888"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -113,7 +115,9 @@ services:
           memory: 256M
 
   discovery-service:
-    build: ./discovery-service
+    build:
+      context: .
+      dockerfile: discovery-service/Dockerfile
     container_name: waylo-discovery-service
     ports:
       - "8761:8761"
@@ -124,7 +128,7 @@ services:
       config-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -134,7 +138,9 @@ services:
           memory: 256M
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: waylo-api-gateway
     ports:
       - "8080:8080"
@@ -146,7 +152,7 @@ services:
       discovery-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -156,7 +162,9 @@ services:
           memory: 256M
 
   flight-service:
-    build: ./flight-service
+    build:
+      context: .
+      dockerfile: flight-service/Dockerfile
     container_name: waylo-flight-service
     ports:
       - "8081:8081"
@@ -179,7 +187,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -189,7 +197,9 @@ services:
           memory: 384M
 
   flight-seat-inventory-service:
-    build: ./flight-seat-inventory-service
+    build:
+      context: .
+      dockerfile: flight-seat-inventory-service/Dockerfile
     container_name: waylo-flight-seat-inventory-service
     ports:
       - "8082:8082"
@@ -212,7 +222,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -222,7 +232,9 @@ services:
           memory: 384M
 
   hotel-service:
-    build: ./hotel-service
+    build:
+      context: .
+      dockerfile: hotel-service/Dockerfile
     container_name: waylo-hotel-service
     ports:
       - "8083:8083"
@@ -245,7 +257,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -255,7 +267,9 @@ services:
           memory: 384M
 
   car-rental-service:
-    build: ./car-rental-service
+    build:
+      context: .
+      dockerfile: car-rental-service/Dockerfile
     container_name: waylo-car-rental-service
     ports:
       - "8084:8084"
@@ -278,7 +292,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -288,7 +302,9 @@ services:
           memory: 384M
 
   package-booking-service:
-    build: ./package-booking-service
+    build:
+      context: .
+      dockerfile: package-booking-service/Dockerfile
     container_name: waylo-package-booking-service
     ports:
       - "8085:8085"
@@ -311,7 +327,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -321,7 +337,9 @@ services:
           memory: 384M
 
   pricing-service:
-    build: ./pricing-service
+    build:
+      context: .
+      dockerfile: pricing-service/Dockerfile
     container_name: waylo-pricing-service
     ports:
       - "8086:8086"
@@ -344,7 +362,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -354,7 +372,9 @@ services:
           memory: 384M
 
   payment-service:
-    build: ./payment-service
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
     container_name: waylo-payment-service
     ports:
       - "8087:8087"
@@ -377,7 +397,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -387,7 +407,9 @@ services:
           memory: 384M
 
   crm-service:
-    build: ./crm-service
+    build:
+      context: .
+      dockerfile: crm-service/Dockerfile
     container_name: waylo-crm-service
     ports:
       - "8088:8088"
@@ -410,7 +432,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8088/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -420,7 +442,9 @@ services:
           memory: 384M
 
   checkin-service:
-    build: ./checkin-service
+    build:
+      context: .
+      dockerfile: checkin-service/Dockerfile
     container_name: waylo-checkin-service
     ports:
       - "8089:8089"
@@ -443,7 +467,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8089/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -453,7 +477,9 @@ services:
           memory: 384M
 
   notification-service:
-    build: ./notification-service
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
     container_name: waylo-notification-service
     ports:
       - "8090:8090"
@@ -473,7 +499,7 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -483,7 +509,9 @@ services:
           memory: 384M
 
   package-booking-saga-orchestrator:
-    build: ./package-booking-saga-orchestrator
+    build:
+      context: .
+      dockerfile: package-booking-saga-orchestrator/Dockerfile
     container_name: waylo-saga-orchestrator
     ports:
       - "8091:8091"
@@ -506,7 +534,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8091/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -516,7 +544,9 @@ services:
           memory: 384M
 
   traffic-simulator:
-    build: ./traffic-simulator
+    build:
+      context: .
+      dockerfile: traffic-simulator/Dockerfile
     container_name: waylo-traffic-simulator
     ports:
       - "8095:8095"
@@ -527,7 +557,7 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8095/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8095/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10

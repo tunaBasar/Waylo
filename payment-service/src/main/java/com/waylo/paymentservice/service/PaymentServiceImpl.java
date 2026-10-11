@@ -33,6 +33,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentResponse create(PaymentRequest request) {
         Payment payment = mapper.toEntity(request);
+        if (payment.getPaymentMethod() == null) {
+            payment.setPaymentMethod(com.waylo.paymentservice.domain.PaymentMethod.MOCK);
+        }
         payment.setStatus(PaymentStatus.PENDING);
         // Mock payment: auto-complete
         payment.setTransactionRef("MOCK-" + UUID.randomUUID().toString().substring(0, 8));
