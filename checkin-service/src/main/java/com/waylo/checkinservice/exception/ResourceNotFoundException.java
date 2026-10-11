@@ -1,7 +1,6 @@
 package com.waylo.checkinservice.exception;
 
 public class ResourceNotFoundException extends RuntimeException {
-
     private final String resourceName;
     private final String fieldName;
     private final Object fieldValue;
