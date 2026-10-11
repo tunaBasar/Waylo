@@ -51,7 +51,7 @@ spring:
         - id: pricing-service
           uri: lb://pricing-service
           predicates:
-            - Path=/api/pricing/**
+            - Path=/api/pricing-rules/**
         - id: payment-service
           uri: lb://payment-service
           predicates:
@@ -63,7 +63,7 @@ spring:
         - id: checkin-service
           uri: lb://checkin-service
           predicates:
-            - Path=/api/checkin/**
+            - Path=/api/checkins/**
         - id: notification-service
           uri: lb://notification-service
           predicates:
@@ -78,7 +78,7 @@ spring:
         - id: saga-orchestrator
           uri: lb://package-booking-saga-orchestrator
           predicates:
-            - Path=/api/saga/**
+            - Path=/api/sagas/**
 
 eureka:
   client:
