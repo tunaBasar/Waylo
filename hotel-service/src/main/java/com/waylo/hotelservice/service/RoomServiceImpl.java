@@ -42,6 +42,9 @@ public class RoomServiceImpl implements RoomService {
         }
         Room room = roomMapper.toEntity(request);
         room.setHotel(hotel);
+        if (room.getStatus() == null) {
+            room.setStatus(RoomStatus.AVAILABLE);
+        }
         room = roomRepository.save(room);
         return roomMapper.toResponse(room);
     }
