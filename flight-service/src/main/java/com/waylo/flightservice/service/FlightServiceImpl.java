@@ -6,6 +6,9 @@ import com.waylo.flightservice.domain.FlightStatus;
 import com.waylo.flightservice.dto.FlightMapper;
 import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
+import com.waylo.flightservice.event.FlightCancelledEvent;
+import com.waylo.flightservice.event.FlightCreatedEvent;
+import com.waylo.flightservice.event.FlightEventPublisher;
 import com.waylo.flightservice.exception.DuplicateResourceException;
 import com.waylo.flightservice.exception.ResourceNotFoundException;
 import com.waylo.flightservice.repository.AirportRepository;
@@ -24,13 +27,16 @@ public class FlightServiceImpl implements FlightService {
     private final FlightRepository flightRepository;
     private final AirportRepository airportRepository;
     private final FlightMapper flightMapper;
+    private final FlightEventPublisher eventPublisher;
 
     public FlightServiceImpl(FlightRepository flightRepository,
                              AirportRepository airportRepository,
-                             FlightMapper flightMapper) {
+                             FlightMapper flightMapper,
+                             FlightEventPublisher eventPublisher) {
         this.flightRepository = flightRepository;
         this.airportRepository = airportRepository;
         this.flightMapper = flightMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -51,6 +57,10 @@ public class FlightServiceImpl implements FlightService {
         }
 
         flight = flightRepository.save(flight);
+        eventPublisher.publishFlightCreated(new FlightCreatedEvent(
+                flight.getId(), flight.getFlightNumber(),
+                flight.getDepartureAirport().getIataCode(), flight.getArrivalAirport().getIataCode(),
+                flight.getDepartureTime(), flight.getArrivalTime(), flight.getAirline()));
         return flightMapper.toResponse(flight);
     }
 
@@ -120,6 +130,8 @@ public class FlightServiceImpl implements FlightService {
                 .orElseThrow(() -> new ResourceNotFoundException("Flight", "id", id));
         flight.setStatus(FlightStatus.CANCELLED);
         flight = flightRepository.save(flight);
+        eventPublisher.publishFlightCancelled(new FlightCancelledEvent(
+                flight.getId(), flight.getFlightNumber()));
         return flightMapper.toResponse(flight);
     }
 

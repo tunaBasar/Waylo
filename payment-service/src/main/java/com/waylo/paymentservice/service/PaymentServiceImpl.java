@@ -5,6 +5,9 @@ import com.waylo.paymentservice.domain.PaymentStatus;
 import com.waylo.paymentservice.dto.PaymentMapper;
 import com.waylo.paymentservice.dto.PaymentRequest;
 import com.waylo.paymentservice.dto.PaymentResponse;
+import com.waylo.paymentservice.event.PaymentCompletedEvent;
+import com.waylo.paymentservice.event.PaymentEventPublisher;
+import com.waylo.paymentservice.event.PaymentRefundedEvent;
 import com.waylo.paymentservice.exception.ResourceNotFoundException;
 import com.waylo.paymentservice.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
@@ -19,10 +22,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository repository;
     private final PaymentMapper mapper;
+    private final PaymentEventPublisher eventPublisher;
 
-    public PaymentServiceImpl(PaymentRepository repository, PaymentMapper mapper) {
+    public PaymentServiceImpl(PaymentRepository repository, PaymentMapper mapper, PaymentEventPublisher eventPublisher) {
         this.repository = repository;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -33,6 +38,9 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setTransactionRef("MOCK-" + UUID.randomUUID().toString().substring(0, 8));
         payment.setStatus(PaymentStatus.COMPLETED);
         payment = repository.save(payment);
+        eventPublisher.publishPaymentCompleted(new PaymentCompletedEvent(
+                payment.getId(), payment.getBookingId(), payment.getCustomerId(),
+                payment.getAmount(), payment.getTransactionRef()));
         return mapper.toResponse(payment);
     }
 
@@ -61,6 +69,8 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = findOrThrow(id);
         payment.setStatus(PaymentStatus.REFUNDED);
         payment = repository.save(payment);
+        eventPublisher.publishPaymentRefunded(new PaymentRefundedEvent(
+                payment.getId(), payment.getBookingId(), payment.getCustomerId()));
         return mapper.toResponse(payment);
     }
 

@@ -5,6 +5,9 @@ import com.waylo.packagebookingservice.domain.PackageBooking;
 import com.waylo.packagebookingservice.dto.PackageBookingMapper;
 import com.waylo.packagebookingservice.dto.PackageBookingRequest;
 import com.waylo.packagebookingservice.dto.PackageBookingResponse;
+import com.waylo.packagebookingservice.event.BookingCancelledEvent;
+import com.waylo.packagebookingservice.event.BookingCreatedEvent;
+import com.waylo.packagebookingservice.event.BookingEventPublisher;
 import com.waylo.packagebookingservice.exception.ResourceNotFoundException;
 import com.waylo.packagebookingservice.repository.PackageBookingRepository;
 import org.springframework.stereotype.Service;
@@ -19,11 +22,14 @@ public class PackageBookingServiceImpl implements PackageBookingService {
 
     private final PackageBookingRepository bookingRepository;
     private final PackageBookingMapper bookingMapper;
+    private final BookingEventPublisher eventPublisher;
 
     public PackageBookingServiceImpl(PackageBookingRepository bookingRepository,
-                                     PackageBookingMapper bookingMapper) {
+                                     PackageBookingMapper bookingMapper,
+                                     BookingEventPublisher eventPublisher) {
         this.bookingRepository = bookingRepository;
         this.bookingMapper = bookingMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -31,6 +37,9 @@ public class PackageBookingServiceImpl implements PackageBookingService {
         PackageBooking booking = bookingMapper.toEntity(request);
         booking.setStatus(BookingStatus.PENDING);
         booking = bookingRepository.save(booking);
+        eventPublisher.publishBookingCreated(new BookingCreatedEvent(
+                booking.getId(), booking.getCustomerId(), booking.getFlightId(),
+                booking.getHotelReservationId(), booking.getVehicleReservationId(), booking.getTotalPrice()));
         return bookingMapper.toResponse(booking);
     }
 
@@ -95,7 +104,11 @@ public class PackageBookingServiceImpl implements PackageBookingService {
 
     @Override
     public PackageBookingResponse cancel(UUID id) {
-        return updateStatus(id, BookingStatus.CANCELLED);
+        PackageBooking booking = findOrThrow(id);
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking = bookingRepository.save(booking);
+        eventPublisher.publishBookingCancelled(new BookingCancelledEvent(booking.getId(), booking.getCustomerId()));
+        return bookingMapper.toResponse(booking);
     }
 
     private PackageBooking findOrThrow(UUID id) {
