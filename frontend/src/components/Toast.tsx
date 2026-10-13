@@ -1,8 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback } from 'react';
-import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -23,25 +21,11 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null);
 
-const icons = {
-  success: CheckCircle,
-  error: AlertCircle,
-  warning: AlertTriangle,
-  info: Info,
-};
-
-const styles = {
-  success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
-};
-
-const iconStyles = {
-  success: 'text-emerald-500',
-  error: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-blue-500',
+const toastConfig: Record<ToastType, { icon: string; bg: string; iconColor: string }> = {
+  success: { icon: 'check_circle', bg: 'bg-secondary-container text-on-secondary-container', iconColor: 'text-secondary' },
+  error: { icon: 'error', bg: 'bg-error-container text-on-error-container', iconColor: 'text-error' },
+  warning: { icon: 'warning', bg: 'bg-tertiary-fixed text-on-tertiary-fixed-variant', iconColor: 'text-tertiary' },
+  info: { icon: 'info', bg: 'bg-primary-fixed text-primary', iconColor: 'text-primary' },
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -74,19 +58,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {/* Toast container */}
       <div className="fixed bottom-4 right-4 z-[100] space-y-2 max-w-sm">
         {toasts.map(t => {
-          const Icon = icons[t.type];
+          const cfg = toastConfig[t.type];
           return (
-            <div
-              key={t.id}
-              className={cn(
-                'flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg animate-in slide-in-from-right-5 fade-in duration-200',
-                styles[t.type]
-              )}
-            >
-              <Icon size={18} className={cn('mt-0.5 shrink-0', iconStyles[t.type])} />
+            <div key={t.id}
+              className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg animate-in slide-in-from-right-5 fade-in duration-200 ${cfg.bg}`}>
+              <span className={`material-symbols-outlined text-[18px] mt-0.5 shrink-0 ${cfg.iconColor}`}>{cfg.icon}</span>
               <p className="text-sm flex-1">{t.message}</p>
               <button onClick={() => removeToast(t.id)} className="shrink-0 opacity-60 hover:opacity-100">
-                <X size={14} />
+                <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
             </div>
           );

@@ -1,26 +1,25 @@
 import Link from 'next/link';
-import { Plane, Home } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-4">
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 mb-6">
-          <div className="bg-blue-600 p-2.5 rounded-xl">
-            <Plane className="text-white" size={28} />
-          </div>
-          <span className="text-3xl font-bold text-gray-900">Waylo</span>
+    <div className="min-h-screen flex items-center justify-center bg-surface relative overflow-hidden px-4">
+      <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
+      <div className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-error/10 blur-3xl" />
+
+      <div className="text-center relative z-10">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary shadow-lg mb-6">
+          <span className="material-symbols-outlined text-on-primary text-2xl">flight</span>
         </div>
 
-        <h1 className="text-8xl font-bold text-gray-200 mb-4">404</h1>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">Sayfa Bulunamadi</h2>
-        <p className="text-gray-500 mb-8 max-w-md mx-auto">
+        <h1 className="text-8xl font-bold text-outline/20 mb-4">404</h1>
+        <h2 className="text-2xl font-semibold text-on-surface mb-2">Sayfa Bulunamadi</h2>
+        <p className="text-on-surface-variant text-sm mb-8 max-w-md mx-auto">
           Aradiginiz sayfa mevcut degil veya tasindi. Ana sayfaya donerek devam edebilirsiniz.
         </p>
 
         <Link href="/"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-          <Home size={18} /> Ana Sayfaya Don
+          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-medium shadow-md hover:shadow-lg active:scale-[0.98] transition-all text-sm">
+          <span className="material-symbols-outlined text-[18px]">home</span> Ana Sayfaya Don
         </Link>
       </div>
     </div>
