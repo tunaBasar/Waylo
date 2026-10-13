@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import {
   Plane, Building2, Car, Package, Users, CreditCard,
   Bell, TicketCheck, LayoutDashboard, Menu, X, LogOut,
+  UserCircle, Settings,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -20,6 +21,8 @@ const nav = [
   { href: '/payments', label: 'Odemeler', icon: CreditCard },
   { href: '/notifications', label: 'Bildirimler', icon: Bell },
   { href: '/checkins', label: 'Check-in', icon: TicketCheck },
+  { href: '/profile', label: 'Profil', icon: UserCircle },
+  { href: '/settings', label: 'Ayarlar', icon: Settings },
 ];
 
 export default function Sidebar() {
