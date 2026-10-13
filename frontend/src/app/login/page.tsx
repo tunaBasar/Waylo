@@ -1,8 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+
+const VIDEOS = [
+  '/videos/travel-1.mp4',
+  '/videos/travel-2.mp4',
+  '/videos/travel-3.mp4',
+  '/videos/travel-4.mp4',
+  '/videos/travel-5.mp4',
+  '/videos/travel-6.mp4',
+  '/videos/travel-7.mp4',
+  '/videos/travel-8.mp4',
+];
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -11,6 +22,32 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Video background state
+  const [currentVideo, setCurrentVideo] = useState(0);
+  const [fading, setFading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const nextVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleEnded = () => {
+      // Start crossfade
+      setFading(true);
+      const nextIdx = (currentVideo + 1) % VIDEOS.length;
+
+      // After fade completes, swap
+      setTimeout(() => {
+        setCurrentVideo(nextIdx);
+        setFading(false);
+      }, 1200);
+    };
+
+    video.addEventListener('ended', handleEnded);
+    return () => video.removeEventListener('ended', handleEnded);
+  }, [currentVideo]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,26 +62,56 @@ export default function LoginPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-surface relative overflow-hidden px-4">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden flex items-center justify-center">
-        <svg className="w-full h-full max-w-2xl text-surface-container" fill="none" viewBox="0 0 800 800">
-          <circle cx="400" cy="400" r="350" stroke="currentColor" strokeDasharray="6 8" strokeWidth="1.5" />
-          <circle cx="400" cy="400" r="240" stroke="currentColor" strokeWidth="1.5" />
-          <circle cx="400" cy="400" r="130" stroke="currentColor" strokeDasharray="4 6" strokeWidth="1" />
-          <path d="M120 400C240 320 380 480 680 400" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M220 220C340 380 480 280 620 540" stroke="currentColor" strokeDasharray="5 5" strokeWidth="1.5" />
-          <circle cx="280" cy="345" fill="currentColor" r="4" />
-          <circle cx="510" cy="425" fill="currentColor" r="4" />
-        </svg>
-      </div>
-      <div className="absolute top-2 left-6 w-32 h-32 rounded-full bg-primary-fixed/25 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-6 w-40 h-40 rounded-full bg-secondary-fixed/20 blur-3xl pointer-events-none" />
+  const nextIdx = (currentVideo + 1) % VIDEOS.length;
 
-      {/* Login Card */}
-      <div className="relative w-full max-w-md mx-auto z-10">
-        <div className="bg-surface-container-lowest rounded-xl shadow-xl shadow-surface-container-highest/40 p-6 sm:p-8 flex flex-col">
+  return (
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      {/* Video Background - Current */}
+      <video
+        ref={videoRef}
+        key={`current-${currentVideo}`}
+        src={VIDEOS[currentVideo]}
+        autoPlay
+        muted
+        playsInline
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ease-in-out ${
+          fading ? 'opacity-0' : 'opacity-100'
+        }`}
+      />
+
+      {/* Video Background - Next (preloaded, fades in) */}
+      <video
+        ref={nextVideoRef}
+        key={`next-${nextIdx}`}
+        src={VIDEOS[nextIdx]}
+        autoPlay={fading}
+        muted
+        playsInline
+        preload="auto"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1200ms] ease-in-out ${
+          fading ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
+
+      {/* Video indicator dots */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+        {VIDEOS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => { setFading(false); setCurrentVideo(i); }}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              i === currentVideo ? 'w-6 bg-white' : 'w-1.5 bg-white/40 hover:bg-white/60'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Login Card - Centered */}
+      <div className="relative w-full max-w-md mx-4 z-10">
+        <div className="bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 sm:p-8 flex flex-col border border-white/10">
           {/* Logo */}
           <div className="flex flex-col items-center text-center mb-6">
             <div className="flex items-center gap-2 mb-2">
@@ -111,7 +178,7 @@ export default function LoginPage() {
 
             {/* Submit */}
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary text-on-primary rounded-xl font-medium shadow-md hover:bg-primary-container active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              className="w-full py-3 bg-primary text-on-primary rounded-xl font-medium shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {loading ? (
                 <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
               ) : (
@@ -126,7 +193,7 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-outline-variant" />
-            <span className="text-xs text-outline uppercase tracking-wider font-medium">veya sununla devam edin</span>
+            <span className="text-xs text-outline uppercase tracking-wider font-medium">veya</span>
             <div className="flex-1 h-px bg-outline-variant" />
           </div>
 
@@ -148,14 +215,6 @@ export default function LoginPage() {
               Hesabiniz yok mu?{' '}
               <Link href="/register" className="text-primary font-semibold hover:text-primary-container transition-colors">Kayit Ol</Link>
             </p>
-          </div>
-
-          {/* API Status */}
-          <div className="mt-4 flex items-center justify-center gap-2 py-2 px-3 bg-surface-container rounded-lg">
-            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-            <span className="text-xs text-on-surface-variant font-mono">
-              REST API: http://localhost:8080 <span className="text-secondary">(Baglandi)</span>
-            </span>
           </div>
         </div>
       </div>
