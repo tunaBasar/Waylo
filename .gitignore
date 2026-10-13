@@ -28,5 +28,8 @@ Thumbs.db
 application-local.yml
 
 # Docker
+.env
+.env.*
+!.env.example
 docker-compose.override.yml
 graphify-out/
