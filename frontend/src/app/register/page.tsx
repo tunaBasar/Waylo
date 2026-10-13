@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
+import VideoBackground from '@/components/VideoBackground';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -27,61 +28,60 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface relative overflow-hidden px-4">
-      {/* Decorative */}
-      <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-secondary/10 blur-3xl" />
-      <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-primary/8 blur-3xl" />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <VideoBackground />
 
-      <div className="w-full max-w-sm relative z-10 space-y-6">
-        {/* Logo */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary shadow-lg mb-4">
-            <span className="material-symbols-outlined text-on-primary text-2xl">flight</span>
+      <div className="relative w-full max-w-md mx-4 z-10">
+        <div className="bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 sm:p-8 flex flex-col border border-white/10">
+          {/* Logo */}
+          <div className="flex flex-col items-center text-center mb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-primary text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>flight</span>
+              <span className="text-2xl font-bold text-on-surface">Waylo</span>
+            </div>
+            <h1 className="text-lg font-semibold text-on-surface mb-1">Hesap Olustur</h1>
+            <p className="text-sm text-on-surface-variant">Waylo&apos;ya katilmak icin bilgilerinizi girin</p>
           </div>
-          <h1 className="text-2xl font-bold text-on-surface tracking-tight">Hesap Olustur</h1>
-          <p className="text-sm text-on-surface-variant mt-1">Waylo&apos;ya katilmak icin bilgilerinizi girin</p>
-        </div>
 
-        {/* Form card */}
-        <div className="bg-surface-container-lowest rounded-2xl shadow-md p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-error-container text-on-error-container text-xs">
-                <span className="material-symbols-outlined text-[16px]">error</span> {error}
+          {error && (
+            <div className="mb-4 p-3 bg-error-container rounded-lg text-on-error-container text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">error</span> {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-on-surface-variant">Ad</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">person</span>
+                  <input type="text" value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Adiniz" />
+                </div>
               </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-on-surface-variant">Ad</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">person</span>
-                <input type="text" value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Adiniz" />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-on-surface-variant">Soyad</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">badge</span>
+                  <input type="text" value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Soyadiniz" />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-on-surface-variant">Soyad</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">badge</span>
-                <input type="text" value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Soyadiniz" />
-              </div>
-            </div>
-
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-on-surface-variant">E-posta</label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">mail</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">alternate_email</span>
                 <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="ornek@waylo.com" />
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-on-surface-variant">Sifre</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">lock</span>
@@ -94,7 +94,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-on-surface-variant">Sifre Tekrar</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">lock</span>
@@ -105,16 +105,20 @@ export default function RegisterPage() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50">
-              {loading ? 'Kaydediliyor...' : 'Kayit Ol'}
+              className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 mt-1">
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin mx-auto" />
+              ) : 'Kayit Ol'}
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-xs text-on-surface-variant">
-          Zaten hesabiniz var mi?{' '}
-          <Link href="/login" className="text-primary font-semibold hover:underline">Giris Yap</Link>
-        </p>
+          <div className="mt-4 text-center">
+            <p className="text-sm text-on-surface-variant">
+              Zaten hesabiniz var mi?{' '}
+              <Link href="/login" className="text-primary font-semibold hover:text-primary-container transition-colors">Giris Yap</Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
