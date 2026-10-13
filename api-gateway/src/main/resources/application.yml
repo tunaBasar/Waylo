@@ -70,6 +70,10 @@ spring:
               uri: lb://notification-service
               predicates:
                 - Path=/api/notifications/**
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**
             - id: saga-orchestrator
               uri: lb://package-booking-saga-orchestrator
               predicates:

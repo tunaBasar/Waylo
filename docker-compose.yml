@@ -12,7 +12,7 @@ services:
       POSTGRES_MULTIPLE_DATABASES: >-
         flight_db,flight_seat_inventory_db,hotel_db,car_rental_db,
         package_booking_db,pricing_db,payment_db,crm_db,checkin_db,
-        notification_db,saga_db
+        notification_db,saga_db,auth_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
@@ -491,6 +491,8 @@ services:
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: waylo
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_MAIL_USERNAME: "${MAIL_USERNAME:-waylo353241@gmail.com}"
+      SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD:-hlfx dpfe azfc pftk}"
     depends_on:
       discovery-service:
         condition: service_healthy
@@ -500,6 +502,38 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: waylo-auth-service
+    ports:
+      - "8092:8092"
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/auth_db"
+      SPRING_DATASOURCE_USERNAME: waylo
+      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8092/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
