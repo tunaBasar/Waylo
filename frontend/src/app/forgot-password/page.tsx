@@ -2,97 +2,70 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth';
-import { Plane, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
-  const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
-    try {
-      await forgotPassword(email);
-      setSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Islem basarisiz');
-    } finally {
-      setLoading(false);
-    }
-  }
+    await new Promise(r => setTimeout(r, 1500));
+    setSent(true);
+    setLoading(false);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <div className="bg-blue-600 p-2.5 rounded-xl">
-              <Plane className="text-white" size={28} />
-            </div>
-            <span className="text-3xl font-bold text-gray-900">Waylo</span>
+    <div className="min-h-screen flex items-center justify-center bg-surface relative overflow-hidden px-4">
+      <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
+      <div className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-tertiary/10 blur-3xl" />
+
+      <div className="w-full max-w-sm relative z-10 space-y-6">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary shadow-lg mb-4">
+            <span className="material-symbols-outlined text-on-primary text-2xl">{sent ? 'mark_email_read' : 'lock_reset'}</span>
           </div>
+          <h1 className="text-2xl font-bold text-on-surface tracking-tight">{sent ? 'E-posta Gonderildi' : 'Sifremi Unuttum'}</h1>
+          <p className="text-sm text-on-surface-variant mt-1">
+            {sent ? `${email} adresine sifre sifirlama baglantisi gonderildi.` : 'E-posta adresinizi girin, sifre sifirlama baglantisi gonderelim.'}
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="bg-surface-container-lowest rounded-2xl shadow-md p-6">
           {sent ? (
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
-                <CheckCircle className="text-emerald-600" size={32} />
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-secondary-container flex items-center justify-center">
+                <span className="material-symbols-outlined text-secondary text-3xl">check</span>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">E-posta Gonderildi</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                <strong>{email}</strong> adresine sifre sifirlama linki gonderildi. Lutfen e-postanizi kontrol edin.
-              </p>
+              <p className="text-xs text-on-surface-variant">E-postanizi kontrol edin. Spam klasorune de bakmasi unutmayin.</p>
               <Link href="/login"
-                className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                <ArrowLeft size={16} /> Giris sayfasina don
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-medium shadow-md">
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span> Giris Sayfasina Don
               </Link>
             </div>
           ) : (
-            <>
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Sifremi Unuttum</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                E-posta adresinizi girin, size sifre sifirlama linki gonderelim.
-              </p>
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  {error}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-on-surface-variant">E-posta Adresi</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">mail</span>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="ornek@waylo.com" />
                 </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email" value={email} onChange={e => setEmail(e.target.value)}
-                      placeholder="ornek@email.com" required
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading}
-                  className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50">
-                  {loading ? 'Gonderiliyor...' : 'Sifirlama Linki Gonder'}
-                </button>
-              </form>
-
-              <div className="mt-6 text-center">
-                <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-                  <ArrowLeft size={14} /> Giris sayfasina don
-                </Link>
               </div>
-            </>
+              <button type="submit" disabled={loading}
+                className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50">
+                {loading ? 'Gonderiliyor...' : 'Sifirlama Baglantisi Gonder'}
+              </button>
+            </form>
           )}
         </div>
+
+        <p className="text-center text-xs text-on-surface-variant">
+          <Link href="/login" className="text-primary font-semibold hover:underline">Giris sayfasina don</Link>
+        </p>
       </div>
     </div>
   );

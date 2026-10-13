@@ -1,141 +1,77 @@
 'use client';
 
-import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { User, Mail, Phone, Shield, Calendar, Save, Camera } from 'lucide-react';
+import { useState } from 'react';
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const [form, setForm] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phone: '+90 555 123 4567',
-    bio: '',
-  });
-  const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+  const [form, setForm] = useState({ name: fullName, email: user?.email || '' });
 
-  function update(field: string, value: string) {
-    setForm(prev => ({ ...prev, [field]: value }));
-    setSaved(false);
-  }
-
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    // Mock save
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  }
+  const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase() || 'U';
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Profil</h1>
+    <div className="space-y-space-md max-w-lg mx-auto">
+      <h2 className="text-xl font-semibold text-on-surface tracking-tight">Profil</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-          <div className="relative inline-block mb-4">
-            <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-3xl font-bold text-blue-700">
-                {user?.firstName?.[0]}{user?.lastName?.[0]}
-              </span>
+      {/* Avatar card */}
+      <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-6 flex flex-col items-center">
+        <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center mb-3">
+          <span className="text-on-primary text-2xl font-bold">{initials}</span>
+        </div>
+        <h3 className="text-lg font-bold text-on-surface">{fullName}</h3>
+        <p className="text-sm text-on-surface-variant">{user?.email}</p>
+        <span className="mt-2 text-[10px] font-bold uppercase px-3 py-1 rounded-full bg-primary-fixed text-primary">{user?.role || 'Admin'}</span>
+      </div>
+
+      {/* Info card */}
+      <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold text-on-surface">Hesap Bilgileri</h4>
+          <button onClick={() => setEditing(!editing)} className="text-xs text-primary font-medium flex items-center gap-1">
+            <span className="material-symbols-outlined text-[16px]">{editing ? 'close' : 'edit'}</span>
+            {editing ? 'Iptal' : 'Duzenle'}
+          </button>
+        </div>
+
+        {editing ? (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-on-surface-variant">Ad Soyad</label>
+              <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors">
-              <Camera size={14} />
+            <div className="space-y-1">
+              <label className="text-xs text-on-surface-variant">E-posta</label>
+              <input value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}
+                className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+            <button onClick={() => setEditing(false)}
+              className="w-full py-2 rounded-xl bg-primary text-on-primary text-sm font-medium shadow-sm active:scale-[0.98] transition-all">
+              Kaydet
             </button>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{user?.firstName} {user?.lastName}</h2>
-          <p className="text-sm text-gray-500">{user?.email}</p>
-          <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-            <Shield size={12} /> {user?.role || 'USER'}
-          </div>
-
-          <div className="mt-6 pt-4 border-t border-gray-100 space-y-3 text-left">
-            <div className="flex items-center gap-3 text-sm">
-              <Calendar size={16} className="text-gray-400" />
-              <span className="text-gray-600">Katilim: Ocak 2024</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Mail size={16} className="text-gray-400" />
-              <span className="text-gray-600">{user?.email}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Phone size={16} className="text-gray-400" />
-              <span className="text-gray-600">+90 555 123 4567</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Edit Form */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Profil Bilgileri</h3>
-
-          {saved && (
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm">
-              Profil basariyla guncellendi!
-            </div>
-          )}
-
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ad</label>
-                <div className="relative">
-                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text" value={form.firstName} onChange={e => update('firstName', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+        ) : (
+          <div className="space-y-3">
+            {[
+              { icon: 'person', label: 'Ad Soyad', value: fullName },
+              { icon: 'mail', label: 'E-posta', value: user?.email },
+              { icon: 'shield', label: 'Rol', value: user?.role || 'Admin' },
+              { icon: 'calendar_today', label: 'Katilim', value: 'Ekim 2024' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-3 py-2">
+                <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center">
+                  <span className="material-symbols-outlined text-on-surface-variant text-[16px]">{item.icon}</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-on-surface-variant">{item.label}</p>
+                  <p className="text-sm text-on-surface font-medium">{item.value}</p>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Soyad</label>
-                <input
-                  type="text" value={form.lastName} onChange={e => update('lastName', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email" value={form.email} onChange={e => update('email', e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-              <div className="relative">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="tel" value={form.phone} onChange={e => update('phone', e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hakkimda</label>
-              <textarea
-                value={form.bio} onChange={e => update('bio', e.target.value)}
-                rows={3} placeholder="Kendiniz hakkinda kisa bir bilgi..."
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <button type="submit"
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                <Save size={16} /> Kaydet
-              </button>
-            </div>
-          </form>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
