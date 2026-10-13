@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import type { Flight, Hotel, Vehicle, PackageBooking, Customer, Payment } from '@/lib/types';
-import {
-  Plane, Building2, Car, Package, Users, CreditCard,
-  TrendingUp, AlertCircle,
-} from 'lucide-react';
+import Link from 'next/link';
 
 interface DashboardStats {
   flights: number;
@@ -14,21 +12,28 @@ interface DashboardStats {
   vehicles: number;
   bookings: number;
   customers: number;
-  payments: number;
+  revenue: number;
 }
 
-const cards = [
-  { key: 'flights' as const, label: 'Ucuslar', icon: Plane, color: 'bg-blue-500', href: '/flights' },
-  { key: 'hotels' as const, label: 'Oteller', icon: Building2, color: 'bg-emerald-500', href: '/hotels' },
-  { key: 'vehicles' as const, label: 'Araclar', icon: Car, color: 'bg-orange-500', href: '/vehicles' },
-  { key: 'bookings' as const, label: 'Rezervasyonlar', icon: Package, color: 'bg-purple-500', href: '/bookings' },
-  { key: 'customers' as const, label: 'Musteriler', icon: Users, color: 'bg-pink-500', href: '/customers' },
-  { key: 'payments' as const, label: 'Odemeler', icon: CreditCard, color: 'bg-indigo-500', href: '/payments' },
+const statCards = [
+  { key: 'flights' as const, label: 'Ucuslar', sublabel: 'Haftalik periyot', icon: 'flight', badge: '+12%', badgeColor: 'text-secondary bg-secondary-container', iconBg: 'bg-primary-fixed', iconColor: 'text-primary', href: '/flights' },
+  { key: 'hotels' as const, label: 'Oteller', sublabel: 'Yuksek doluluk', icon: 'hotel', badge: '%98', badgeColor: 'text-primary bg-primary-fixed', iconBg: 'bg-secondary-fixed', iconColor: 'text-secondary', href: '/hotels' },
+  { key: 'vehicles' as const, label: 'Araclar', sublabel: 'Kirada hazir', icon: 'directions_car', badge: '', badgeColor: '', iconBg: 'bg-tertiary-fixed', iconColor: 'text-tertiary', href: '/vehicles' },
+  { key: 'bookings' as const, label: 'Rezervasyon', sublabel: 'Aylik toplam', icon: 'confirmation_number', badge: '+18.4%', badgeColor: 'text-secondary bg-secondary-container', iconBg: 'bg-primary-fixed', iconColor: 'text-primary', href: '/bookings' },
+  { key: 'customers' as const, label: 'Musteriler', sublabel: 'Yeni kayitlar', icon: 'group', badge: '+124', badgeColor: 'text-secondary bg-secondary-container', iconBg: 'bg-tertiary-fixed', iconColor: 'text-tertiary', href: '/customers' },
+  { key: 'revenue' as const, label: 'Gelir & Ciro', sublabel: 'Net tahsilat', icon: 'payments', badge: '+22.8%', badgeColor: 'text-secondary bg-secondary-container', iconBg: 'bg-secondary-fixed', iconColor: 'text-secondary', href: '/payments' },
+];
+
+const recentBookings = [
+  { id: '#WY-8921', customer: 'Can Demir', status: 'ONAYLANDI', statusColor: 'bg-secondary-container text-on-secondary-container', items: ['Ucus', 'Otel (Rixos Premium)', 'Arac (SUV)'], amount: '₺14.750,00' },
+  { id: '#WY-8920', customer: 'Elif Kaya', status: 'BEKLEYEN', statusColor: 'bg-surface-container-high text-on-surface-variant', items: ['Ucus (Gidis-Donus)', 'Otel (Hilton Dalaman)'], amount: '₺9.820,00' },
+  { id: '#WY-8919', customer: 'Burak Senturk', status: 'ONAYLANDI', statusColor: 'bg-secondary-container text-on-secondary-container', items: ['Ucus', 'Transfer Dahil'], amount: '₺4.490,00' },
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
-    flights: 0, hotels: 0, vehicles: 0, bookings: 0, customers: 0, payments: 0,
+    flights: 0, hotels: 0, vehicles: 0, bookings: 0, customers: 0, revenue: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +55,7 @@ export default function Dashboard() {
           vehicles: vehicles.status === 'fulfilled' ? vehicles.value.data.length : 0,
           bookings: bookings.status === 'fulfilled' ? bookings.value.data.length : 0,
           customers: customers.status === 'fulfilled' ? customers.value.data.length : 0,
-          payments: payments.status === 'fulfilled' ? payments.value.data.length : 0,
+          revenue: payments.status === 'fulfilled' ? payments.value.data.reduce((sum: number, p: Payment) => sum + (p.amount || 0), 0) : 0,
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Veri yuklenemedi');
@@ -61,51 +66,155 @@ export default function Dashboard() {
     loadStats();
   }, []);
 
+  const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
+
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Waylo platform genel bakis</p>
-      </div>
+    <div className="space-y-space-md">
+      {/* Welcome Banner */}
+      <section className="bg-surface-container-low p-space-md rounded-xl shadow-sm relative overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="inline-flex items-center gap-space-xs px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+            <span>Waylo Global Turizm A.S.</span>
+          </div>
+          <span className="text-xs text-outline">{today}</span>
+        </div>
+        <div className="pt-space-xs">
+          <h2 className="text-xl font-semibold text-on-surface tracking-tight">
+            Hos geldin, {user?.firstName || 'Admin'} 👋
+          </h2>
+          <p className="text-sm text-on-surface-variant">Turizm operasyonlari ve rezervasyon akisinda bugun yuksek hareketlilik var.</p>
+        </div>
+        {/* Quick Actions */}
+        <div className="flex items-center gap-space-xs pt-space-sm overflow-x-auto no-scrollbar pb-1">
+          <Link href="/flights" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-on-primary text-xs font-medium shadow-sm hover:bg-primary-container active:scale-95 transition-all shrink-0">
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            <span>Yeni Ucus</span>
+          </Link>
+          <Link href="/hotels" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-on-surface text-xs font-medium shadow-sm hover:bg-surface-container active:scale-95 transition-all shrink-0">
+            <span className="material-symbols-outlined text-[16px] text-secondary">hotel</span>
+            <span>Yeni Otel</span>
+          </Link>
+          <Link href="/vehicles" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-on-surface text-xs font-medium shadow-sm hover:bg-surface-container active:scale-95 transition-all shrink-0">
+            <span className="material-symbols-outlined text-[16px] text-tertiary">directions_car</span>
+            <span>Yeni Arac</span>
+          </Link>
+          <Link href="/bookings" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-lowest text-on-surface text-xs font-medium shadow-sm hover:bg-surface-container active:scale-95 transition-all shrink-0">
+            <span className="material-symbols-outlined text-[16px] text-primary">confirmation_number</span>
+            <span>Yeni Rezervasyon</span>
+          </Link>
+        </div>
+      </section>
 
       {error && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="text-amber-500" size={20} />
-          <p className="text-amber-700 text-sm">
-            Backend baglantisi kurulamadi. <code className="bg-amber-100 px-1 rounded">docker compose up -d</code> calistirdiginizdan emin olun.
-          </p>
+        <div className="p-3 bg-error-container rounded-lg text-on-error-container text-sm flex items-center gap-2">
+          <span className="material-symbols-outlined text-base">warning</span>
+          Backend baglantisi kurulamadi. <code className="bg-on-error-container/10 px-1 rounded text-xs">docker compose start</code> calistirin.
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {cards.map(({ key, label, icon: Icon, color, href }) => (
-          <a
-            key={key}
-            href={href}
-            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow group"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">{label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {loading ? (
-                    <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded" />
-                  ) : (
-                    stats[key]
-                  )}
-                </p>
+      {/* 6 Key Stat Cards */}
+      <section className="grid grid-cols-2 lg:grid-cols-3 gap-space-sm">
+        {statCards.map(({ key, label, sublabel, icon, badge, badgeColor, iconBg, iconColor, href }) => (
+          <Link key={key} href={href}
+            className="flex flex-col justify-between p-space-sm bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group">
+            <div className="flex items-center justify-between mb-1">
+              <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center`}>
+                <span className={`material-symbols-outlined ${iconColor} text-[18px]`}>{icon}</span>
               </div>
-              <div className={`${color} p-3 rounded-lg text-white group-hover:scale-110 transition-transform`}>
-                <Icon size={24} />
-              </div>
+              {badge && (
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
+              )}
             </div>
-            <div className="mt-4 flex items-center text-sm text-gray-500">
-              <TrendingUp size={14} className="mr-1" />
-              Detaylari gor
-            </div>
-          </a>
+            <span className="text-xs text-on-surface-variant mt-1">{label}</span>
+            <span className="text-2xl font-bold text-on-surface tracking-tight">
+              {loading ? (
+                <span className="inline-block w-12 h-7 bg-surface-container animate-pulse rounded" />
+              ) : key === 'revenue' ? (
+                `₺${stats[key].toLocaleString('tr-TR')}`
+              ) : (
+                stats[key]
+              )}
+            </span>
+            <span className="text-xs text-on-surface-variant">{sublabel}</span>
+          </Link>
         ))}
-      </div>
+      </section>
+
+      {/* Revenue Chart Placeholder */}
+      <section className="bg-surface-container-lowest rounded-xl shadow-sm p-space-md">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-on-surface">Haftalik Gelir Ozeti</h3>
+            <p className="text-xs text-on-surface-variant">Son 7 gunluk satis hacmi dagilimi</p>
+          </div>
+          <span className="text-xs font-medium text-primary px-2.5 py-1 bg-primary-fixed rounded-full">Bu Hafta</span>
+        </div>
+        <div className="flex items-end gap-2 h-40">
+          {[180, 240, 310, 290, 420, 510, 380].map((val, i) => {
+            const days = ['Pzt', 'Sal', 'Car', 'Per', 'Cum', 'Cmt', 'Paz'];
+            const maxVal = 510;
+            const height = (val / maxVal) * 100;
+            const isHighest = val === maxVal;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-[10px] text-on-surface-variant font-medium">{val}k</span>
+                <div
+                  className={`w-full rounded-t-md transition-all ${isHighest ? 'bg-primary' : 'bg-primary-fixed'}`}
+                  style={{ height: `${height}%` }}
+                />
+                <span className={`text-[10px] font-medium ${isHighest ? 'text-primary font-bold bg-primary-fixed px-1.5 py-0.5 rounded' : 'text-on-surface-variant'}`}>
+                  {days[i]}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
+          <span className="w-2.5 h-2.5 rounded bg-primary inline-block" />
+          En Yuksek: Cumartesi
+          <span className="ml-auto">Ortalama: ₺362.8k/gun</span>
+        </div>
+      </section>
+
+      {/* Recent Bookings */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-xl">bookmark</span>
+            Son Rezervasyonlar
+          </h3>
+          <Link href="/bookings" className="text-xs font-medium text-primary hover:text-primary-container transition-colors">
+            Detayli Liste
+          </Link>
+        </div>
+        <div className="space-y-space-sm">
+          {recentBookings.map(b => (
+            <div key={b.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-space-md">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-on-surface-variant">{b.id}</span>
+                  <span className="text-sm font-bold text-on-surface">{b.customer}</span>
+                </div>
+                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${b.statusColor}`}>
+                  {b.status}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {b.items.map((item, i) => (
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-medium">
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-on-surface-variant">Paket Tutari</span>
+                <span className="text-lg font-bold text-on-surface">{b.amount}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

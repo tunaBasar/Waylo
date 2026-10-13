@@ -19,10 +19,19 @@ export interface Flight {
   departureAirportName: string;
   arrivalAirportCode: string;
   arrivalAirportName: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  departureCity?: string;
+  arrivalCity?: string;
   departureTime: string;
   arrivalTime: string;
   airline: string;
-  status: 'SCHEDULED' | 'CANCELLED';
+  status: 'SCHEDULED' | 'CANCELLED' | 'ACTIVE' | 'COMPLETED' | 'DELAYED';
+  duration?: string;
+  price?: number;
+  totalSeats?: number;
+  availableSeats?: number;
+  aircraftType?: string;
   createdAt: string;
   updatedAt: string;
 }

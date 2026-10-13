@@ -4,25 +4,29 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import {
-  Plane, Building2, Car, Package, Users, CreditCard,
-  Bell, TicketCheck, LayoutDashboard, Menu, X, LogOut,
-  UserCircle, Settings,
-} from 'lucide-react';
 import { useState } from 'react';
 
 const nav = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/flights', label: 'Ucuslar', icon: Plane },
-  { href: '/hotels', label: 'Oteller', icon: Building2 },
-  { href: '/vehicles', label: 'Araclar', icon: Car },
-  { href: '/bookings', label: 'Rezervasyonlar', icon: Package },
-  { href: '/customers', label: 'Musteriler', icon: Users },
-  { href: '/payments', label: 'Odemeler', icon: CreditCard },
-  { href: '/notifications', label: 'Bildirimler', icon: Bell },
-  { href: '/checkins', label: 'Check-in', icon: TicketCheck },
-  { href: '/profile', label: 'Profil', icon: UserCircle },
-  { href: '/settings', label: 'Ayarlar', icon: Settings },
+  { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
+  { href: '/flights', label: 'Ucuslar', icon: 'flight' },
+  { href: '/hotels', label: 'Oteller', icon: 'hotel' },
+  { href: '/vehicles', label: 'Araclar', icon: 'directions_car' },
+  { href: '/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
+  { href: '/customers', label: 'Musteriler', icon: 'group' },
+  { href: '/payments', label: 'Odemeler', icon: 'payments' },
+  { href: '/notifications', label: 'Bildirimler', icon: 'notifications' },
+  { href: '/checkins', label: 'Check-in', icon: 'check_circle' },
+  { href: '/profile', label: 'Profil', icon: 'person' },
+  { href: '/settings', label: 'Ayarlar', icon: 'settings' },
+];
+
+// Bottom tab bar items (mobile)
+const bottomTabs = [
+  { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
+  { href: '/flights', label: 'Ucuslar', icon: 'flight' },
+  { href: '/hotels', label: 'Oteller', icon: 'hotel' },
+  { href: '/bookings', label: 'Rezervasyon', icon: 'confirmation_number' },
+  { href: '/settings', label: 'Menu', icon: 'menu' },
 ];
 
 export default function Sidebar() {
@@ -32,42 +36,33 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md"
-      >
-        {open ? <X size={20} /> : <Menu size={20} />}
-      </button>
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 flex flex-col',
-          open ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-200">
-          <Plane className="text-blue-600" size={28} />
-          <span className="text-xl font-bold text-gray-900">Waylo</span>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 bg-surface-container-lowest border-r border-outline-variant flex-col">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 px-6 py-5 border-b border-outline-variant">
+          <span className="material-symbols-outlined text-primary text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>flight</span>
+          <div>
+            <span className="text-lg font-bold text-on-surface tracking-tight">WAYLO</span>
+            <p className="text-[10px] text-on-surface-variant -mt-0.5">Seyahat Yonetimi</p>
+          </div>
         </div>
 
-        <nav className="mt-4 px-3 space-y-1 flex-1">
-          {nav.map(({ href, label, icon: Icon }) => {
+        {/* Nav */}
+        <nav className="mt-2 px-3 space-y-0.5 flex-1 overflow-y-auto">
+          {nav.map(({ href, label, icon }) => {
             const active = pathname === href || (href !== '/' && pathname.startsWith(href));
             return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
+              <Link key={href} href={href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                   active
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                )}
-              >
-                <Icon size={18} />
+                    ? 'bg-primary-fixed text-primary font-semibold'
+                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                )}>
+                <span className={cn('material-symbols-outlined text-[20px]', active && 'text-primary')}
+                  style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}>
+                  {icon}
+                </span>
                 {label}
               </Link>
             );
@@ -75,37 +70,69 @@ export default function Sidebar() {
         </nav>
 
         {/* User info + logout */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-outline-variant p-4">
           {user && (
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-semibold text-blue-700">
+              <div className="w-9 h-9 bg-primary-fixed rounded-full flex items-center justify-center">
+                <span className="text-sm font-bold text-primary">
                   {user.firstName[0]}{user.lastName[0]}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user.firstName} {user.lastName}</p>
-                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                <p className="text-sm font-semibold text-on-surface truncate">{user.firstName} {user.lastName}</p>
+                <p className="text-xs text-on-surface-variant truncate">{user.email}</p>
               </div>
             </div>
           )}
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
+          <button onClick={logout}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-on-surface-variant hover:text-error hover:bg-error-container/50 rounded-xl transition-colors">
+            <span className="material-symbols-outlined text-[18px]">logout</span>
             Cikis Yap
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {open && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/20"
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-surface-container-lowest border-b border-outline-variant px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>flight</span>
+          <span className="text-base font-bold text-on-surface">WAYLO</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="p-2 hover:bg-surface-container rounded-full transition-colors">
+            <span className="material-symbols-outlined text-on-surface-variant text-xl">search</span>
+          </button>
+          <button className="p-2 hover:bg-surface-container rounded-full transition-colors relative">
+            <span className="material-symbols-outlined text-on-surface-variant text-xl">notifications</span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error" />
+          </button>
+          <Link href="/profile" className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <span className="text-xs font-bold text-on-primary">
+              {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Mobile Bottom Tab Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-around px-2 py-1.5 safe-area-bottom">
+        {bottomTabs.map(({ href, label, icon }) => {
+          const active = pathname === href || (href !== '/' && pathname.startsWith(href));
+          return (
+            <Link key={href} href={href}
+              className={cn(
+                'flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all min-w-[52px]',
+                active ? 'text-primary' : 'text-on-surface-variant'
+              )}>
+              <span className={cn('material-symbols-outlined text-[22px]', active && 'text-primary')}
+                style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}>
+                {icon}
+              </span>
+              <span className="text-[10px] font-medium">{label}</span>
+            </Link>
+          );
+        })}
+      </div>
     </>
   );
 }
