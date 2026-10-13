@@ -7,15 +7,35 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('waylo_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
   if (!res.ok) {
+    // Handle 401 - expired/invalid token
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('waylo_user');
+      localStorage.removeItem('waylo_token');
+      localStorage.removeItem('waylo_refresh');
+      window.location.href = '/login';
+    }
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || `HTTP ${res.status}`);
   }

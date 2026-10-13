@@ -56,12 +56,16 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify'];
 
 async function authFetch<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  const data: ApiResponse<T> = await res.json();
-  return data;
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    const data: ApiResponse<T> = await res.json();
+    return data;
+  } catch {
+    return { success: false, message: 'Sunucuya baglanilamiyor. Lutfen daha sonra tekrar deneyin.', data: null };
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
