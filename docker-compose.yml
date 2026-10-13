@@ -98,7 +98,9 @@ services:
   config-service:
     build:
       context: .
-      dockerfile: config-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: config-service
     container_name: waylo-config-service
     ports:
       - "8888:8888"
@@ -117,7 +119,9 @@ services:
   discovery-service:
     build:
       context: .
-      dockerfile: discovery-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: discovery-service
     container_name: waylo-discovery-service
     ports:
       - "8761:8761"
@@ -140,7 +144,9 @@ services:
   api-gateway:
     build:
       context: .
-      dockerfile: api-gateway/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: api-gateway
     container_name: waylo-api-gateway
     ports:
       - "8080:8080"
@@ -164,10 +170,12 @@ services:
   flight-service:
     build:
       context: .
-      dockerfile: flight-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: flight-service
     container_name: waylo-flight-service
     ports:
-      - "8081:8081"
+      - "${FLIGHT_SERVICE_PORT:-18081}:8081"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -199,7 +207,9 @@ services:
   flight-seat-inventory-service:
     build:
       context: .
-      dockerfile: flight-seat-inventory-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: flight-seat-inventory-service
     container_name: waylo-flight-seat-inventory-service
     ports:
       - "8082:8082"
@@ -234,7 +244,9 @@ services:
   hotel-service:
     build:
       context: .
-      dockerfile: hotel-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: hotel-service
     container_name: waylo-hotel-service
     ports:
       - "8083:8083"
@@ -269,7 +281,9 @@ services:
   car-rental-service:
     build:
       context: .
-      dockerfile: car-rental-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: car-rental-service
     container_name: waylo-car-rental-service
     ports:
       - "8084:8084"
@@ -304,7 +318,9 @@ services:
   package-booking-service:
     build:
       context: .
-      dockerfile: package-booking-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: package-booking-service
     container_name: waylo-package-booking-service
     ports:
       - "8085:8085"
@@ -339,7 +355,9 @@ services:
   pricing-service:
     build:
       context: .
-      dockerfile: pricing-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: pricing-service
     container_name: waylo-pricing-service
     ports:
       - "8086:8086"
@@ -374,7 +392,9 @@ services:
   payment-service:
     build:
       context: .
-      dockerfile: payment-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: payment-service
     container_name: waylo-payment-service
     ports:
       - "8087:8087"
@@ -409,7 +429,9 @@ services:
   crm-service:
     build:
       context: .
-      dockerfile: crm-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: crm-service
     container_name: waylo-crm-service
     ports:
       - "8088:8088"
@@ -444,7 +466,9 @@ services:
   checkin-service:
     build:
       context: .
-      dockerfile: checkin-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: checkin-service
     container_name: waylo-checkin-service
     ports:
       - "8089:8089"
@@ -479,7 +503,9 @@ services:
   notification-service:
     build:
       context: .
-      dockerfile: notification-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notification-service
     container_name: waylo-notification-service
     ports:
       - "8090:8090"
@@ -513,7 +539,9 @@ services:
   auth-service:
     build:
       context: .
-      dockerfile: auth-service/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: auth-service
     container_name: waylo-auth-service
     ports:
       - "8092:8092"
@@ -545,7 +573,9 @@ services:
   package-booking-saga-orchestrator:
     build:
       context: .
-      dockerfile: package-booking-saga-orchestrator/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: package-booking-saga-orchestrator
     container_name: waylo-saga-orchestrator
     ports:
       - "8091:8091"
@@ -580,7 +610,9 @@ services:
   traffic-simulator:
     build:
       context: .
-      dockerfile: traffic-simulator/Dockerfile
+      dockerfile: Dockerfile
+      args:
+        SERVICE: traffic-simulator
     container_name: waylo-traffic-simulator
     ports:
       - "8095:8095"
@@ -599,6 +631,32 @@ services:
       resources:
         limits:
           memory: 256M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: waylo-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 volumes:
   postgres_data:

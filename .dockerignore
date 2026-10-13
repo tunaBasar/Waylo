@@ -1,28 +1,23 @@
-# Git
+# Version control, editor state, generated output
 .git
-.gitignore
-
-# IDE
 .idea
-*.iml
 .vscode
-
-# Build cache (only libs needed)
-*/build/classes
-*/build/generated
-*/build/resources
-*/build/tmp
-
-# Graphify
+.gradle
+**/build
+**/*.log
+**/*.pid
 graphify-out
 
-# Docs
+# Secrets must never enter the build context
+.env
+.env.*
+**/.env
+**/.env.*
+**/application-local.yml
+docker-compose.override.yml
+
+# Frontend has its own Docker build context
+frontend
+
+# Documentation is not needed to compile backend services
 *.md
-!infra/*.sh
-
-# Source (not needed for pre-built JAR Dockerfiles)
-*/src
-
-# Gradle caches
-.gradle
-build
