@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#f4f4f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f9;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr><td style="background:linear-gradient(135deg,#6750A4,#7F67BE);padding:32px 40px;text-align:center;">
+          <h1 style="color:#ffffff;font-size:28px;margin:0;">&#9992; Waylo</h1>
+          <p style="color:#E8DEF8;font-size:14px;margin:8px 0 0;">Seyahatini Paketle</p>
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <h2 style="color:#1C1B1F;font-size:22px;margin:0 0 16px;">Hos Geldiniz <span th:text="${name}">Kullanici</span>! &#127881;</h2>
+          <p style="color:#49454F;font-size:15px;line-height:1.6;margin:0 0 24px;">E-postaniz basariyla dogrulandi ve hesabiniz aktif edildi. Artik Waylo'nun tum ozelliklerinden yararlanabilirsiniz:</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr>
+              <td style="padding:12px 16px;background:#F7F2FA;border-radius:12px;margin-bottom:8px;">
+                <p style="color:#1C1B1F;font-size:14px;margin:0;">&#9992;&#65039; <strong>Ucuslar</strong> - En uygun fiyatli ucuslari bulun</p>
+              </td>
+            </tr>
+            <tr><td style="height:8px;"></td></tr>
+            <tr>
+              <td style="padding:12px 16px;background:#F7F2FA;border-radius:12px;">
+                <p style="color:#1C1B1F;font-size:14px;margin:0;">&#127976; <strong>Oteller</strong> - Konforlu konaklama secenekleri</p>
+              </td>
+            </tr>
+            <tr><td style="height:8px;"></td></tr>
+            <tr>
+              <td style="padding:12px 16px;background:#F7F2FA;border-radius:12px;">
+                <p style="color:#1C1B1F;font-size:14px;margin:0;">&#128663; <strong>Arac Kiralama</strong> - Seyahatinizi tamamlayin</p>
+              </td>
+            </tr>
+          </table>
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+            <a href="http://localhost:3000" style="display:inline-block;background:#6750A4;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:100px;font-size:15px;font-weight:600;">Panele Git</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="background:#F7F2FA;padding:20px 40px;text-align:center;">
+          <p style="color:#79747E;font-size:12px;margin:0;">&copy; <span th:text="${year}">2024</span> Waylo Travel. Tum haklari saklidir.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
