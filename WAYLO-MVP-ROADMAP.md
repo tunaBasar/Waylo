@@ -8,6 +8,13 @@ Kaynaklar resmi/birincil sayfalardan salt okuma ile derlendi (web.run/webfetch).
 
 ## 1. Yönetici özeti
 
+**KRİTİK GÜNCELLEME (14 Ekim 2026, kullanıcı sorusu üzerine bulundu):** ENUYGUN, 5 Ekim 2026'da "Wegsuite" adlı yeni bir otel extranet'i lansmanı yaptı. Bu bulgu önceki rakip araştırmasından (Bölüm 2) SONRA tespit edildi ve mevcut MVP tezini doğrudan etkiler.
+- Kaynak: Turizm Günlüğü, "ENUYGUN, Yapay Zekâ Destekli Otel Extranet'i Wegsuite'i Açtı", 5 Ekim 2026, https://www.turizmgunlugu.com/2026/10/05/enuygun-wegsuite-yapay-zeka-otel-extranet/ (14 Ekim 2026'da fetch edildi).
+- Doğrulanan olgu: Wegsuite oteller için fiyat, kontenjan, indirim, kampanya, rezervasyon, ödeme ve içerik işlemlerini tek panelden yönetmeyi sağlar; ilk etapta 500'ü aşkın tesise açıldı; sahiplik doğrulaması sonrası kurulum ücreti veya teknik ekip gerekmeden aynı gün başlanabiliyor; AI destekli fiyat/kontenjan önerisi sunuyor.
+- Ölçek: Türkiye otel ekosisteminin 14.450 tesis, Enuygun grubunun doğrudan kontratlı portföyünün 3.600 tesis olduğu kaynakta belirtiliyor. Bu rakamlar şirket beyanıdır, bağımsız doğrulanmadı.
+- Sınırlama: Tek haber kaynağı okundu, Wegsuite'in gerçek kullanım kolaylığı, ücretlendirme detayları ve hangi otel segmentlerini kapsadığı (büyük/küçük tesis ayrımı dışında) doğrulanmadı.
+- **Sonuç: "Otel kendi panelinden kendi tesisini yönetsin" fikri artık sadece rakipte parity değil, Türkiye'nin en büyük seyahat gruplarından birinde ücretsiz, AI destekli ve geniş ölçekte canlı. Genel amaçlı bir otel yönetim paneli MVP'si bu haliyle satılabilir bir fark taşımaz. RM-01/RM-02/RM-03 bu bulguyla yeniden çalıştırılmalı: dar bir segment/coğrafya/iş akışı boşluğu bulunmadan B2B panel inşasına geçilmemeli.**
+
 - **Konumlandırma bulgusu:** Kanıtlardan çıkarım: Booking.com Extranet, Expedia Partner Central, Otelz Extranet ve SiteMinder/HotelRunner yönetim kabiliyetleri nedeniyle owner dashboard tek başına savunulabilir fark değildir. OTA extraneti tam PMS ile eşdeğer sayılmamalıdır.
 
 - Kanıtlardan çıkarım: ENUYGUN aynı yerde çoklu seyahat ürünleri, uçak+otel ve seyahat yönetimi sunar. Geniş 'tek noktada seyahat' iddiası parity'dir. Tek sepet, ortak ödeme ve değişiklik orkestrasyonu ise bu araştırmada doğrulanmadı, ayrı test edilmesi gerekir.
