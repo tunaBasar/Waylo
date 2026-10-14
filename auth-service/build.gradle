@@ -17,6 +17,28 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// Unit tests run normally. Real PostgreSQL mapping/constraint tests are explicit
+// so a missing test database can never be reported as a successful integration run.
+tasks.named('test') {
+    exclude '**/*IntegrationTest.class'
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Validates auth entities and Flyway migrations against a dedicated PostgreSQL database.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/*IntegrationTest.class'
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+    doFirst {
+        if (!System.getenv('AUTH_TEST_DB_URL')) {
+            throw new GradleException('AUTH_TEST_DB_URL must point to a dedicated empty PostgreSQL test database')
+        }
+    }
 }
 
 dependencyManagement {
