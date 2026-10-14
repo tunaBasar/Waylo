@@ -1,5 +1,8 @@
 # Waylo Architecture
 
+> Ürün yönü ve hedef B2B/mobil mimarisi: [PRODUCT-ARCHITECTURE.md](PRODUCT-ARCHITECTURE.md).
+> Bu dosya mevcut teknik yapıyı anlatır, hedef dokümandaki özelliklerin uygulanmış olduğunu göstermez.
+
 Uçuş + otel + araç kiralama paket rezervasyon platformu. Mikroservis mimarisi.
 
 ## Tech Stack
