@@ -107,14 +107,15 @@ Returns:
 | `MISSING_PARAMETER`           | 400         | `MissingServletRequestParameterException`     |
 | `MALFORMED_REQUEST`           | 400         | `HttpMessageNotReadableException`             |
 | `METHOD_NOT_ALLOWED`          | 405         | `HttpRequestMethodNotSupportedException`      |
+| `UNAUTHORIZED`                 | 401         | No identity (missing/invalid token)                        |
+| `FORBIDDEN`                    | 403         | AccessDeniedException (not authorized for this org/hotel)  |
+| `AUTHORIZATION_UNAVAILABLE`    | 503         | auth-service /internal/access unavailable (fail closed)    |
 | `INTERNAL_SERVER_ERROR`       | 500         | Unhandled `Exception`                         |
 
 ## Security Status
 
-**JWT is NOT yet enforced** on this service or at the api-gateway. No authentication middleware is configured for hotel-service.
+JWT verified at api-gateway; gateway forwards X-User-Id; all hotel and room mutations require an ALLOWED decision from auth-service /internal/access (HOTEL_CREATE for create using request organizationId, HOTEL_MANAGE / ROOM_MANAGE using the hotel's stored organizationId); errors 401 no identity, 403 denied, 503 auth-service unavailable (fail closed); legacy hotels without organizationId are read-only; GET endpoints are public; room access is scoped to its hotel.
 
-- `organizationId` is **client-supplied** and **NOT verified** against any membership or tenant relationship.
-- Room access is scoped to its hotel — a room belonging to another hotel returns **404** (`ResourceNotFoundException`), but there is no cross-hotel authorization check beyond the FK relationship.
 - See `../ISSUES.md` for the full list of known security gaps.
 
 ## Environment Variables
@@ -180,4 +181,4 @@ hotel-service/build/reports/jacoco/test/html/index.html
 
 ## Test Coverage
 
-Last measured: 64.4% line / 56.4% branch (112 tests, 2026-10-15; MapStruct generated mappers are 0% because services are tested with mocked mappers) (target: 60%)
+Last measured: 64.4% line before access guard (target: 60%); 135 tests (2026-10-15)

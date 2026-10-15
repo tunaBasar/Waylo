@@ -45,3 +45,31 @@ Observed on October 14, 2026: 8 unit tests and 20 PostgreSQL integration test ex
 | Packaging | `:auth-service:bootJar` succeeds alongside the full isolated test run. This is not a complete application startup or endpoint authorization test. |
 
 Existing auth logic and V1 are unchanged. The user's separate Hotel.java change is outside this slice and is not staged with it.
+
+## Endpoints (2026-10-15)
+
+**POST /api/organizations** — Create a new organization.
+
+- Caller must have a valid identity (JWT verified by api-gateway, forwarded as X-User-Id).
+- Creates an Organization with status `PENDING` and creates the caller's membership as `ACTIVE` with role `ORGANIZATION_OWNER` scoped to the new organization.
+- Returns the created organization and the new membership/role assignment.
+- Returns `409` if the organization name already exists.
+
+**GET /api/me/memberships** — List the current user's organization memberships.
+
+- Identity from gateway X-User-Id (JWT verified at api-gateway).
+- Returns all memberships (active and inactive) for the authenticated user across all organizations.
+- Each item includes: organization details, membership status, and the set of role assignments (role, scopeType, scopeId).
+- Returns `401` if no valid identity is present.
+
+**GET /internal/access** — Permission check for service-to-service authorization.
+
+- Called by downstream services (hotel-service) to verify whether a user has permission to perform an action on a specific resource.
+- No service-to-service authentication; protected by not being routed through the gateway and 127.0.0.1 port binding.
+- Exact permission rules:
+  - `ORGANIZATION_OWNER` → `HOTEL_CREATE`, `HOTEL_MANAGE`, `ROOM_MANAGE` for resources in its organization.
+  - `HOTEL_OWNER` / `HOTEL_MANAGER` with `HOTEL` scope → `HOTEL_MANAGE` / `ROOM_MANAGE` for that specific hotel only.
+  - `HOTEL_STAFF` → no permissions granted.
+  - Inactive membership or `SUSPENDED`/`ARCHIVED` organization → deny.
+  - Any error (missing user, organization, membership, role, etc.) → deny.
+- Returns `ALLOWED` or `DENIED` with details about the denial reason.
