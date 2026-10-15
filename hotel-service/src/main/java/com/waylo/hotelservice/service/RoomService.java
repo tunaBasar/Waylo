@@ -13,7 +13,7 @@ public interface RoomService {
 
     RoomResponse create(UUID hotelId, RoomRequest request);
 
-    RoomResponse getById(UUID id);
+    RoomResponse getById(UUID hotelId, UUID roomId);
 
     List<RoomResponse> getByHotelId(UUID hotelId);
 
@@ -22,11 +22,11 @@ public interface RoomService {
      */
     List<RoomResponse> search(UUID hotelId, RoomType roomType, RoomStatus status, BigDecimal maxPrice);
 
-    RoomResponse update(UUID id, RoomRequest request);
+    RoomResponse update(UUID hotelId, UUID roomId, RoomRequest request);
 
-    void delete(UUID id);
+    void delete(UUID hotelId, UUID roomId);
 
-    RoomResponse updateStatus(UUID id, RoomStatus status);
+    RoomResponse updateStatus(UUID hotelId, UUID roomId, RoomStatus status);
 
     long getAvailableRoomCount(UUID hotelId);
 }

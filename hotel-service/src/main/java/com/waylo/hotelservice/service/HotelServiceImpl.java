@@ -98,6 +98,14 @@ public class HotelServiceImpl implements HotelService {
         return hotelMapper.toResponse(hotel);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<HotelResponse> getByOrganization(UUID organizationId) {
+        return hotelRepository.findByOrganizationId(organizationId).stream()
+                .map(hotelMapper::toResponse)
+                .toList();
+    }
+
     private Hotel findHotelOrThrow(UUID id) {
         return hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));

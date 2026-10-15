@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record HotelResponse(
         UUID id,
+        UUID organizationId,
         String name,
         String city,
         String country,

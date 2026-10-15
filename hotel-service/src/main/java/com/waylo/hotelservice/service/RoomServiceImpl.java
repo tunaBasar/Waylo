@@ -11,6 +11,8 @@ import com.waylo.hotelservice.exception.DuplicateResourceException;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.repository.HotelRepository;
 import com.waylo.hotelservice.repository.RoomRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,8 @@ import java.util.stream.Stream;
 @Service
 @Transactional
 public class RoomServiceImpl implements RoomService {
+
+    private static final Logger log = LoggerFactory.getLogger(RoomServiceImpl.class);
 
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
@@ -46,20 +50,32 @@ public class RoomServiceImpl implements RoomService {
             room.setStatus(RoomStatus.AVAILABLE);
         }
         room = roomRepository.save(room);
+        log.info("Room created: roomId={}, hotelId={}", room.getId(), hotelId);
         return roomMapper.toResponse(room);
+    }
+
+    private Room findRoomOrThrow(UUID hotelId, UUID roomId) {
+        return roomRepository.findByIdAndHotelId(roomId, hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room", "id", roomId));
+    }
+
+    private void ensureHotelExists(UUID hotelId) {
+        if (!hotelRepository.existsById(hotelId)) {
+            throw new ResourceNotFoundException("Hotel", "id", hotelId);
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public RoomResponse getById(UUID id) {
-        Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Room", "id", id));
+    public RoomResponse getById(UUID hotelId, UUID roomId) {
+        Room room = findRoomOrThrow(hotelId, roomId);
         return roomMapper.toResponse(room);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<RoomResponse> getByHotelId(UUID hotelId) {
+        ensureHotelExists(hotelId);
         return roomRepository.findByHotelId(hotelId).stream()
                 .map(roomMapper::toResponse)
                 .toList();
@@ -68,6 +84,7 @@ public class RoomServiceImpl implements RoomService {
     @Override
     @Transactional(readOnly = true)
     public List<RoomResponse> search(UUID hotelId, RoomType roomType, RoomStatus status, BigDecimal maxPrice) {
+        ensureHotelExists(hotelId);
         Stream<Room> stream;
         if (roomType != null && status != null) {
             stream = roomRepository.findByHotelIdAndRoomTypeAndStatus(hotelId, roomType, status).stream();
@@ -85,34 +102,38 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public RoomResponse update(UUID id, RoomRequest request) {
-        Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Room", "id", id));
+    public RoomResponse update(UUID hotelId, UUID roomId, RoomRequest request) {
+        Room room = findRoomOrThrow(hotelId, roomId);
+        if (request.roomNumber() != null && !request.roomNumber().equals(room.getRoomNumber())
+                && roomRepository.existsByHotelIdAndRoomNumberAndIdNot(hotelId, request.roomNumber(), roomId)) {
+            throw new DuplicateResourceException("Room", "roomNumber", request.roomNumber());
+        }
         roomMapper.updateEntity(request, room);
         room = roomRepository.save(room);
+        log.info("Room updated: roomId={}, hotelId={}", roomId, hotelId);
         return roomMapper.toResponse(room);
     }
 
     @Override
-    public void delete(UUID id) {
-        if (!roomRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Room", "id", id);
-        }
-        roomRepository.deleteById(id);
+    public void delete(UUID hotelId, UUID roomId) {
+        Room room = findRoomOrThrow(hotelId, roomId);
+        roomRepository.delete(room);
+        log.info("Room deleted: roomId={}, hotelId={}", roomId, hotelId);
     }
 
     @Override
-    public RoomResponse updateStatus(UUID id, RoomStatus status) {
-        Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Room", "id", id));
+    public RoomResponse updateStatus(UUID hotelId, UUID roomId, RoomStatus status) {
+        Room room = findRoomOrThrow(hotelId, roomId);
         room.setStatus(status);
         room = roomRepository.save(room);
+        log.info("Room status updated: roomId={}, hotelId={}, status={}", roomId, hotelId, status);
         return roomMapper.toResponse(room);
     }
 
     @Override
     @Transactional(readOnly = true)
     public long getAvailableRoomCount(UUID hotelId) {
+        ensureHotelExists(hotelId);
         return roomRepository.countByHotelIdAndStatus(hotelId, RoomStatus.AVAILABLE);
     }
 }

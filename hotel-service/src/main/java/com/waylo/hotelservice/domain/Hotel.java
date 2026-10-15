@@ -53,6 +53,9 @@ public class Hotel {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "organization_id")
+    private UUID organizationId;
+
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Room> rooms = new ArrayList<>();
 
@@ -103,4 +106,7 @@ public class Hotel {
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public UUID getOrganizationId() { return organizationId; }
+    public void setOrganizationId(UUID organizationId) { this.organizationId = organizationId; }
 }

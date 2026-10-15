@@ -42,8 +42,12 @@ public class HotelController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<HotelResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.of(hotelService.getAll()));
+    public ResponseEntity<ApiResponse<List<HotelResponse>>> getAll(
+            @RequestParam(required = false) UUID organizationId) {
+        List<HotelResponse> hotels = organizationId != null
+                ? hotelService.getByOrganization(organizationId)
+                : hotelService.getAll();
+        return ResponseEntity.ok(ApiResponse.of(hotels));
     }
 
     @GetMapping("/search")

@@ -22,5 +22,7 @@ public interface HotelRepository extends JpaRepository<Hotel, UUID> {
 
     List<Hotel> findByCityAndActiveTrue(String city);
 
+    List<Hotel> findByOrganizationId(UUID organizationId);
+
     boolean existsByNameAndAddress(String name, String address);
 }

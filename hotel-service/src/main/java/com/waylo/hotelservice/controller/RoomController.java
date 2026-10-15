@@ -43,7 +43,7 @@ public class RoomController {
     @GetMapping("/{roomId}")
     public ResponseEntity<ApiResponse<RoomResponse>> getById(@PathVariable UUID hotelId,
                                                               @PathVariable UUID roomId) {
-        return ResponseEntity.ok(ApiResponse.of(roomService.getById(roomId)));
+        return ResponseEntity.ok(ApiResponse.of(roomService.getById(hotelId, roomId)));
     }
 
     @GetMapping
@@ -64,13 +64,13 @@ public class RoomController {
     public ResponseEntity<ApiResponse<RoomResponse>> update(@PathVariable UUID hotelId,
                                                              @PathVariable UUID roomId,
                                                              @Valid @RequestBody RoomRequest request) {
-        return ResponseEntity.ok(ApiResponse.of(roomService.update(roomId, request), "Room updated"));
+        return ResponseEntity.ok(ApiResponse.of(roomService.update(hotelId, roomId, request), "Room updated"));
     }
 
     @DeleteMapping("/{roomId}")
     public ResponseEntity<Void> delete(@PathVariable UUID hotelId,
                                        @PathVariable UUID roomId) {
-        roomService.delete(roomId);
+        roomService.delete(hotelId, roomId);
         return ResponseEntity.noContent().build();
     }
 
@@ -78,7 +78,7 @@ public class RoomController {
     public ResponseEntity<ApiResponse<RoomResponse>> updateStatus(@PathVariable UUID hotelId,
                                                                    @PathVariable UUID roomId,
                                                                    @RequestParam RoomStatus status) {
-        return ResponseEntity.ok(ApiResponse.of(roomService.updateStatus(roomId, status), "Room status updated"));
+        return ResponseEntity.ok(ApiResponse.of(roomService.updateStatus(hotelId, roomId, status), "Room status updated"));
     }
 
     @GetMapping("/available-count")

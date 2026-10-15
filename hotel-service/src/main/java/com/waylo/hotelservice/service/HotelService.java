@@ -26,4 +26,6 @@ public interface HotelService {
     HotelResponse deactivate(UUID id);
 
     HotelResponse activate(UUID id);
+
+    List<HotelResponse> getByOrganization(UUID organizationId);
 }
