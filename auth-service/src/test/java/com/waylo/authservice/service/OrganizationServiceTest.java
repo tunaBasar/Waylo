@@ -93,6 +93,7 @@ class OrganizationServiceTest {
         // Arrange
         CreateOrganizationRequest req = new CreateOrganizationRequest(" Acme Corp ");
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(0L);
         when(organizationRepository.saveAndFlush(any(Organization.class))).thenAnswer(invocation -> {
             Organization saved = invocation.getArgument(0);
             setOrganizationId(saved, ORG_ID);
@@ -140,6 +141,7 @@ class OrganizationServiceTest {
         // Arrange
         CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org");
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(0L);
         when(organizationRepository.saveAndFlush(any(Organization.class))).thenAnswer(invocation -> {
             Organization saved = invocation.getArgument(0);
             setOrganizationId(saved, ORG_ID);
@@ -197,5 +199,23 @@ class OrganizationServiceTest {
         // Assert
         assertTrue(results.isEmpty());
         verifyNoInteractions(roleAssignmentRepository);
+    }
+
+    @Test
+    void createOrganization_limitReached_returns409() {
+        // Arrange
+        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org");
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(5L);
+
+        // Act & Assert
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> organizationService.createOrganization(USER_ID, req));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("Organization limit reached", ex.getReason());
+
+        verify(organizationRepository, never()).saveAndFlush(any());
+        verify(membershipRepository, never()).save(any());
+        verify(roleAssignmentRepository, never()).save(any());
     }
 }

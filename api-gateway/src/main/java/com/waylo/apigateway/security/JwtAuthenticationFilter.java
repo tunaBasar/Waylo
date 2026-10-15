@@ -24,7 +24,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final List<String> SPOOFED_HEADERS = List.of(
-            "X-User-Id", "X-User-Email", "X-User-Role"
+            "X-User-Id", "X-User-Email", "X-User-Role", "X-Internal-Token"
     );
 
     private final JwtVerifier jwtVerifier;

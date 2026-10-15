@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
-@FeignClient(name = "auth-service", path = "/internal")
+@FeignClient(name = "auth-service", path = "/internal", configuration = InternalAuthFeignConfig.class)
 public interface AuthAccessClient {
 
     @GetMapping("/access")

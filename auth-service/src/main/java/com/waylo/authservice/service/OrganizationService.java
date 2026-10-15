@@ -49,6 +49,11 @@ public class OrganizationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+        long count = membershipRepository.countOwnedOrganizations(userId);
+        if (count >= 5) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Organization limit reached");
+        }
+
         Organization organization = new Organization(req.name().trim());
         organization = organizationRepository.saveAndFlush(organization);
 
