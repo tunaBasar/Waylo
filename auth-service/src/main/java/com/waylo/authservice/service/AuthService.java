@@ -187,7 +187,7 @@ public class AuthService {
     }
 
     public ApiResponse<AuthResponse> refreshToken(String refreshTokenStr) {
-        if (!jwtUtil.isValid(refreshTokenStr)) {
+        if (refreshTokenStr == null || !jwtUtil.isValidRefreshToken(refreshTokenStr)) {
             return ApiResponse.error("Gecersiz refresh token");
         }
 

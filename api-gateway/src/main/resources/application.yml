@@ -25,6 +25,7 @@ spring:
                   - PUT
                   - DELETE
                   - OPTIONS
+                  - PATCH
                 allowed-headers: "*"
                 allow-credentials: true
                 max-age: 3600
@@ -97,3 +98,7 @@ logging:
   level:
     org.springframework.cloud.gateway: INFO
     reactor.netty.http.server: INFO
+
+waylo:
+  jwt:
+    secret: ${JWT_SECRET}

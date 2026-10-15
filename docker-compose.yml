@@ -154,6 +154,7 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
     depends_on:
       discovery-service:
         condition: service_healthy
@@ -175,7 +176,7 @@ services:
         SERVICE: flight-service
     container_name: waylo-flight-service
     ports:
-      - "${FLIGHT_SERVICE_PORT:-18081}:8081"
+      - "127.0.0.1:${FLIGHT_SERVICE_PORT:-18081}:8081"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -212,7 +213,7 @@ services:
         SERVICE: flight-seat-inventory-service
     container_name: waylo-flight-seat-inventory-service
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -249,7 +250,7 @@ services:
         SERVICE: hotel-service
     container_name: waylo-hotel-service
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -286,7 +287,7 @@ services:
         SERVICE: car-rental-service
     container_name: waylo-car-rental-service
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -323,7 +324,7 @@ services:
         SERVICE: package-booking-service
     container_name: waylo-package-booking-service
     ports:
-      - "8085:8085"
+      - "127.0.0.1:8085:8085"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -360,7 +361,7 @@ services:
         SERVICE: pricing-service
     container_name: waylo-pricing-service
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -397,7 +398,7 @@ services:
         SERVICE: payment-service
     container_name: waylo-payment-service
     ports:
-      - "8087:8087"
+      - "127.0.0.1:8087:8087"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -434,7 +435,7 @@ services:
         SERVICE: crm-service
     container_name: waylo-crm-service
     ports:
-      - "8088:8088"
+      - "127.0.0.1:8088:8088"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -471,7 +472,7 @@ services:
         SERVICE: checkin-service
     container_name: waylo-checkin-service
     ports:
-      - "8089:8089"
+      - "127.0.0.1:8089:8089"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -508,7 +509,7 @@ services:
         SERVICE: notification-service
     container_name: waylo-notification-service
     ports:
-      - "8090:8090"
+      - "127.0.0.1:8090:8090"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -544,11 +545,12 @@ services:
         SERVICE: auth-service
     container_name: waylo-auth-service
     ports:
-      - "8092:8092"
+      - "127.0.0.1:8092:8092"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/auth_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: waylo
@@ -578,7 +580,7 @@ services:
         SERVICE: package-booking-saga-orchestrator
     container_name: waylo-saga-orchestrator
     ports:
-      - "8091:8091"
+      - "127.0.0.1:8091:8091"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -615,7 +617,7 @@ services:
         SERVICE: traffic-simulator
     container_name: waylo-traffic-simulator
     ports:
-      - "8095:8095"
+      - "127.0.0.1:8095:8095"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"

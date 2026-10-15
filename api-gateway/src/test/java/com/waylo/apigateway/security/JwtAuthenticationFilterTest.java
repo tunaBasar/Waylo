@@ -1,0 +1,460 @@
+package com.waylo.apigateway.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import reactor.core.publisher.Mono;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Date;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class JwtAuthenticationFilterTest {
+
+    private static final String SECRET = Base64.getEncoder().encodeToString(
+            UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)
+    ) + Base64.getEncoder().encodeToString(
+            UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)
+    ) + Base64.getEncoder().encodeToString(
+            UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)
+    );
+
+    private static final SecretKey KEY = Keys.hmacShaKeyFor(
+            java.util.Base64.getDecoder().decode(SECRET)
+    );
+
+    private static final String ACCESS_TOKEN = buildToken("user-1", "user@example.com", "USER", "access");
+    private static final String REFRESH_TOKEN = buildToken("user-1", "user@example.com", "USER", "refresh");
+
+    private static String buildToken(String subject, String email, String role, String typ) {
+        return Jwts.builder()
+                .subject(subject)
+                .claim("email", email)
+                .claim("role", role)
+                .claim("typ", typ)
+                .issuer("waylo-auth")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 3600_000))
+                .signWith(KEY)
+                .compact();
+    }
+
+    @Test
+    void noTokenOnBookings_returns401AndChainNotCalled() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void validToken_chainCalledWithIdentityHeaders() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void spoofedHeaderWithValidToken_forwardedHeaderIsRealSubject() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .header("X-User-Id", "attacker")
+                .header("X-User-Email", "attacker@evil.com")
+                .header("X-User-Role", "ADMIN")
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Spoofed headers removed, verified headers added
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void spoofedHeaderOnPublicPath_headerRemoved() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/auth/login")
+                .header("X-User-Id", "attacker")
+                .header("X-User-Email", "attacker@evil.com")
+                .header("X-User-Role", "ADMIN")
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isNull();
+    }
+
+    @Test
+    void refreshToken_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + REFRESH_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void optionsRequest_passesWithoutToken() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.options("/api/bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNotNull();
+    }
+
+    @Test
+    void getOrder_returnsMinus100() {
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+        assertThat(filter.getOrder()).isEqualTo(-100);
+    }
+
+    // --- BUG 1: downstream error propagation tests ---
+
+    @Test
+    void downstreamChainError_propagatesErrorNot401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return Mono.error(new RuntimeException("service unavailable"));
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        RuntimeException thrown = org.assertj.core.api.Assertions.catchThrowableOfType(
+                () -> filter.filter(exchange, chain).block(), RuntimeException.class);
+        assertThat(thrown).isNotNull();
+        assertThat(thrown.getMessage()).isEqualTo("service unavailable");
+
+        // Chain was called (it threw the error)
+        assertThat(capturedRequest.get()).isNotNull();
+        // Response status should NOT be set to 401
+        assertThat(exchange.getResponse().getStatusCode()).isNotEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void downstreamChainError_headerForwardedBeforeError() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return Mono.error(new RuntimeException("service unavailable"));
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/bookings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        org.assertj.core.api.Assertions.catchThrowableOfType(
+                () -> filter.filter(exchange, chain).block(), RuntimeException.class);
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // X-User-* headers were still forwarded before downstream failed
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    // --- BUG 2: path traversal tests ---
+
+    @Test
+    void pathTraversal_dotdotSlash_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/../bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_percentEncodedDotDot_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/%2e%2e/bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_semColon_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/..;/bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_doubleSlash_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        // Use %2F%2F so decoded path becomes /api//bookings
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/%2F%2Fbookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_backslashEncoded_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/%5cbookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_rawBackslash_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels\\bookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pathTraversal_percentEncodedSlash_returns400() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/%2fbookings").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void hotelXNotPublic_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotelsX").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void hotelExactPathPublic_passes() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNotNull();
+    }
+
+    @Test
+    void hotelSubPathPublic_passes() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/search").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNotNull();
+    }
+}

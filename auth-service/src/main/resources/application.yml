@@ -43,9 +43,9 @@ management:
 
 waylo:
   jwt:
-    secret: ${JWT_SECRET:c2VjcmV0S2V5V2F5bG9BdXRoU2VydmljZTIwMjRWZXJ5TG9uZ1NlY3JldEtleUZvckpXVA==}
-    expiration: 86400000
-    refresh-expiration: 604800000
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_ACCESS_TTL_MS:900000}
+    refresh-expiration: ${JWT_REFRESH_TTL_MS:604800000}
   verification:
     expiration-hours: 24
   reset:
