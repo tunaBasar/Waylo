@@ -28,6 +28,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${waylo.verification.expiration-hours}")
     private int verificationExpirationHours;
@@ -37,12 +38,13 @@ public class AuthService {
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil, KafkaTemplate<String, String> kafkaTemplate,
-                       ObjectMapper objectMapper) {
+                       ObjectMapper objectMapper, RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -67,7 +69,7 @@ public class AuthService {
 
         // Generate tokens (user can login but will see "verify email" prompt)
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        String refreshToken = refreshTokenService.issue(user.getId(), null);
 
         AuthResponse response = new AuthResponse(
                 token, refreshToken, user.getId(), user.getEmail(),
@@ -87,7 +89,7 @@ public class AuthService {
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        String refreshToken = refreshTokenService.issue(user.getId(), null);
 
         AuthResponse response = new AuthResponse(
                 token, refreshToken, user.getId(), user.getEmail(),
@@ -187,27 +189,42 @@ public class AuthService {
     }
 
     public ApiResponse<AuthResponse> refreshToken(String refreshTokenStr) {
-        if (refreshTokenStr == null || !jwtUtil.isValidRefreshToken(refreshTokenStr)) {
+        RotationResult result;
+        try {
+            result = refreshTokenService.rotate(refreshTokenStr);
+        } catch (InvalidRefreshTokenException e) {
             return ApiResponse.error("Gecersiz refresh token");
         }
 
-        String userId = jwtUtil.getUserId(refreshTokenStr);
-        User user = userRepository.findById(UUID.fromString(userId)).orElse(null);
+        String userId = result.userId().toString();
+        User user = userRepository.findById(result.userId()).orElse(null);
 
         if (user == null) {
             return ApiResponse.error("Kullanici bulunamadi");
         }
 
         String newToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        String newRefresh = jwtUtil.generateRefreshToken(user.getId());
 
         AuthResponse response = new AuthResponse(
-                newToken, newRefresh, user.getId(), user.getEmail(),
+                newToken, result.newRefreshToken(), user.getId(), user.getEmail(),
                 user.getFirstName(), user.getLastName(),
                 user.getRole().name(), user.isEmailVerified()
         );
 
         return ApiResponse.success("Token yenilendi", response);
+    }
+
+    @Transactional
+    public ApiResponse<Void> logout(UUID userId) {
+        refreshTokenService.revokeAll(userId);
+        log.info("Logout: user {}", userId);
+        return ApiResponse.success("Cikis yapildi");
+    }
+
+    @Transactional
+    public ApiResponse<Void> logoutByToken(String refreshToken) {
+        refreshTokenService.revokeByToken(refreshToken);
+        return ApiResponse.success("Cikis yapildi");
     }
 
     private void publishAuthEvent(String eventType, User user, String token) {

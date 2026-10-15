@@ -73,3 +73,37 @@ Existing auth logic and V1 are unchanged. The user's separate Hotel.java change 
   - Inactive membership or `SUSPENDED`/`ARCHIVED` organization → deny.
   - Any error (missing user, organization, membership, role, etc.) → deny.
 - Returns `ALLOWED` or `DENIED` with details about the denial reason.
+
+## Delegation and administration (2026-10-15)
+
+### Role delegation endpoints
+
+**POST /api/organizations/{orgId}/role-grants** — Assign or reassign a scoped role to a user within an organization.
+
+- Requires `X-User-Id` (JWT verified by api-gateway) and an authorization check.
+- **Subset rule**: If the caller is `ORGANIZATION_OWNER`, they may grant `HOTEL_OWNER`, `HOTEL_MANAGER`, or `HOTEL_STAFF`. If the caller is `HOTEL_OWNER`, they may grant `HOTEL_MANAGER` or `HOTEL_STAFF` scoped only to hotels they own.
+- Hotel scope is verified against hotel-service: the hotel must exist, belong to the same organization, and be owned by the caller if they are a hotel owner.
+- Returns `400` for invalid role/scope combinations (e.g. `ORGANIZATION_OWNER` grant, or `HOTEL_STAFF` with `HOTEL` scope).
+- Returns `403` if the caller lacks authority or the hotel does not belong to the caller's organization.
+- Returns `409` on duplicate role assignment.
+- Returns `200` on success.
+
+**DELETE /api/organizations/{orgId}/role-grants** — Revoke a scoped role assignment.
+
+- Same authorization rules as POST. The revokee loses the granted permissions immediately.
+- Returns `204` on success.
+
+### Platform admin endpoints
+
+**GET /internal/platform/organizations**, **POST /internal/platform/organizations/{orgId}/approve**, **POST /internal/platform/organizations/{orgId}/suspend**
+
+- Platform admin access is enforced by the api-gateway via the `X-User-Role` header (JWT verified by the gateway, not the auth-service).
+- `approve` transitions an organization from `PENDING` to `ACTIVE`. Returns `409` if already approved. Requires a reason in the request body; returns `400` without one.
+- `suspend` transitions an organization to `SUSPENDED`. Returns `200` on success.
+- A user may own at most **5 organizations**. Attempting a 6th returns `409`.
+
+### Service-to-service authentication
+
+All `/internal/**` endpoints on auth-service and hotel-service now require the `X-Internal-Token` header. The api-gateway strips this header before forwarding to downstream services, so internal endpoints enforce it directly. Without the header or with an invalid token, requests receive `401`.
+
+This prevents unauthenticated internal calls from any local process, complementing the `127.0.0.1` port binding.

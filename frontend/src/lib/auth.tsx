@@ -144,6 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const logout = useCallback(() => {
+    const refreshToken = localStorage.getItem('waylo_refresh');
+    if (refreshToken) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => {});
+    }
     setUser(null);
     setToken(null);
     localStorage.removeItem('waylo_user');

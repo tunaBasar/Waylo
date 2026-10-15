@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -67,6 +68,21 @@ public class AuthController {
         return response.success()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.status(401).body(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestBody(required = false) Map<String, String> body) {
+
+        String refreshTokenStr = (body != null) ? (String) body.get("refreshToken") : null;
+
+        if (userId != null) {
+            return ResponseEntity.ok(authService.logout(userId));
+        }
+
+        // Gateway strips X-User-Id, so fall back to revoking the token's family
+        return ResponseEntity.ok(authService.logoutByToken(refreshTokenStr));
     }
 
     @GetMapping("/health")

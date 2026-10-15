@@ -7,6 +7,49 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
+export async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = localStorage.getItem('waylo_refresh');
+      if (!refreshToken) {
+        return false;
+      }
+
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!res.ok) {
+        return false;
+      }
+
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        localStorage.setItem('waylo_token', data.data.token);
+        localStorage.setItem('waylo_refresh', data.data.refreshToken);
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -28,17 +71,48 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   });
-  if (!res.ok) {
-    // Handle 401 - expired/invalid token
-    if (res.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('waylo_user');
-      localStorage.removeItem('waylo_token');
-      localStorage.removeItem('waylo_refresh');
-      window.location.href = '/login';
+
+  // Handle 401 - expired/invalid token
+  if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/api/auth/')) {
+    const refreshed = await refreshAccessToken();
+
+    if (refreshed) {
+      // Retry the original request once with the new token
+      const retryRes = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: {
+          ...getAuthHeaders(),
+          ...options?.headers,
+        },
+      });
+
+      if (retryRes.status === 401) {
+        localStorage.removeItem('waylo_user');
+        localStorage.removeItem('waylo_token');
+        localStorage.removeItem('waylo_refresh');
+        window.location.href = '/login';
+      }
+
+      if (!retryRes.ok) {
+        const err = await retryRes.json().catch(() => ({ message: retryRes.statusText }));
+        throw new Error(err.message || `HTTP ${retryRes.status}`);
+      }
+
+      return retryRes.json();
     }
+
+    // Refresh failed - clear session and redirect
+    localStorage.removeItem('waylo_user');
+    localStorage.removeItem('waylo_token');
+    localStorage.removeItem('waylo_refresh');
+    window.location.href = '/login';
+  }
+
+  if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || `HTTP ${res.status}`);
   }
+
   return res.json();
 }
 

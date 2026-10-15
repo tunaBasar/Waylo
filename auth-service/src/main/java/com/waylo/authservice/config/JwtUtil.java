@@ -9,6 +9,7 @@ import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
+import java.time.Instant;
 
 @Component
 public class JwtUtil {
@@ -52,11 +53,19 @@ public class JwtUtil {
     }
 
     public String generateRefreshToken(UUID userId) {
+        return generateRefreshTokenWithJti(userId, UUID.randomUUID());
+    }
+
+    public String generateRefreshToken(UUID userId, UUID jti) {
+        return generateRefreshTokenWithJti(userId, jti);
+    }
+
+    private String generateRefreshTokenWithJti(UUID userId, UUID jti) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
                 .issuer(ISSUER)
-                .id(UUID.randomUUID().toString())
+                .id(jti.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(key)
@@ -96,5 +105,13 @@ public class JwtUtil {
 
     public String getEmail(String token) {
         return parseToken(token).get("email", String.class);
+    }
+
+    public String getJti(String token) {
+        return parseToken(token).getId();
+    }
+
+    public Instant getExpiration(String token) {
+        return parseToken(token).getExpiration().toInstant();
     }
 }
