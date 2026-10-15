@@ -1,12 +1,18 @@
 package com.waylo.hotelservice.controller;
 
+import com.waylo.hotelservice.domain.RoomStatus;
+import com.waylo.hotelservice.domain.RoomType;
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.RoomRequest;
 import com.waylo.hotelservice.dto.RoomResponse;
-import com.waylo.hotelservice.domain.RoomStatus;
-import com.waylo.hotelservice.domain.RoomType;
+import com.waylo.hotelservice.exception.AccessDeniedException;
+import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.RoomService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -15,16 +21,22 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class RoomControllerTest {
 
     private final RoomService roomService = mock(RoomService.class);
-    private final RoomController controller = new RoomController(roomService);
+    private final HotelAccessGuard accessGuard = mock(HotelAccessGuard.class);
+    @InjectMocks
+    private RoomController controller;
 
     private final UUID hotelId = UUID.randomUUID();
     private final UUID roomId = UUID.randomUUID();
+    private final UUID userId = UUID.randomUUID();
 
     private RoomResponse buildRoomResponse(UUID id) {
         return new RoomResponse(
@@ -41,11 +53,23 @@ class RoomControllerTest {
         RoomResponse response = buildRoomResponse(roomId);
         when(roomService.create(eq(hotelId), any(RoomRequest.class))).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RoomResponse>> result = controller.create(hotelId, request);
+        ResponseEntity<ApiResponse<RoomResponse>> result = controller.create(userId, hotelId, request);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().data().id()).isEqualTo(roomId);
+        verify(accessGuard).requireRoomManage(userId, hotelId);
+    }
+
+    @Test
+    void create_guardThrowsAccessDenied_serviceNotCalled() {
+        RoomRequest request = new RoomRequest("101", RoomType.DOUBLE, 2, BigDecimal.valueOf(100), 1, "desc", null);
+        doThrow(new AccessDeniedException("Not allowed")).when(accessGuard).requireRoomManage(userId, hotelId);
+
+        assertThatThrownBy(() -> controller.create(userId, hotelId, request))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(roomService, never()).create(any(), any());
     }
 
     @Test
@@ -99,19 +123,42 @@ class RoomControllerTest {
         RoomResponse response = buildRoomResponse(roomId);
         when(roomService.update(eq(hotelId), eq(roomId), any(RoomRequest.class))).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RoomResponse>> result = controller.update(hotelId, roomId, request);
+        ResponseEntity<ApiResponse<RoomResponse>> result = controller.update(userId, hotelId, roomId, request);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
+        verify(accessGuard).requireRoomManage(userId, hotelId);
+    }
+
+    @Test
+    void update_guardThrowsAccessDenied_serviceNotCalled() {
+        RoomRequest request = new RoomRequest("102", RoomType.SUITE, 3, BigDecimal.valueOf(150), 2, "desc", null);
+        doThrow(new AccessDeniedException("Not allowed")).when(accessGuard).requireRoomManage(userId, hotelId);
+
+        assertThatThrownBy(() -> controller.update(userId, hotelId, roomId, request))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(roomService, never()).update(any(), any(), any());
     }
 
     @Test
     void delete_returns204() {
         doNothing().when(roomService).delete(hotelId, roomId);
 
-        ResponseEntity<Void> result = controller.delete(hotelId, roomId);
+        ResponseEntity<Void> result = controller.delete(userId, hotelId, roomId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(accessGuard).requireRoomManage(userId, hotelId);
+    }
+
+    @Test
+    void delete_guardThrowsAccessDenied_serviceNotCalled() {
+        doThrow(new AccessDeniedException("Not allowed")).when(accessGuard).requireRoomManage(userId, hotelId);
+
+        assertThatThrownBy(() -> controller.delete(userId, hotelId, roomId))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(roomService, never()).delete(any(), any());
     }
 
     @Test
@@ -120,10 +167,21 @@ class RoomControllerTest {
         when(roomService.updateStatus(hotelId, roomId, RoomStatus.OCCUPIED)).thenReturn(response);
 
         ResponseEntity<ApiResponse<RoomResponse>> result =
-                controller.updateStatus(hotelId, roomId, RoomStatus.OCCUPIED);
+                controller.updateStatus(userId, hotelId, roomId, RoomStatus.OCCUPIED);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
+        verify(accessGuard).requireRoomManage(userId, hotelId);
+    }
+
+    @Test
+    void updateStatus_guardThrowsAccessDenied_serviceNotCalled() {
+        doThrow(new AccessDeniedException("Not allowed")).when(accessGuard).requireRoomManage(userId, hotelId);
+
+        assertThatThrownBy(() -> controller.updateStatus(userId, hotelId, roomId, RoomStatus.OCCUPIED))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(roomService, never()).updateStatus(any(), any(), any());
     }
 
     @Test

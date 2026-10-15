@@ -38,6 +38,51 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleAuthenticationRequired_returns401() {
+        AuthenticationRequiredException ex = new AuthenticationRequiredException("Authentication required");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/hotels");
+
+        ResponseEntity<ErrorResponse> response = handler.handleAuthenticationRequired(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(401);
+        assertThat(response.getBody().error()).isEqualTo("UNAUTHORIZED");
+        assertThat(response.getBody().message()).isEqualTo("Authentication required");
+    }
+
+    @Test
+    void handleAccessDenied_returns403() {
+        AccessDeniedException ex = new AccessDeniedException("Not allowed to perform this action");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/hotels/1");
+
+        ResponseEntity<ErrorResponse> response = handler.handleAccessDenied(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(403);
+        assertThat(response.getBody().error()).isEqualTo("FORBIDDEN");
+        assertThat(response.getBody().message()).isEqualTo("Not allowed to perform this action");
+    }
+
+    @Test
+    void handleAuthorizationUnavailable_returns503() {
+        AuthorizationUnavailableException ex = new AuthorizationUnavailableException("Authorization service unavailable");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/hotels");
+
+        ResponseEntity<ErrorResponse> response = handler.handleAuthorizationUnavailable(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(503);
+        assertThat(response.getBody().error()).isEqualTo("AUTHORIZATION_UNAVAILABLE");
+        assertThat(response.getBody().message()).isEqualTo("Authorization service unavailable");
+    }
+
+    @Test
     void handleDuplicateResource_returns409() {
         DuplicateResourceException ex = new DuplicateResourceException("Room", "roomNumber", "101");
         HttpServletRequest request = mock(HttpServletRequest.class);

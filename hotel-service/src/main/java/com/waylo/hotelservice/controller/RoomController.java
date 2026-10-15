@@ -5,6 +5,7 @@ import com.waylo.hotelservice.domain.RoomType;
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.RoomRequest;
 import com.waylo.hotelservice.dto.RoomResponse;
+import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.RoomService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
@@ -28,14 +30,18 @@ import java.util.UUID;
 public class RoomController {
 
     private final RoomService roomService;
+    private final HotelAccessGuard accessGuard;
 
-    public RoomController(RoomService roomService) {
+    public RoomController(RoomService roomService, HotelAccessGuard accessGuard) {
         this.roomService = roomService;
+        this.accessGuard = accessGuard;
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<RoomResponse>> create(@PathVariable UUID hotelId,
+    public ResponseEntity<ApiResponse<RoomResponse>> create(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                             @PathVariable UUID hotelId,
                                                              @Valid @RequestBody RoomRequest request) {
+        accessGuard.requireRoomManage(userId, hotelId);
         RoomResponse response = roomService.create(hotelId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Room created"));
     }
@@ -61,23 +67,29 @@ public class RoomController {
     }
 
     @PutMapping("/{roomId}")
-    public ResponseEntity<ApiResponse<RoomResponse>> update(@PathVariable UUID hotelId,
+    public ResponseEntity<ApiResponse<RoomResponse>> update(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                             @PathVariable UUID hotelId,
                                                              @PathVariable UUID roomId,
                                                              @Valid @RequestBody RoomRequest request) {
+        accessGuard.requireRoomManage(userId, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.update(hotelId, roomId, request), "Room updated"));
     }
 
     @DeleteMapping("/{roomId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID hotelId,
-                                       @PathVariable UUID roomId) {
+    public ResponseEntity<Void> delete(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                        @PathVariable UUID hotelId,
+                                        @PathVariable UUID roomId) {
+        accessGuard.requireRoomManage(userId, hotelId);
         roomService.delete(hotelId, roomId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{roomId}/status")
-    public ResponseEntity<ApiResponse<RoomResponse>> updateStatus(@PathVariable UUID hotelId,
+    public ResponseEntity<ApiResponse<RoomResponse>> updateStatus(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                                   @PathVariable UUID hotelId,
                                                                    @PathVariable UUID roomId,
                                                                    @RequestParam RoomStatus status) {
+        accessGuard.requireRoomManage(userId, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.updateStatus(hotelId, roomId, status), "Room status updated"));
     }
 

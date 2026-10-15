@@ -3,6 +3,7 @@ package com.waylo.hotelservice.controller;
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
+import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,13 +27,17 @@ import java.util.UUID;
 public class HotelController {
 
     private final HotelService hotelService;
+    private final HotelAccessGuard accessGuard;
 
-    public HotelController(HotelService hotelService) {
+    public HotelController(HotelService hotelService, HotelAccessGuard accessGuard) {
         this.hotelService = hotelService;
+        this.accessGuard = accessGuard;
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<HotelResponse>> create(@Valid @RequestBody HotelRequest request) {
+    public ResponseEntity<ApiResponse<HotelResponse>> create(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                              @Valid @RequestBody HotelRequest request) {
+        accessGuard.requireCreate(userId, request.organizationId());
         HotelResponse response = hotelService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Hotel created"));
     }
@@ -59,24 +65,32 @@ public class HotelController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<HotelResponse>> update(@PathVariable UUID id,
+    public ResponseEntity<ApiResponse<HotelResponse>> update(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                              @PathVariable UUID id,
                                                               @Valid @RequestBody HotelRequest request) {
+        accessGuard.requireHotelManage(userId, id);
         return ResponseEntity.ok(ApiResponse.of(hotelService.update(id, request), "Hotel updated"));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                        @PathVariable UUID id) {
+        accessGuard.requireHotelManage(userId, id);
         hotelService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/deactivate")
-    public ResponseEntity<ApiResponse<HotelResponse>> deactivate(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<HotelResponse>> deactivate(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                                  @PathVariable UUID id) {
+        accessGuard.requireHotelManage(userId, id);
         return ResponseEntity.ok(ApiResponse.of(hotelService.deactivate(id), "Hotel deactivated"));
     }
 
     @PostMapping("/{id}/activate")
-    public ResponseEntity<ApiResponse<HotelResponse>> activate(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<HotelResponse>> activate(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                                @PathVariable UUID id) {
+        accessGuard.requireHotelManage(userId, id);
         return ResponseEntity.ok(ApiResponse.of(hotelService.activate(id), "Hotel activated"));
     }
 }
