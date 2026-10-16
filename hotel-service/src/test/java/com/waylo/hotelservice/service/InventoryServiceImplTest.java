@@ -726,9 +726,14 @@ class InventoryServiceImplTest {
         List<DailyInventoryResponse> result = service.updateInventory(hotelId, userId, request);
 
         assertThat(result).hasSize(2);
-        assertThat(result.get(0).roomTypeId()).isEqualTo(roomTypeId1);
-        assertThat(result.get(1).roomTypeId()).isEqualTo(roomTypeId2);
-        assertThat(result.get(0).allotment()).isEqualTo(110); // changed
-        assertThat(result.get(1).allotment()).isEqualTo(80);   // unchanged
+        // Service sorts items by (roomTypeId, stayDate); roomTypeId1/roomTypeId2 are random UUIDs,
+        // so assert against their actual UUID order rather than assuming roomTypeId1 < roomTypeId2.
+        boolean rt1First = roomTypeId1.compareTo(roomTypeId2) <= 0;
+        DailyInventoryResponse first = rt1First ? result.get(0) : result.get(1);
+        DailyInventoryResponse second = rt1First ? result.get(1) : result.get(0);
+        assertThat(first.roomTypeId()).isEqualTo(roomTypeId1);
+        assertThat(second.roomTypeId()).isEqualTo(roomTypeId2);
+        assertThat(first.allotment()).isEqualTo(110); // changed
+        assertThat(second.allotment()).isEqualTo(80);   // unchanged
     }
 }

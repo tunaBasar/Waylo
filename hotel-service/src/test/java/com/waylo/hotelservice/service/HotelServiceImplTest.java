@@ -1,16 +1,20 @@
 package com.waylo.hotelservice.service;
 
+import com.waylo.hotelservice.client.AuthAccessClient;
 import com.waylo.hotelservice.domain.Hotel;
 import com.waylo.hotelservice.dto.HotelMapper;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.repository.HotelRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class HotelServiceImplTest {
 
     @Mock
@@ -31,11 +36,21 @@ class HotelServiceImplTest {
     @Mock
     private HotelMapper hotelMapper;
 
+    @Mock
+    private AuthAccessClient authAccessClient;
+
     @InjectMocks
     private HotelServiceImpl hotelService;
 
     private final UUID testId = UUID.randomUUID();
     private final UUID orgId = UUID.randomUUID();
+
+    @BeforeEach
+    void setUpDefaultActiveOrg() {
+        // Default: the test hotel's org is active, so existing getAll/search tests (which build
+        // hotels with orgId via buildHotel) keep passing without each test stubbing this.
+        when(authAccessClient.activeOrganizationIds()).thenReturn(List.of(orgId));
+    }
 
     private Hotel buildHotel(UUID id, String name, String city, String country) {
         Hotel hotel = new Hotel();
@@ -314,5 +329,109 @@ class HotelServiceImplTest {
 
         assertThat(result).hasSize(1);
         verify(hotelRepository).findByOrganizationId(orgId);
+    }
+
+    // --- Public projection: getAll/search exclude inactive and non-ACTIVE-org hotels ---
+
+    @Test
+    void getAll_excludesInactiveHotel() {
+        Hotel active = buildHotel(testId, "Active Hotel", "Istanbul", "Turkey");
+        Hotel inactive = buildHotel(UUID.randomUUID(), "Inactive Hotel", "Istanbul", "Turkey");
+        inactive.setActive(false);
+        HotelResponse response = buildResponse(testId);
+
+        when(hotelRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(hotelMapper.toResponse(active)).thenReturn(response);
+
+        List<HotelResponse> result = hotelService.getAll();
+
+        assertThat(result).hasSize(1);
+        verify(hotelMapper, never()).toResponse(inactive);
+    }
+
+    @Test
+    void getAll_excludesHotelOfNonActiveOrganization() {
+        UUID suspendedOrgId = UUID.randomUUID();
+        Hotel visible = buildHotel(testId, "Visible Hotel", "Istanbul", "Turkey");
+        Hotel hidden = buildHotel(UUID.randomUUID(), "Hidden Hotel", "Istanbul", "Turkey");
+        hidden.setOrganizationId(suspendedOrgId);
+        HotelResponse response = buildResponse(testId);
+
+        // authAccessClient stubbed in @BeforeEach to return only [orgId] as ACTIVE
+        when(hotelRepository.findAll()).thenReturn(List.of(visible, hidden));
+        when(hotelMapper.toResponse(visible)).thenReturn(response);
+
+        List<HotelResponse> result = hotelService.getAll();
+
+        assertThat(result).hasSize(1);
+        verify(hotelMapper, never()).toResponse(hidden);
+    }
+
+    @Test
+    void getAll_includesLegacyHotelWithoutOrganization() {
+        Hotel legacy = buildHotel(testId, "Legacy Hotel", "Istanbul", "Turkey");
+        legacy.setOrganizationId(null);
+        HotelResponse response = buildResponse(testId);
+
+        when(hotelRepository.findAll()).thenReturn(List.of(legacy));
+        when(hotelMapper.toResponse(legacy)).thenReturn(response);
+
+        List<HotelResponse> result = hotelService.getAll();
+
+        assertThat(result).hasSize(1);
+        // Legacy hotel visible without ever calling the organization lookup (short-circuit when all-legacy)
+        verify(authAccessClient, never()).activeOrganizationIds();
+    }
+
+    @Test
+    void getAll_authServiceUnavailable_hidesOrgOwnedHotelsFailClosed() {
+        Hotel orgOwned = buildHotel(testId, "Org Hotel", "Istanbul", "Turkey");
+        Hotel legacy = buildHotel(UUID.randomUUID(), "Legacy Hotel", "Istanbul", "Turkey");
+        legacy.setOrganizationId(null);
+        HotelResponse legacyResponse = buildResponse(legacy.getId());
+
+        when(authAccessClient.activeOrganizationIds()).thenThrow(new RuntimeException("auth-service down"));
+        when(hotelRepository.findAll()).thenReturn(List.of(orgOwned, legacy));
+        when(hotelMapper.toResponse(legacy)).thenReturn(legacyResponse);
+
+        List<HotelResponse> result = hotelService.getAll();
+
+        assertThat(result).hasSize(1);
+        verify(hotelMapper, never()).toResponse(orgOwned);
+    }
+
+    @Test
+    void search_excludesHotelOfNonActiveOrganization() {
+        UUID suspendedOrgId = UUID.randomUUID();
+        Hotel visible = buildHotel(testId, "Visible Hotel", "Istanbul", "Turkey");
+        Hotel hidden = buildHotel(UUID.randomUUID(), "Hidden Hotel", "Istanbul", "Turkey");
+        hidden.setOrganizationId(suspendedOrgId);
+        HotelResponse response = buildResponse(testId);
+
+        when(hotelRepository.findByCity("Istanbul")).thenReturn(List.of(visible, hidden));
+        when(hotelMapper.toResponse(visible)).thenReturn(response);
+
+        List<HotelResponse> result = hotelService.search("Istanbul", null, null);
+
+        assertThat(result).hasSize(1);
+        verify(hotelMapper, never()).toResponse(hidden);
+    }
+
+    @Test
+    void getById_doesNotFilterByOrganizationStatus() {
+        // getById is the internal lookup auth-service relies on for role-grant verification
+        // before a PENDING organization is ever ACTIVE; it must never apply the public filter.
+        UUID pendingOrgId = UUID.randomUUID();
+        Hotel hotel = buildHotel(testId, "Pending Org Hotel", "Istanbul", "Turkey");
+        hotel.setOrganizationId(pendingOrgId);
+        HotelResponse response = buildResponse(testId);
+
+        when(hotelRepository.findById(testId)).thenReturn(Optional.of(hotel));
+        when(hotelMapper.toResponse(hotel)).thenReturn(response);
+
+        HotelResponse result = hotelService.getById(testId);
+
+        assertThat(result).isEqualTo(response);
+        verify(authAccessClient, never()).activeOrganizationIds();
     }
 }
