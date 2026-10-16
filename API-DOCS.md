@@ -451,6 +451,66 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 #### `POST /api/bookings/{id}/status?status=CONFIRMED` - Update Status
 #### `POST /api/bookings/{id}/cancel` - Cancel Booking
 
+### Order / OrderItem (additive, same service)
+
+Self-service customer orders. `customerId` in the request body must equal the caller's
+`X-User-Id` (forwarded by api-gateway from a verified JWT); mismatches return 403. v1 accepts
+exactly one `OrderItem` per order (array of size 1); the model is ready for multiple items.
+Legacy `/api/bookings` is unaffected and untouched by this addition.
+
+#### `POST /api/orders` - Create Order
+
+```json
+// Request
+{
+  "customerId": "customer-uuid",         // required, must equal caller
+  "currency": "USD",                     // required, 3-letter ISO 4217
+  "quoteId": null,                       // optional, pricing-service not implemented yet
+  "notes": "Honeymoon package",          // optional, max 2000 chars
+  "items": [
+    {
+      "vertical": "HOTEL",                       // required: HOTEL, FLIGHT, CAR
+      "supplierOrganizationId": "org-uuid",      // optional
+      "productRef": "room-type-or-rate-uuid",    // required
+      "description": "Deluxe room, 2 nights",    // required, max 500 chars
+      "unitAmount": 100.00,                      // required, >= 0.01
+      "quantity": 2,                             // required, 1-20
+      "currency": "USD"                          // required, must equal order currency or 422
+    }
+  ]
+}
+
+// Response: 201 Created - status PENDING, totalAmount = sum(unitAmount * quantity)
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "customerId": "customer-uuid",
+    "status": "PENDING",
+    "currency": "USD",
+    "quoteId": null,
+    "totalAmount": 200.00,
+    "notes": "Honeymoon package",
+    "version": 0,
+    "items": [ { "id": "uuid", "orderId": "uuid", "vertical": "HOTEL", "productRef": "...",
+                 "unitAmount": 100.00, "quantity": 2, "subtotal": 200.00, "currency": "USD" } ],
+    "createdAt": "...", "updatedAt": "..."
+  }
+}
+```
+
+Errors: 401 no identity, 403 `customerId` does not match caller or order not owned by caller,
+422 `CURRENCY_MISMATCH` item currency differs from order currency, 400 validation (more than
+one item, non-positive amount, lowercase/invalid currency), 404 order not found.
+
+#### `GET /api/orders/{id}` - Get own order (403 if not owner)
+#### `GET /api/orders` - List caller's own orders
+#### `POST /api/orders/{id}/cancel?expectedVersion=0` - Cancel own order
+
+`expectedVersion` is optional; when provided and stale, returns 409 `CONCURRENT_MODIFICATION`.
+Cancelling an already-`CANCELLED` or `FAILED` order returns 422 (`ALREADY_CANCELLED` /
+`TERMINAL_STATE`). The response reflects the persisted version (flushed before responding).
+
 ---
 
 ## 6. Pricing Service
