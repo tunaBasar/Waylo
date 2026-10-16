@@ -457,4 +457,257 @@ class JwtAuthenticationFilterTest {
 
         assertThat(capturedRequest.get()).isNotNull();
     }
+
+    // --- PART B: identity forwarding on public GETs ---
+
+    @Test
+    void publicHotelGet_withValidToken_forwardIdentityHeaders() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void publicHotelGet_withValidTokenMissingEmail_forwardIdentityHeaders() {
+        // Token without email claim - should still forward subject and role, skip email
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        String tokenWithoutEmail = Jwts.builder()
+                .subject("user-2")
+                .claim("role", "USER")
+                .claim("typ", "access")
+                .issuer("waylo-auth")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 3600_000))
+                .signWith(KEY)
+                .compact();
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutEmail)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-2");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void publicHotelSubPath_withValidToken_forwardIdentityHeaders() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels/12345678-1234-1234-1234-123456789abc")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void publicHotelGet_noToken_proceedsAnonymous() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // No identity headers present (anonymous)
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isNull();
+    }
+
+    @Test
+    void publicHotelGet_withInvalidToken_proceedsAnonymous() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer invalid.token.here")
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Not 401 - public path continues anonymous even with invalid token
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+    }
+
+    @Test
+    void publicHotelGet_withExpiredToken_proceedsAnonymous() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        // Build an expired token
+        String expiredToken = Jwts.builder()
+                .subject("user-1")
+                .claim("email", "user@example.com")
+                .claim("role", "USER")
+                .claim("typ", "access")
+                .issuer("waylo-auth")
+                .issuedAt(new Date(System.currentTimeMillis() - 7200_000))
+                .expiration(new Date(System.currentTimeMillis() - 3600_000)) // expired 1 hour ago
+                .signWith(KEY)
+                .compact();
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Public path continues anonymous with expired token
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+    }
+
+    @Test
+    void publicHotelGet_withSpoofedHeadersAndValidToken_usesRealSubject() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .header("X-User-Id", "attacker")
+                .header("X-User-Email", "attacker@evil.com")
+                .header("X-User-Role", "ADMIN")
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Spoofed headers removed, verified headers from token added
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void nonPublicHotelPost_withValidToken_forwardsIdentity() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.post("/api/hotels")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Non-GET hotel paths require auth but are handled by the regular auth flow
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
+        assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void authEndpoint_withValidToken_proceedsWithoutIdentity() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.post("/api/auth/login")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        // Auth endpoints are public and don't do identity forwarding
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+    }
 }

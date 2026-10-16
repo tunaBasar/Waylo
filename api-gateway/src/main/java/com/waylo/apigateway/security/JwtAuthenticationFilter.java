@@ -57,8 +57,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return badRequestResponse(exchange);
         }
 
-        // Public paths: no token required
+        // Public paths: no token required by default
         if (isPublicRequest(method, decodedPath)) {
+            // For public GETs on hotel catalog browse paths, check if a valid token is present.
+            // If so, forward identity from the token; otherwise proceed anonymous.
+            if ("GET".equalsIgnoreCase(method) && isPublicHotelBrowsePath(decodedPath)) {
+                return processPublicGetWithOptionalIdentity(exchange, chain, mutatedRequest);
+            }
+            // Other public paths (auth endpoints, actuator, OPTIONS): forward without identity
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
         }
 
@@ -77,13 +83,67 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         Claims c = claims.get();
-        // Add verified identity headers
-        ServerHttpRequest verifiedRequest = mutatedRequest.mutate()
-                .header("X-User-Id", c.getSubject())
-                .header("X-User-Email", c.get("email", String.class))
-                .header("X-User-Role", c.get("role", String.class))
-                .build();
+        ServerHttpRequest verifiedRequest = withIdentity(mutatedRequest, c);
         return chain.filter(exchange.mutate().request(verifiedRequest).build());
+    }
+
+    /**
+     * For public GET hotel browse paths: check for a valid Bearer token.
+     * If present and valid, forward with identity headers from the token.
+     * If absent or invalid, forward anonymous (stripped headers).
+     */
+    private Mono<Void> processPublicGetWithOptionalIdentity(
+            ServerWebExchange exchange,
+            GatewayFilterChain chain,
+            ServerHttpRequest mutatedRequest) {
+
+        String authHeader = exchange.getRequest().getHeaders().getFirst(AUTHORIZATION_HEADER);
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            // No valid token: proceed anonymous
+            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+        }
+
+        String token = authHeader.substring(BEARER_PREFIX.length());
+
+        // BUG 1 FIX: Verify synchronously, no Mono.fromCallable, no onErrorResume
+        Optional<Claims> claims = jwtVerifier.verifyAccessToken(token);
+        if (claims.isEmpty()) {
+            // Invalid token: proceed anonymous (not 401, since path is public)
+            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+        }
+
+        Claims c = claims.get();
+        ServerHttpRequest identityRequest = withIdentity(mutatedRequest, c);
+        return chain.filter(exchange.mutate().request(identityRequest).build());
+    }
+
+    /**
+     * Check if the path is a public hotel catalog browse path.
+     * Covers /api/hotels and /api/hotels/{hotelId} and sub-paths.
+     */
+    private boolean isPublicHotelBrowsePath(String path) {
+        return path.equals("/api/hotels") || path.startsWith("/api/hotels/");
+    }
+
+    /**
+     * Build a request with verified identity headers from claims.
+     * Only adds headers for non-null claim values (handles tokens without email/role).
+     */
+    private ServerHttpRequest withIdentity(ServerHttpRequest request, Claims claims) {
+        ServerHttpRequest.Builder builder = request.mutate();
+        String subject = claims.getSubject();
+        if (subject != null) {
+            builder.header("X-User-Id", subject);
+        }
+        String email = claims.get("email", String.class);
+        if (email != null) {
+            builder.header("X-User-Email", email);
+        }
+        String role = claims.get("role", String.class);
+        if (role != null) {
+            builder.header("X-User-Role", role);
+        }
+        return builder.build();
     }
 
     private boolean hasPathTraversal(String rawPath, String decodedPath) {
