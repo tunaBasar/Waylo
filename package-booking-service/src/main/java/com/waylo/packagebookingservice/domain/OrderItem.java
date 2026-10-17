@@ -21,7 +21,7 @@ import java.util.UUID;
  * JSONB kolon ornegi yok).
  *
  * fulfillmentRef, dikeyin fulfillment kaydina (orn. ileride hotel-service reservation) isaret
- * eder; bugun hotel-service'te reservation modeli olmadigi icin null kalir (ISSUES.md: hotel
+ * eder; bugun hotel-service'te reservation modeli olmadigi icin null kalir (hotel
  * hold/reservation modelleri planli degil).
  */
 @Entity

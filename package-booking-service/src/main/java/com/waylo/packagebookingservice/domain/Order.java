@@ -22,7 +22,7 @@ import java.util.UUID;
  * dogrular), model birden fazla OrderItem'a hazirdir (order_items.order_id FK, cascade).
  *
  * quoteId pricing-service henuz yok oldugu icin su an isaretci alandir, dogrulanmis quote
- * baglantisi sonraki is paketidir (ISSUES.md'de ayrica kayitlidir).
+ * baglantisi sonraki is paketidir.
  */
 @Entity
 @Table(name = "orders")

@@ -3,6 +3,19 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# Node / Next.js
+node_modules/
+.next/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 # IDE
 .idea/
 *.iml
@@ -22,14 +35,34 @@ Thumbs.db
 *.swp
 *~
 
-# Spring Boot
+# Logs and runtime
+logs/
 *.log
 *.pid
-application-local.yml
+hs_err_pid*
 
-# Docker
+# Secrets and local config
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.jks
+application-local.yml
+application-local.properties
 docker-compose.override.yml
+
+# Local tooling, AI agent and personal working files (not part of the product)
 graphify-out/
+CLAUDE.md
+AGENTS.md
+manager_prompt.md
+PROGRESS.md
+TASK_QUEUE.md
+ISSUES.md
+PRODUCT-DISCUSSION-NOTES.md
+.claude/
+.cursor/
+.jcode/
+.aider*

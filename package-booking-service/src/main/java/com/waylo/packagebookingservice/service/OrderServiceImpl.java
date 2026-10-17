@@ -26,7 +26,7 @@ import java.util.UUID;
 /**
  * v1 self-service kurali: bir musteri yalniz kendi customerId'si altinda order olusturabilir
  * ve goruntuleyebilir (PRODUCT-ARCHITECTURE.md SS7 "GET /api/v1/me/orders/{id}": getOwnedOrder).
- * Platform-genis cross-customer erisim bu is paketinde yoktur (ISSUES.md'ye kaydedilir).
+ * Platform-genis cross-customer erisim bu is paketinde yoktur.
  */
 @Service
 @Transactional

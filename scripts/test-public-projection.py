@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Acceptance test for hotel-service public projection (TASK_QUEUE priority #1).
+"""Acceptance test for hotel-service public projection.
 
 Verifies GET /api/hotels and /api/hotels/search exclude:
   - inactive hotels
@@ -11,7 +11,7 @@ remain unfiltered by organization status.
 Registers a real user, creates an organization (stays PENDING by default),
 creates a hotel under it, and asserts the hotel is absent from public listing
 while PENDING, then (if an admin exists) approving flow is out of scope here
-since admin bootstrap requires direct DB access per ISSUES.md.
+since admin bootstrap requires direct DB access.
 """
 import argparse, json, secrets, sys, uuid
 from decimal import Decimal
