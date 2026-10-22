@@ -4,6 +4,7 @@ import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,10 +19,13 @@ public interface FlightService {
     List<FlightResponse> getAll();
 
     /**
-     * Kalkış ve varış havalimanı + tarih aralığı ile uçuş arama.
+     * Search flights by departure/arrival airport codes with date or time range.
      */
-    List<FlightResponse> search(String departureCode, String arrivalCode,
-                                Instant from, Instant to);
+    List<FlightResponse> search(String from, String to,
+                                LocalDate date,
+                                Instant departureFrom,
+                                Instant departureTo,
+                                boolean includeCancelled);
 
     FlightResponse update(UUID id, FlightRequest request);
 

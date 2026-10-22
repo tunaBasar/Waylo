@@ -5,6 +5,7 @@ import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
 import com.waylo.flightservice.service.FlightService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,9 +58,11 @@ public class FlightController {
     public ResponseEntity<ApiResponse<List<FlightResponse>>> search(
             @RequestParam String from,
             @RequestParam String to,
-            @RequestParam Instant departureFrom,
-            @RequestParam Instant departureTo) {
-        return ResponseEntity.ok(ApiResponse.of(flightService.search(from, to, departureFrom, departureTo)));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Instant departureFrom,
+            @RequestParam(required = false) Instant departureTo,
+            @RequestParam(defaultValue = "false") boolean includeCancelled) {
+        return ResponseEntity.ok(ApiResponse.of(flightService.search(from, to, date, departureFrom, departureTo, includeCancelled)));
     }
 
     @PutMapping("/{id}")

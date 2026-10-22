@@ -59,9 +59,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         // Public paths: no token required by default
         if (isPublicRequest(method, decodedPath)) {
-            // For public GETs on hotel catalog browse paths, check if a valid token is present.
+            // For public GETs on catalog browse paths (hotels, flights, airports), check if a valid token is present.
             // If so, forward identity from the token; otherwise proceed anonymous.
-            if ("GET".equalsIgnoreCase(method) && isPublicHotelBrowsePath(decodedPath)) {
+            if ("GET".equalsIgnoreCase(method) && isPublicCatalogBrowsePath(decodedPath)) {
                 return processPublicGetWithOptionalIdentity(exchange, chain, mutatedRequest);
             }
             // Other public paths (auth endpoints, actuator, OPTIONS): forward without identity
@@ -88,7 +88,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * For public GET hotel browse paths: check for a valid Bearer token.
+     * For public GET catalog browse paths (hotels, flights, airports): check for a valid Bearer token.
      * If present and valid, forward with identity headers from the token.
      * If absent or invalid, forward anonymous (stripped headers).
      */
@@ -118,11 +118,24 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * Check if the path is a public hotel catalog browse path.
-     * Covers /api/hotels and /api/hotels/{hotelId} and sub-paths.
+     * Check if the path is a public catalog browse path.
+     * Covers /api/hotels, /api/flights, /api/airports and their sub-paths.
+     * Uses exact segment matching (equals prefix or starts with prefix + "/").
      */
-    private boolean isPublicHotelBrowsePath(String path) {
-        return path.equals("/api/hotels") || path.startsWith("/api/hotels/");
+    private boolean isPublicCatalogBrowsePath(String path) {
+        // Hotels (existing behavior)
+        if (path.equals("/api/hotels") || path.startsWith("/api/hotels/")) {
+            return true;
+        }
+        // Flights (new)
+        if (path.equals("/api/flights") || path.startsWith("/api/flights/")) {
+            return true;
+        }
+        // Airports (new)
+        if (path.equals("/api/airports") || path.startsWith("/api/airports/")) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -181,9 +194,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if ("/actuator/health".equals(path)) {
             return true;
         }
-        // Public hotel catalog browse (GET only, exact segment match)
-        if ("GET".equalsIgnoreCase(method) &&
-                (path.equals("/api/hotels") || path.startsWith("/api/hotels/"))) {
+        // Public catalog browse (GET only, exact segment match)
+        if ("GET".equalsIgnoreCase(method) && isPublicCatalogBrowsePath(path)) {
             return true;
         }
         return false;

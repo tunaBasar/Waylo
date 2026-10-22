@@ -15,14 +15,16 @@ public interface FlightMapper {
     FlightResponse toResponse(Flight flight);
 
     /**
-     * Entity oluşturma: departureAirport ve arrivalAirport service katmanında
-     * IATA code ile lookup yapılıp set edilecek, burada ignore.
+     * Entity olusturma: departureAirport ve arrivalAirport service katmaninda
+     * IATA code ile lookup yapilip set edilecek, burada ignore.
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "departureAirport", ignore = true)
     @Mapping(target = "arrivalAirport", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Flight toEntity(FlightRequest request);
 
     @Mapping(target = "id", ignore = true)
@@ -30,5 +32,7 @@ public interface FlightMapper {
     @Mapping(target = "arrivalAirport", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updateEntity(FlightRequest request, @MappingTarget Flight flight);
 }
