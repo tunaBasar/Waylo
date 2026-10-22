@@ -5,6 +5,7 @@ import com.waylo.hotelservice.domain.Hotel;
 import com.waylo.hotelservice.domain.HotelRoomType;
 import com.waylo.hotelservice.domain.RatePlan;
 import com.waylo.hotelservice.dto.DailyRateResponse;
+import com.waylo.hotelservice.dto.HotelCurrencyResponse;
 import com.waylo.hotelservice.dto.RateUpdateItem;
 import com.waylo.hotelservice.dto.RateUpdateRequest;
 import com.waylo.hotelservice.exception.BusinessRuleException;
@@ -289,5 +290,22 @@ public class RateServiceImpl implements RateService {
         if (daysBetween > MAX_DAYS) {
             throw new IllegalArgumentException("Date range exceeds " + MAX_DAYS + " days");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HotelCurrencyResponse getHotelCurrency(UUID hotelId) {
+        if (!hotelRepository.existsById(hotelId)) {
+            throw new ResourceNotFoundException("Hotel", "id", hotelId);
+        }
+
+        List<String> existingCurrencies = dailyRateRepository.findCurrenciesByHotelId(hotelId);
+        if (existingCurrencies.isEmpty()) {
+            return null;
+        }
+
+        // Return the first (and should be only) currency
+        String currency = existingCurrencies.get(0);
+        return new HotelCurrencyResponse(currency);
     }
 }

@@ -5,6 +5,8 @@ import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
+import com.waylo.hotelservice.service.HotelSearchService;
+import org.springframework.format.annotation.DateTimeFormat;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,10 +31,12 @@ public class HotelController {
 
     private final HotelService hotelService;
     private final HotelAccessGuard accessGuard;
+    private final HotelSearchService hotelSearchService;
 
-    public HotelController(HotelService hotelService, HotelAccessGuard accessGuard) {
+    public HotelController(HotelService hotelService, HotelAccessGuard accessGuard, HotelSearchService hotelSearchService) {
         this.hotelService = hotelService;
         this.accessGuard = accessGuard;
+        this.hotelSearchService = hotelSearchService;
     }
 
     @PostMapping
@@ -60,8 +65,17 @@ public class HotelController {
     public ResponseEntity<ApiResponse<List<HotelResponse>>> search(
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String country,
-            @RequestParam(required = false) Integer minStars) {
-        return ResponseEntity.ok(ApiResponse.of(hotelService.search(city, country, minStars)));
+            @RequestParam(required = false) Integer minStars,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            @RequestParam(defaultValue = "1") int rooms,
+            @RequestParam(defaultValue = "1") int adults,
+            @RequestParam(required = false) List<Integer> childrenAges) {
+        if (checkIn == null && checkOut == null) {
+            return ResponseEntity.ok(ApiResponse.of(hotelService.search(city, country, minStars)));
+        }
+        return ResponseEntity.ok(ApiResponse.of(hotelSearchService.search(
+                city, country, minStars, checkIn, checkOut, rooms, adults, childrenAges)));
     }
 
     @PutMapping("/{id}")

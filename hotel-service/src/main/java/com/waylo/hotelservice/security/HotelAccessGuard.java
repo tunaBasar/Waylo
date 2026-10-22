@@ -53,6 +53,17 @@ public class HotelAccessGuard {
         check(userId, hotel.getOrganizationId(), hotelId, "ROOM_MANAGE");
     }
 
+    public void requireHotelAccess(UUID userId, UUID hotelId) {
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+
+        if (hotel.getOrganizationId() == null) {
+            throw new AccessDeniedException("Hotel has no owning organization; access is locked until it is assigned");
+        }
+
+        check(userId, hotel.getOrganizationId(), hotelId, "HOTEL_ACCESS");
+    }
+
     private void check(UUID userId, UUID organizationId, UUID hotelId, String permission) {
         if (userId == null) {
             throw new AuthenticationRequiredException("Authentication required");

@@ -2,6 +2,7 @@ package com.waylo.hotelservice.controller;
 
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.DailyRateResponse;
+import com.waylo.hotelservice.dto.HotelCurrencyResponse;
 import com.waylo.hotelservice.dto.RateUpdateRequest;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.RateService;
@@ -10,6 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -56,5 +58,15 @@ public class RateController {
         accessGuard.requireRoomManage(userId, hotelId);
         List<DailyRateResponse> response = rateService.updateRates(hotelId, request);
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.of(response, "Rates updated"));
+    }
+
+    @GetMapping("/currency")
+    public ResponseEntity<ApiResponse<HotelCurrencyResponse>> getCurrency(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @org.springframework.web.bind.annotation.PathVariable UUID hotelId) {
+
+        accessGuard.requireHotelAccess(userId, hotelId);
+        HotelCurrencyResponse response = rateService.getHotelCurrency(hotelId);
+        return ResponseEntity.ok(ApiResponse.of(response));
     }
 }

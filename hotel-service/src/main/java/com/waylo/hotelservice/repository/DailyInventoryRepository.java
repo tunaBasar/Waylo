@@ -43,4 +43,19 @@ public interface DailyInventoryRepository extends JpaRepository<DailyInventory, 
             @Param("roomTypeId") UUID roomTypeId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /**
+     * Deterministic lock order (roomTypeId, stayDate) to avoid deadlocks between
+     * concurrent multi-night holds on the same room type.
+     * The `to` parameter is the LAST night = checkOut.minusDays(1), inclusive.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM DailyInventory d WHERE d.hotelId = :hotelId " +
+           "AND d.roomTypeId = :roomTypeId " +
+           "AND d.stayDate >= :from AND d.stayDate <= :to " +
+           "ORDER BY d.roomTypeId, d.stayDate")
+    List<DailyInventory> lockNightsForHold(@Param("hotelId") UUID hotelId,
+                                           @Param("roomTypeId") UUID roomTypeId,
+                                           @Param("from") LocalDate from,
+                                           @Param("to") LocalDate to);
 }

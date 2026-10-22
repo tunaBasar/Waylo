@@ -9,6 +9,7 @@ import com.waylo.hotelservice.exception.AccessDeniedException;
 import com.waylo.hotelservice.repository.HotelRepository;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
+import com.waylo.hotelservice.service.HotelSearchService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class HotelControllerTest {
 
+    private final HotelSearchService hotelSearchService = mock(HotelSearchService.class);
     private final HotelService hotelService = mock(HotelService.class);
     private final HotelAccessGuard accessGuard = mock(HotelAccessGuard.class);
     private final HotelRepository hotelRepository = mock(HotelRepository.class);
@@ -223,7 +225,7 @@ class HotelControllerTest {
         HotelResponse response = buildResponse(hotelId);
         when(hotelService.search("Istanbul", "Turkey", 4)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.search("Istanbul", "Turkey", 4);
+        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.search("Istanbul", "Turkey", 4, null, null, 1, 1, null);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();

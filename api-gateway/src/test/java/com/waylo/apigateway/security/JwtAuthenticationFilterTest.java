@@ -53,6 +53,32 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void quoteEndpointsRequireVerifiedIdentity() {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper());
+        for (String path : java.util.List.of("/api/quotes", "/api/quotes/" + UUID.randomUUID())) {
+            AtomicReference<ServerHttpRequest> forwarded = new AtomicReference<>();
+            GatewayFilterChain chain = exchange -> {
+                forwarded.set(exchange.getRequest());
+                return Mono.empty();
+            };
+            var anonymous = MockServerWebExchange.from(MockServerHttpRequest.get(path)
+                    .header("X-User-Id", "spoofed-user").build());
+            filter.filter(anonymous, chain).block();
+            assertThat(anonymous.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(forwarded.get()).isNull();
+
+            var authenticated = MockServerWebExchange.from(MockServerHttpRequest.post(path)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                    .header("X-User-Id", "spoofed-user")
+                    .header("X-Internal-Token", "spoofed-internal").build());
+            filter.filter(authenticated, chain).block();
+            assertThat(forwarded.get()).isNotNull();
+            assertThat(forwarded.get().getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+            assertThat(forwarded.get().getHeaders().getFirst("X-Internal-Token")).isNull();
+        }
+    }
+
+    @Test
     void noTokenOnBookings_returns401AndChainNotCalled() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
