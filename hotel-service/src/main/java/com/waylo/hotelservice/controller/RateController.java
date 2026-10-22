@@ -38,7 +38,7 @@ public class RateController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<DailyRateResponse>>> getRates(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
-            @org.springframework.web.bind.annotation.PathVariable UUID hotelId,
+            @PathVariable UUID hotelId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID roomTypeId,
@@ -52,7 +52,7 @@ public class RateController {
     @PutMapping
     public ResponseEntity<ApiResponse<List<DailyRateResponse>>> updateRates(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
-            @org.springframework.web.bind.annotation.PathVariable UUID hotelId,
+            @PathVariable UUID hotelId,
             @Valid @RequestBody RateUpdateRequest request) {
 
         accessGuard.requireRoomManage(userId, hotelId);
@@ -63,9 +63,9 @@ public class RateController {
     @GetMapping("/currency")
     public ResponseEntity<ApiResponse<HotelCurrencyResponse>> getCurrency(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
-            @org.springframework.web.bind.annotation.PathVariable UUID hotelId) {
+            @PathVariable UUID hotelId) {
 
-        accessGuard.requireHotelAccess(userId, hotelId);
+        accessGuard.requireRoomManage(userId, hotelId);
         HotelCurrencyResponse response = rateService.getHotelCurrency(hotelId);
         return ResponseEntity.ok(ApiResponse.of(response));
     }

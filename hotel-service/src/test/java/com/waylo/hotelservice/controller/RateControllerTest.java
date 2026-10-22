@@ -1,6 +1,7 @@
 package com.waylo.hotelservice.controller;
 
 import com.waylo.hotelservice.dto.DailyRateResponse;
+import com.waylo.hotelservice.dto.HotelCurrencyResponse;
 import com.waylo.hotelservice.dto.RateUpdateItem;
 import com.waylo.hotelservice.dto.RateUpdateRequest;
 import com.waylo.hotelservice.exception.BusinessRuleException;
@@ -195,5 +196,59 @@ class RateControllerTest {
         assertThatThrownBy(() -> controller.updateRates(USER_ID, HOTEL_ID, buildRequest()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Room type");
+    }
+
+    // --- GET CURRENCY ---
+
+    @Test
+    void getCurrency_guardThrows_accessDenied() {
+        doThrow(new BusinessRuleException("ACCESS_DENIED", "Not allowed"))
+                .when(accessGuard).requireRoomManage(USER_ID, HOTEL_ID);
+
+        assertThatThrownBy(() -> controller.getCurrency(USER_ID, HOTEL_ID))
+                .isInstanceOf(BusinessRuleException.class);
+
+        verify(rateService, never()).getHotelCurrency(any());
+    }
+
+    @Test
+    void getCurrency_noUserId_guardThrows() {
+        doThrow(new BusinessRuleException("ACCESS_DENIED", "Not allowed"))
+                .when(accessGuard).requireRoomManage(null, HOTEL_ID);
+
+        assertThatThrownBy(() -> controller.getCurrency(null, HOTEL_ID))
+                .isInstanceOf(BusinessRuleException.class);
+
+        verify(rateService, never()).getHotelCurrency(any());
+    }
+
+    @Test
+    void getCurrency_authorized_returns200WithCurrency() {
+        doNothing().when(accessGuard).requireRoomManage(USER_ID, HOTEL_ID);
+        when(rateService.getHotelCurrency(HOTEL_ID))
+                .thenReturn(new HotelCurrencyResponse("EUR"));
+
+        ResponseEntity<?> result = controller.getCurrency(USER_ID, HOTEL_ID);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody()).isNotNull();
+        var body = (com.waylo.hotelservice.dto.ApiResponse<HotelCurrencyResponse>) result.getBody();
+        assertThat(body.data()).isNotNull();
+        assertThat(body.data().currency()).isEqualTo("EUR");
+        verify(accessGuard).requireRoomManage(USER_ID, HOTEL_ID);
+    }
+
+    @Test
+    void getCurrency_noRates_returns200WithDataNull() {
+        doNothing().when(accessGuard).requireRoomManage(USER_ID, HOTEL_ID);
+        when(rateService.getHotelCurrency(HOTEL_ID))
+                .thenReturn(null);
+
+        ResponseEntity<?> result = controller.getCurrency(USER_ID, HOTEL_ID);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody()).isNotNull();
+        var body = (com.waylo.hotelservice.dto.ApiResponse<HotelCurrencyResponse>) result.getBody();
+        assertThat(body.data()).isNull();
     }
 }
