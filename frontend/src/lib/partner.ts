@@ -305,6 +305,8 @@ export const partnerApi = {
     ),
   updateRates: (hotelId: string, items: RateUpdateItem[]) =>
     api.put<DailyRate[]>(`/api/hotels/${enc(hotelId)}/rates`, { items }),
+  rateCurrency: (hotelId: string) =>
+    api.get<{ currency: string } | null>(`/api/hotels/${enc(hotelId)}/rates/currency`),
 
   // orders (self-service: the caller's own orders)
   myOrders: () => api.get<Order[]>('/api/orders'),

@@ -100,19 +100,16 @@ export default function CalendarPage() {
 
   const loadCatalog = useCallback(async (hid: string) => {
     try {
-      const [rt, rp] = await Promise.all([partnerApi.roomTypes(hid), partnerApi.ratePlans(hid)]);
+      const [rt, rp, cur] = await Promise.all([
+        partnerApi.roomTypes(hid),
+        partnerApi.ratePlans(hid),
+        partnerApi.rateCurrency(hid),
+      ]);
       const types = (rt.data ?? []).filter(r => r.status === 'ACTIVE');
       setRoomTypes(types);
       setRatePlans(rp.data ?? []);
       setRoomTypeId(prev => (types.some(t => t.id === prev) ? prev : types[0]?.id ?? null));
-      // The hotel has one currency. Rates can only exist from yesterday to today+730, so two
-      // 366-day probes cover every possible rate row (backend limit is 366 days per request).
-      const base = addDays(toIso(new Date()), -1);
-      const [p1, p2] = await Promise.all([
-        partnerApi.rates(hid, base, addDays(base, 365)),
-        partnerApi.rates(hid, addDays(base, 366), addDays(base, 731)),
-      ]);
-      setHotelCurrency(p1.data?.[0]?.currency ?? p2.data?.[0]?.currency ?? null);
+      setHotelCurrency(cur.data?.currency ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Katalog yuklenemedi');
