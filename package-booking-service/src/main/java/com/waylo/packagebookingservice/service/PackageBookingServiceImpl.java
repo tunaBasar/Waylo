@@ -64,6 +64,13 @@ public class PackageBookingServiceImpl implements PackageBookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<PackageBookingResponse> getByFlightId(UUID flightId) {
+        return bookingRepository.findByFlightId(flightId).stream()
+                .map(bookingMapper::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PackageBookingResponse> search(UUID customerId, BookingStatus status) {
         if (customerId != null && status != null) {
             return bookingRepository.findByCustomerIdAndStatus(customerId, status).stream()

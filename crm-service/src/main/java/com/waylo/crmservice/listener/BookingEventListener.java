@@ -5,11 +5,11 @@ import com.waylo.crmservice.event.BookingCancelledEvent;
 import com.waylo.crmservice.event.BookingCreatedEvent;
 import com.waylo.crmservice.repository.ProcessedEventRepository;
 import com.waylo.crmservice.service.CustomerService;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,14 +30,15 @@ public class BookingEventListener {
 
     @KafkaListener(topics = "booking-events", groupId = GROUP,
             containerFactory = "kafkaListenerContainerFactory")
-    public void handleBookingEvent(@Payload Object event, Acknowledgment ack) {
+    public void handleBookingEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+        Object event = record.value();
         try {
             if (event instanceof BookingCreatedEvent e) {
                 handleBookingCreated(e);
             } else if (event instanceof BookingCancelledEvent e) {
                 handleBookingCancelled(e);
             } else {
-                log.warn("Bilinmeyen booking event tipi: {}", event.getClass().getSimpleName());
+                log.warn("Bilinmeyen booking event tipi: {}", event == null ? "null" : event.getClass().getSimpleName());
             }
         } catch (Exception ex) {
             log.error("Booking event islenirken hata: {}", ex.getMessage(), ex);

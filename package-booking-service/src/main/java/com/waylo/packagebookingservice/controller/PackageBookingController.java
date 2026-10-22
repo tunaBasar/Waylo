@@ -52,6 +52,11 @@ public class PackageBookingController {
         return ResponseEntity.ok(ApiResponse.of(bookingService.getByCustomerId(customerId)));
     }
 
+    @GetMapping("/flight/{flightId}")
+    public ResponseEntity<ApiResponse<List<PackageBookingResponse>>> getByFlightId(@PathVariable UUID flightId) {
+        return ResponseEntity.ok(ApiResponse.of(bookingService.getByFlightId(flightId)));
+    }
+
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<PackageBookingResponse>>> search(
             @RequestParam(required = false) UUID customerId,

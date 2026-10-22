@@ -34,7 +34,7 @@ services:
     container_name: waylo-kafka
     hostname: kafka
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       CLUSTER_ID: 'WayloKafkaCluster0001'
       KAFKA_NODE_ID: 1
@@ -436,7 +436,7 @@ services:
         SERVICE: crm-service
     container_name: waylo-crm-service
     ports:
-      - "127.0.0.1:8088:8088"
+      - "127.0.0.1:${CRM_SERVICE_PORT:-18088}:8088"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"

@@ -17,6 +17,8 @@ public interface PackageBookingService {
 
     List<PackageBookingResponse> getByCustomerId(UUID customerId);
 
+    List<PackageBookingResponse> getByFlightId(UUID flightId);
+
     List<PackageBookingResponse> search(UUID customerId, BookingStatus status);
 
     PackageBookingResponse update(UUID id, PackageBookingRequest request);

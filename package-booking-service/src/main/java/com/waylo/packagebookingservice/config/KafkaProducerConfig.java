@@ -19,6 +19,19 @@ public class KafkaProducerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    /**
+     * Shared type tokens for the __TypeId__ header so that consumer services (which have
+     * their own locally-declared event classes in a different package) can resolve the
+     * payload type instead of trying to Class.forName() this service's own FQCN.
+     * Must stay in sync with the TYPE_MAPPINGS token names used by every consumer
+     * (notification-service, crm-service).
+     */
+    private static final String TYPE_MAPPINGS =
+            "bookingCreated:com.waylo.packagebookingservice.event.BookingCreatedEvent,"
+          + "bookingCancelled:com.waylo.packagebookingservice.event.BookingCancelledEvent,"
+          + "orderCreated:com.waylo.packagebookingservice.event.OrderCreatedEvent,"
+          + "orderCancelled:com.waylo.packagebookingservice.event.OrderCancelledEvent";
+
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -28,6 +41,7 @@ public class KafkaProducerConfig {
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(JsonSerializer.TYPE_MAPPINGS, TYPE_MAPPINGS);
         return new DefaultKafkaProducerFactory<>(props);
     }
 

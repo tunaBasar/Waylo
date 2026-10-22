@@ -4,11 +4,11 @@ import com.waylo.notificationservice.domain.ProcessedEvent;
 import com.waylo.notificationservice.event.PaymentCompletedEvent;
 import com.waylo.notificationservice.event.PaymentRefundedEvent;
 import com.waylo.notificationservice.repository.ProcessedEventRepository;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,14 +25,15 @@ public class PaymentEventListener {
 
     @KafkaListener(topics = "payment-events", groupId = GROUP,
             containerFactory = "kafkaListenerContainerFactory")
-    public void handlePaymentEvent(@Payload Object event, Acknowledgment ack) {
+    public void handlePaymentEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+        Object event = record.value();
         try {
             if (event instanceof PaymentCompletedEvent e) {
                 handlePaymentCompleted(e);
             } else if (event instanceof PaymentRefundedEvent e) {
                 handlePaymentRefunded(e);
             } else {
-                log.warn("Bilinmeyen payment event tipi: {}", event.getClass().getSimpleName());
+                log.warn("Bilinmeyen payment event tipi: {}", event == null ? "null" : event.getClass().getSimpleName());
             }
         } catch (Exception ex) {
             log.error("Payment event islenirken hata: {}", ex.getMessage(), ex);
