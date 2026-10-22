@@ -25,6 +25,8 @@ interface AuthContextType {
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
   resendVerification: (email: string) => Promise<void>;
+  updateUser: (patch: Partial<User>) => void;
+  applyAuthResponse: (authData: AuthData) => void;
 }
 
 interface RegisterData {
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, pathname, router]);
 
-  const persistAuth = (authData: AuthData) => {
+  const persistAuth = useCallback((authData: AuthData) => {
     const userData: User = {
       id: authData.userId,
       firstName: authData.firstName,
@@ -113,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('waylo_user', JSON.stringify(userData));
     localStorage.setItem('waylo_token', authData.token);
     localStorage.setItem('waylo_refresh', authData.refreshToken);
-  };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authFetch<AuthData>('/api/auth/login', {
@@ -127,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     persistAuth(res.data);
     router.push('/');
-  }, [router]);
+  }, [router, persistAuth]);
 
   const register = useCallback(async (data: RegisterData) => {
     const res = await authFetch<AuthData>('/api/auth/register', {
@@ -141,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     persistAuth(res.data);
     router.push('/');
-  }, [router]);
+  }, [router, persistAuth]);
 
   const logout = useCallback(() => {
     const refreshToken = localStorage.getItem('waylo_refresh');
@@ -197,11 +199,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser(prev => {
+      const next = prev ? { ...prev, ...patch } : null;
+      if (next) {
+        localStorage.setItem('waylo_user', JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const applyAuthResponse = useCallback((authData: AuthData) => {
+    persistAuth(authData);
+  }, [persistAuth]);
+
   return (
     <AuthContext.Provider value={{
       user, loading, token,
       login, register, logout,
       forgotPassword, resetPassword, verifyEmail, resendVerification,
+      updateUser, applyAuthResponse,
     }}>
       {children}
     </AuthContext.Provider>
