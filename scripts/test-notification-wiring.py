@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
-"""Acceptance test for notification-service's wired BookingEventListener/FlightEventListener.
+"""Acceptance test for the booking flow that feeds notification-service.
 
-Verifies that:
-1. Creating a booking triggers a Kafka booking-events BookingCreatedEvent, which the
-   notification-service listener consumes and attempts a crm-service customer lookup
-   (idempotency ledger row written either way).
-2. A flight cancellation triggers FlightCancelledEvent, package-booking-service's
-   /api/bookings/flight/{flightId} is queried by notification-service, and for every
-   affected booking a crm-service customer lookup is attempted.
-3. Pre-existing architecture gap: auth-service registration does not create a linked
-   crm-service Customer, so the customerId (auth user UUID) will not resolve to a real
-   CRM customer. This test asserts the fail-soft path is taken (no crash, event still
-   marked processed) rather than asserting an email is actually sent, which documents
-   the real current behavior rather than a false claim.
+Verifies through the gateway that:
+1. A booking can be created and cancelled (each publishes a booking-events record that
+   notification-service and crm-service consume).
+2. GET /api/bookings/flight/{flightId}, which notification-service uses to find the
+   customers affected by a flight cancellation, returns exactly that flight's bookings.
+The resulting notification and loyalty side effects are asserted by test-crm-link.py.
 Uses standard library only.
 """
 import argparse, json, secrets, sys, time, uuid
@@ -98,10 +92,6 @@ def main():
     time.sleep(3)
 
     print(f"\n{P} passed, {F} failed")
-    print("\nNOTE: notification-service's crm-service customer lookup is expected to miss")
-    print("(pre-existing gap: auth registration does not create a linked crm-service Customer).")
-    print("Check `docker compose logs notification-service --since 20s` for:")
-    print("  'Customer lookup failed for customerId=...' or 'returned no email' (fail-soft, no crash)")
     sys.exit(1 if F else 0)
 
 

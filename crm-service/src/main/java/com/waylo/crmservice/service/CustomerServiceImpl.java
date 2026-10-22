@@ -90,6 +90,15 @@ public class CustomerServiceImpl implements CustomerService {
         return mapper.toResponse(customer);
     }
 
+    @Override
+    public boolean ensureCustomerForUser(UUID userId, String fullName, String email) {
+        String name = fullName == null ? "" : fullName.trim();
+        int split = name.lastIndexOf(' ');
+        String firstName = split > 0 ? name.substring(0, split).trim() : name;
+        String lastName = split > 0 ? name.substring(split + 1).trim() : "";
+        return repository.insertIfAbsent(userId, firstName, lastName, email.trim().toLowerCase()) > 0;
+    }
+
     private Customer findOrThrow(UUID id) {
         return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
     }
