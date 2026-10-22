@@ -98,7 +98,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         throw new Error(err.message || `HTTP ${retryRes.status}`);
       }
 
-      return retryRes.json();
+      return parseBody<T>(retryRes);
     }
 
     // Refresh failed - clear session and redirect
@@ -113,7 +113,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(err.message || `HTTP ${res.status}`);
   }
 
-  return res.json();
+  return parseBody<T>(res);
+}
+
+/** 204 No Content (e.g. DELETE) has no body; res.json() would throw on it. */
+async function parseBody<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {
@@ -122,5 +128,7 @@ export const api = {
     request<ApiResponse<T>>(path, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<ApiResponse<T>>(path, { method: 'PUT', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown) =>
+    request<ApiResponse<T>>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   del: (path: string) => request(path, { method: 'DELETE' }),
 };

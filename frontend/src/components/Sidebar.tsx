@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 const nav = [
   { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
+  { href: '/partner', label: 'Partner Paneli', icon: 'storefront' },
   { href: '/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/hotels', label: 'Oteller', icon: 'hotel' },
   { href: '/vehicles', label: 'Araclar', icon: 'directions_car' },
