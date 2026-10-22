@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -43,13 +43,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [removeToast]);
 
-  const ctx: ToastContextType = {
+  // Stable identity: consumers put `toast` in effect/callback dependency lists, so a new object on
+  // every render would re-run their effects (e.g. reload data and discard unsaved edits).
+  const ctx = useMemo<ToastContextType>(() => ({
     toast: addToast,
     success: (msg) => addToast('success', msg),
     error: (msg) => addToast('error', msg),
     warning: (msg) => addToast('warning', msg),
     info: (msg) => addToast('info', msg),
-  };
+  }), [addToast]);
 
   return (
     <ToastContext.Provider value={ctx}>

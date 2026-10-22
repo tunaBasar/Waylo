@@ -94,8 +94,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       }
 
       if (!retryRes.ok) {
-        const err = await retryRes.json().catch(() => ({ message: retryRes.statusText }));
-        throw new Error(err.message || `HTTP ${retryRes.status}`);
+        throw await toApiError(retryRes);
       }
 
       return parseBody<T>(retryRes);
@@ -109,11 +108,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    throw await toApiError(res);
   }
 
   return parseBody<T>(res);
+}
+
+/**
+ * Error thrown for non-2xx responses. Keeps the HTTP status and the backend error code so callers
+ * can branch on facts (e.g. 409 CONCURRENT_MODIFICATION) instead of matching message text.
+ * Still an Error, so existing `err.message` callers keep working.
+ */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code: string | null) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+async function toApiError(res: Response): Promise<ApiError> {
+  const body = await res.json().catch(() => null) as { message?: string; error?: string } | null;
+  return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.error ?? null);
 }
 
 /** 204 No Content (e.g. DELETE) has no body; res.json() would throw on it. */

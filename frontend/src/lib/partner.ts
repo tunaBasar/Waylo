@@ -5,7 +5,7 @@
  * same types and functions can be lifted into a shared package for the mobile app later.
  * Field names mirror the backend DTOs exactly (auth-service, hotel-service, package-booking-service).
  */
-import { api } from './api';
+import { api, ApiError } from './api';
 
 // ---------- shared enums (string unions, values identical to backend enums) ----------
 
@@ -116,14 +116,18 @@ export interface RoomTypeCreateRequest {
   sizeSqm?: number | null;
 }
 
-/** PATCH semantics: omit a field to leave it unchanged. expectedVersion enables optimistic locking. */
+/**
+ * PATCH semantics: omit a field to leave it unchanged. The backend ignores null, so a field cannot be
+ * cleared with null: send an empty string for description to clear it. expectedVersion enables
+ * optimistic locking.
+ */
 export interface RoomTypeUpdateRequest {
   name?: string;
-  description?: string | null;
+  description?: string;
   maxAdults?: number;
   maxChildren?: number;
   maxOccupancy?: number;
-  sizeSqm?: number | null;
+  sizeSqm?: number;
   status?: CatalogStatus;
   expectedVersion?: number;
 }
@@ -153,9 +157,10 @@ export interface RatePlanCreateRequest {
   freeCancellationDaysBefore?: number | null;
 }
 
+/** PATCH semantics as RoomTypeUpdateRequest (null/omitted = unchanged, empty string clears description). */
 export interface RatePlanUpdateRequest {
   name?: string;
-  description?: string | null;
+  description?: string;
   mealPlan?: MealPlan;
   cancellationPolicy?: CancellationPolicy;
   freeCancellationDaysBefore?: number | null;
@@ -265,15 +270,18 @@ export const partnerApi = {
   createHotel: (body: HotelRequest) => api.post<PartnerHotel>('/api/hotels', body),
   updateHotel: (hotelId: string, body: HotelRequest) => api.put<PartnerHotel>(`/api/hotels/${enc(hotelId)}`, body),
 
-  // room types
-  roomTypes: (hotelId: string) => api.get<RoomType[]>(`/api/hotels/${enc(hotelId)}/room-types`),
+  // room types (includeInactive=true lists deactivated ones too, so they can be re-activated;
+  // the backend requires ROOM_MANAGE permission for it, which partner users have)
+  roomTypes: (hotelId: string, includeInactive = false) =>
+    api.get<RoomType[]>(`/api/hotels/${enc(hotelId)}/room-types${includeInactive ? '?includeInactive=true' : ''}`),
   createRoomType: (hotelId: string, body: RoomTypeCreateRequest) =>
     api.post<RoomType>(`/api/hotels/${enc(hotelId)}/room-types`, body),
   updateRoomType: (hotelId: string, roomTypeId: string, body: RoomTypeUpdateRequest) =>
     api.patch<RoomType>(`/api/hotels/${enc(hotelId)}/room-types/${enc(roomTypeId)}`, body),
 
   // rate plans
-  ratePlans: (hotelId: string) => api.get<RatePlan[]>(`/api/hotels/${enc(hotelId)}/rate-plans`),
+  ratePlans: (hotelId: string, includeInactive = false) =>
+    api.get<RatePlan[]>(`/api/hotels/${enc(hotelId)}/rate-plans${includeInactive ? '?includeInactive=true' : ''}`),
   createRatePlan: (hotelId: string, body: RatePlanCreateRequest) =>
     api.post<RatePlan>(`/api/hotels/${enc(hotelId)}/rate-plans`, body),
   updateRatePlan: (hotelId: string, ratePlanId: string, body: RatePlanUpdateRequest) =>
@@ -304,6 +312,23 @@ export const partnerApi = {
 };
 
 // ---------- display helpers (pure) ----------
+
+/** True when a partnerApi call failed because someone else saved the same record first (HTTP 409 optimistic lock). */
+export function isVersionConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && err.code === 'CONCURRENT_MODIFICATION';
+}
+
+/**
+ * Turns a failed partnerApi call into a Turkish message for the user. Optimistic-lock conflicts
+ * (someone else saved the same record first) get an actionable explanation instead of the raw
+ * backend text.
+ */
+export function partnerErrorMessage(err: unknown, fallback: string): string {
+  if (isVersionConflict(err)) {
+    return 'Bu kayit siz duzenlerken baska biri tarafindan degistirildi. Guncel bilgiler yuklendi, tekrar deneyin.';
+  }
+  return (err instanceof Error && err.message) || fallback;
+}
 
 export const ORGANIZATION_STATUS_LABEL: Record<OrganizationStatus, string> = {
   PENDING: 'Onay bekliyor',

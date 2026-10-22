@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Waylo frontend
 
-## Getting Started
+Next.js application for the Waylo gateway and partner workspace.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The frontend runs on port 3000 and defaults to the gateway at `http://localhost:8080`.
+Set `NEXT_PUBLIC_API_URL` before building when the gateway has a different address.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test
+npx tsc --noEmit
+npx eslint src/app/partner src/lib/partner.ts src/lib/partner-context.tsx src/components/partner src/components/Toast.tsx
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Partner workspace
 
-## Learn More
+`/partner` provides organization and hotel creation. Room types and rate plans can be
+created, edited, deactivated and reactivated. Management lists include inactive rows.
+The calendar edits inventory and nightly prices for one room type over a 14-day window.
+Prices currently use the room type's maximum occupancy. The backend remains authoritative
+for access checks, validation and optimistic concurrency.
 
-To learn more about Next.js, take a look at the following resources:
+Inventory and prices are saved in separate requests, not a single cross-resource transaction.
+If inventory succeeds but prices fail validation, only unsaved price edits remain.
+A concurrency conflict reloads current server values instead of overwriting another editor.
+Ordinary failures retain edits. Hotel selection is locked while calendar edits are pending,
+and link navigation asks before discarding them. Browser Back/Forward navigation currently
+bypasses that confirmation, so save or discard calendar edits before using browser history.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`/partner/orders` shows the signed-in account's own orders. It is not a hotel's incoming
+reservation list and does not filter by the workspace hotel.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Browser acceptance checklist
 
-## Deploy on Vercel
+Use a dedicated test organization and hotel. Never alter unrelated catalog entries.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a room type and two rate plans. Verify invalid occupancy and three-decimal prices
+   are rejected before saving. Verify comma decimals are accepted.
+2. Save allotment, stop-sell and nightly prices. Reload and compare against the gateway API.
+3. Deactivate a room type or rate plan. Confirm it stays visible and can be reactivated.
+4. Make an unsaved calendar change. Verify the hotel selector is disabled. Cancel a tab
+   navigation confirmation and verify the edit remains.
+5. Return a temporary validation error for the save request in a browser test harness.
+   Verify the error toast and subsequent grid refresh do not erase the edit.
+6. Change an inventory row through a second client, then save the first client's stale
+   version. Verify the current server value survives and a conflict is reported.
+7. Discard edits and switch to a hotel without room types. Verify the empty state is shown
+   without a request using the previous hotel's room type.
+8. Repeat at a narrow viewport and verify horizontal calendar scrolling.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The browser checklist is manual acceptance coverage, not an automated test suite.
+Native mobile applications and per-occupancy calendar editing are not included here.

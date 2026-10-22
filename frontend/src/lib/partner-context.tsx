@@ -5,7 +5,7 @@
  * Every /partner page reads the selection from here instead of fetching it itself.
  * The selection is remembered in localStorage so a reload keeps the same hotel.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { partnerApi, type Membership, type PartnerHotel } from './partner';
 
 const ORG_KEY = 'waylo_partner_org';
@@ -23,7 +23,10 @@ interface PartnerContextValue {
   selectOrganization: (organizationId: string) => void;
   selectHotel: (hotelId: string) => void;
   /** Re-fetch memberships and hotels, e.g. after creating an organization or hotel. */
-  reload: () => Promise<void>;
+  reload: (preferred?: { organizationId?: string; hotelId?: string }) => Promise<void>;
+  /** A page with unsaved edits sets this; the workspace selector is locked while it is true. */
+  hasUnsavedChanges: boolean;
+  setHasUnsavedChanges: (dirty: boolean) => void;
 }
 
 const PartnerContext = createContext<PartnerContextValue | null>(null);
@@ -35,44 +38,56 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [hotels, setHotels] = useState<PartnerHotel[]>([]);
   const [hotelId, setHotelId] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const loadHotels = useCallback(async (orgId: string | null) => {
+  const hotelRequest = useRef(0);
+  const workspaceRequest = useRef(0);
+  const loadHotels = useCallback(async (orgId: string | null, preferredHotelId?: string) => {
+    const request = ++hotelRequest.current;
+    setHotels([]);
+    setHotelId(null);
     if (!orgId) {
-      setHotels([]);
-      setHotelId(null);
+      setError(null);
       return;
     }
-    const res = await partnerApi.hotelsByOrganization(orgId);
-    const list = res.data ?? [];
-    setHotels(list);
-    const stored = localStorage.getItem(HOTEL_KEY);
-    const next = list.find(h => h.id === stored)?.id ?? list[0]?.id ?? null;
-    setHotelId(next);
-    if (next) localStorage.setItem(HOTEL_KEY, next);
+    try {
+      const res = await partnerApi.hotelsByOrganization(orgId);
+      if (request !== hotelRequest.current) return;
+      const list = res.data ?? [];
+      setHotels(list);
+      const stored = preferredHotelId ?? localStorage.getItem(HOTEL_KEY);
+      const next = list.find(h => h.id === stored)?.id ?? list[0]?.id ?? null;
+      setHotelId(next);
+      if (next) localStorage.setItem(HOTEL_KEY, next);
+      setError(null);
+    } catch (e) {
+      if (request === hotelRequest.current) setError(e instanceof Error ? e.message : 'Oteller yuklenemedi');
+    }
   }, []);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (preferred?: { organizationId?: string; hotelId?: string }) => {
+    const request = ++workspaceRequest.current;
     try {
       const res = await partnerApi.myMemberships();
+      if (request !== workspaceRequest.current) return;
       const list = (res.data ?? []).filter(m => m.status === 'ACTIVE');
       setMemberships(list);
-      const stored = localStorage.getItem(ORG_KEY);
+      const stored = preferred?.organizationId ?? localStorage.getItem(ORG_KEY);
       const orgId = list.find(m => m.organizationId === stored)?.organizationId ?? list[0]?.organizationId ?? null;
       setOrganizationId(orgId);
       if (orgId) localStorage.setItem(ORG_KEY, orgId);
-      await loadHotels(orgId);
-      setError(null);
+      await loadHotels(orgId, preferred?.hotelId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Isletme bilgileri yuklenemedi');
+      if (request === workspaceRequest.current) setError(e instanceof Error ? e.message : 'Isletme bilgileri yuklenemedi');
     } finally {
-      setLoading(false);
+      if (request === workspaceRequest.current) setLoading(false);
     }
   }, [loadHotels]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (preferred?: { organizationId?: string; hotelId?: string }) => {
     setLoading(true);
     setError(null);
-    await fetchAll();
+    await fetchAll(preferred);
   }, [fetchAll]);
 
   useEffect(() => {
@@ -82,17 +97,22 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [fetchAll]);
 
+  // Ignored while a page has unsaved edits. The selects are also disabled in the UI, but a disabled
+  // control can still be changed programmatically, so the guard lives here where the state does.
   const selectOrganization = useCallback((orgId: string) => {
+    if (hasUnsavedChanges || loading || orgId === organizationId || !memberships.some(m => m.organizationId === orgId)) return;
+    workspaceRequest.current++;
     localStorage.setItem(ORG_KEY, orgId);
     localStorage.removeItem(HOTEL_KEY);
     setOrganizationId(orgId);
-    void loadHotels(orgId).catch(e => setError(e instanceof Error ? e.message : 'Oteller yuklenemedi'));
-  }, [loadHotels]);
+    void loadHotels(orgId);
+  }, [loadHotels, hasUnsavedChanges, loading, organizationId, memberships]);
 
   const selectHotel = useCallback((id: string) => {
+    if (hasUnsavedChanges || !hotels.some(h => h.id === id)) return;
     localStorage.setItem(HOTEL_KEY, id);
     setHotelId(id);
-  }, []);
+  }, [hasUnsavedChanges, hotels]);
 
   const value = useMemo<PartnerContextValue>(() => ({
     loading,
@@ -106,7 +126,9 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
     selectOrganization,
     selectHotel,
     reload,
-  }), [loading, error, memberships, organizationId, hotels, hotelId, selectOrganization, selectHotel, reload]);
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+  }), [loading, error, memberships, organizationId, hotels, hotelId, selectOrganization, selectHotel, reload, hasUnsavedChanges]);
 
   return <PartnerContext.Provider value={value}>{children}</PartnerContext.Provider>;
 }

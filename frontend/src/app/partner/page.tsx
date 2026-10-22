@@ -36,9 +36,9 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
     inFlight.current = true;
     setSaving(true);
     try {
-      await partnerApi.createOrganization(name.trim());
+      const res = await partnerApi.createOrganization(name.trim());
       toast.success('Isletme olusturuldu. Platform onayindan sonra oteller yayina alinir.');
-      await reload();
+      await reload({ organizationId: res.data.id });
       onDone();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Isletme olusturulamadi');
@@ -68,7 +68,7 @@ const EMPTY_HOTEL = { name: '', city: '', country: 'Turkiye', address: '', starR
 
 function NewHotelForm({ organizationId, onDone }: { organizationId: string; onDone: () => void }) {
   const toast = useToast();
-  const { reload, selectHotel } = usePartner();
+  const { reload } = usePartner();
   const [form, setForm] = useState(EMPTY_HOTEL);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
@@ -93,8 +93,7 @@ function NewHotelForm({ organizationId, onDone }: { organizationId: string; onDo
     try {
       const res = await partnerApi.createHotel(body);
       toast.success('Otel eklendi');
-      await reload();
-      if (res.data?.id) selectHotel(res.data.id);
+      await reload({ organizationId, hotelId: res.data.id });
       onDone();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Otel eklenemedi');
@@ -206,7 +205,7 @@ export default function PartnerOrganizationsPage() {
                       <StatusPill tone={h.active ? 'success' : 'neutral'}>{h.active ? 'Aktif' : 'Pasif'}</StatusPill>
                     </div>
                     <p className="text-sm text-on-surface-variant mt-1">{h.city}, {h.country}</p>
-                    <p className="text-xs text-outline mt-2">{'★'.repeat(h.starRating)} &middot; {h.roomCount} oda</p>
+                    <p className="text-xs text-outline mt-2">{'★'.repeat(h.starRating)} &middot; {h.address}</p>
                   </Card>
                 </button>
               ))}
