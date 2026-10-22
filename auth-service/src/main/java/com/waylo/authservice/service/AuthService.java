@@ -15,11 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class AuthService {
+
+    public static final String LOCKED_MESSAGE = "Cok fazla hatali giris. Lutfen daha sonra tekrar deneyin.";
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
@@ -36,6 +39,12 @@ public class AuthService {
     @Value("${waylo.reset.expiration-hours}")
     private int resetExpirationHours;
 
+    @Value("${waylo.login.max-attempts:5}")
+    private int maxLoginAttempts;
+
+    @Value("${waylo.login.lock-minutes:15}")
+    private int lockMinutes;
+
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil, KafkaTemplate<String, String> kafkaTemplate,
                        ObjectMapper objectMapper, RefreshTokenService refreshTokenService) {
@@ -47,16 +56,32 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
     }
 
+    // ------------------------------------------------------------------
+    // Email normalization helpers (Task B)
+    // ------------------------------------------------------------------
+
+    private static String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    // ------------------------------------------------------------------
+    // Registration
+    // ------------------------------------------------------------------
+
     @Transactional
     public ApiResponse<AuthResponse> register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        String normalized = normalizeEmail(request.email());
+        if (userRepository.existsByEmailIgnoreCase(normalized)) {
             return ApiResponse.error("Bu e-posta adresi zaten kullaniliyor");
         }
 
         User user = new User();
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
-        user.setEmail(request.email());
+        user.setEmail(normalized);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setVerificationToken(UUID.randomUUID().toString());
         user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(verificationExpirationHours));
@@ -80,12 +105,43 @@ public class AuthService {
         return ApiResponse.success("Kayit basarili! Lutfen e-postanizi dogrulayin.", response);
     }
 
+    // ------------------------------------------------------------------
+    // Login with brute-force lockout (Task A)
+    // ------------------------------------------------------------------
+
+    @Transactional
     public ApiResponse<AuthResponse> login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String normalized = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalized)
                 .orElse(null);
 
-        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+        // 1. Unknown user -> same generic error (don't reveal existence)
+        if (user == null) {
             return ApiResponse.error("E-posta veya sifre hatali");
+        }
+
+        // 2. Locked user -> reject without checking password
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            return ApiResponse.error(LOCKED_MESSAGE);
+        }
+
+        // 3. Wrong password -> increment counter; lock if threshold reached
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+            if (user.getFailedLoginAttempts() >= maxLoginAttempts) {
+                user.setLockedUntil(now.plusMinutes(lockMinutes));
+                user.setFailedLoginAttempts(0);
+            }
+            userRepository.save(user);
+            return ApiResponse.error("E-posta veya sifre hatali");
+        }
+
+        // 4. Correct password -> clear counters if they were dirty, then issue tokens
+        if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+            userRepository.save(user);
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
@@ -100,6 +156,10 @@ public class AuthService {
         log.info("User logged in: {}", user.getEmail());
         return ApiResponse.success("Giris basarili", response);
     }
+
+    // ------------------------------------------------------------------
+    // Email verification
+    // ------------------------------------------------------------------
 
     @Transactional
     public ApiResponse<Void> verifyEmail(String token) {
@@ -126,9 +186,14 @@ public class AuthService {
         return ApiResponse.success("E-posta basariyla dogrulandi!");
     }
 
+    // ------------------------------------------------------------------
+    // Resend verification (Task B: normalize email)
+    // ------------------------------------------------------------------
+
     @Transactional
     public ApiResponse<Void> resendVerification(String email) {
-        User user = userRepository.findByEmail(email).orElse(null);
+        String normalized = normalizeEmail(email);
+        User user = userRepository.findByEmailIgnoreCase(normalized).orElse(null);
 
         if (user == null) {
             return ApiResponse.success("Eger hesabiniz varsa, dogrulama linki gonderildi.");
@@ -147,9 +212,14 @@ public class AuthService {
         return ApiResponse.success("Dogrulama linki tekrar gonderildi");
     }
 
+    // ------------------------------------------------------------------
+    // Forgot password (Task B: normalize email)
+    // ------------------------------------------------------------------
+
     @Transactional
     public ApiResponse<Void> forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.email()).orElse(null);
+        String normalized = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalized).orElse(null);
 
         // Don't reveal whether the email exists
         if (user == null) {
@@ -165,6 +235,10 @@ public class AuthService {
         log.info("Password reset requested for: {}", user.getEmail());
         return ApiResponse.success("Sifre sifirlama linki e-postaniza gonderildi");
     }
+
+    // ------------------------------------------------------------------
+    // Reset password (clears lockout + revokes all sessions)
+    // ------------------------------------------------------------------
 
     @Transactional
     public ApiResponse<Void> resetPassword(ResetPasswordRequest request) {
@@ -182,7 +256,13 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
+        // Clear lockout state
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
+
+        // Revoke all existing sessions (stolen sessions die)
+        refreshTokenService.revokeAll(user.getId());
 
         log.info("Password reset for user: {}", user.getEmail());
         return ApiResponse.success("Sifreniz basariyla guncellendi");

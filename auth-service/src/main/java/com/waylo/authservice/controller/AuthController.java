@@ -30,9 +30,14 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         ApiResponse<AuthResponse> response = authService.login(request);
-        return response.success()
-                ? ResponseEntity.ok(response)
-                : ResponseEntity.status(401).body(response);
+        if (response.success()) {
+            return ResponseEntity.ok(response);
+        }
+        // Task A: distinguish 429 (locked) from 401 (wrong creds)
+        if (com.waylo.authservice.service.AuthService.LOCKED_MESSAGE.equals(response.message())) {
+            return ResponseEntity.status(429).body(response);
+        }
+        return ResponseEntity.status(401).body(response);
     }
 
     @GetMapping("/verify")
@@ -62,8 +67,14 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody Map<String, String> refreshRequest) {
-        String refreshTokenStr = (String) refreshRequest.get("refreshToken");
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
+            @RequestBody(required = false) Map<String, String> body) {
+        // Task C: null or missing body / refreshToken -> 401
+        if (body == null || body.get("refreshToken") == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error("Gecersiz refresh token"));
+        }
+        String refreshTokenStr = body.get("refreshToken");
         ApiResponse<AuthResponse> response = authService.refreshToken(refreshTokenStr);
         return response.success()
                 ? ResponseEntity.ok(response)
