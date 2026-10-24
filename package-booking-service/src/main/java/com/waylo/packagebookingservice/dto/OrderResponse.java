@@ -18,5 +18,6 @@ public record OrderResponse(
         Long version,
         List<OrderItemResponse> items,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Instant holdExpiresAt
 ) {}

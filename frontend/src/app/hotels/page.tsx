@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { api } from '@/lib/api';
 import type { Hotel } from '@/lib/types';
 import {
@@ -311,16 +312,24 @@ export default function HotelsPage() {
       ) : (
         <div className="space-y-space-md">
           {filtered.map((hotel, idx) => {
-            const qs = activeQuery ? stayQueryString(activeQuery) : '';
-            const href = activeQuery ? `/hotels/${hotel.id}?${qs}` : `/hotels/${hotel.id}`;
+            const query = activeQuery ?? {
+              checkIn: formCheckIn,
+              checkOut: formCheckOut,
+              rooms: formRooms,
+              adults: formAdults,
+              childrenAges: formChildrenAges,
+            };
+            const href = `/hotels/${hotel.id}?${stayQueryString(query)}`;
             return (
               <Link key={hotel.id} href={href} passHref>
                 <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                   {/* Hotel Image */}
                   <div className="relative h-48 bg-surface-container overflow-hidden">
-                    <img
+                    <Image
                       src={hotelImages[idx % 5]}
                       alt={hotel.name}
+                      width={600}
+                      height={300}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -381,14 +390,10 @@ export default function HotelsPage() {
                       </span>
                     </div>
 
-                    {/* Price + action */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xs text-on-surface-variant">Gecelik Baslangic</span>
-                        <p className="text-xl font-bold text-primary">
-                          {hotel.starRating !== undefined ? `₺${((hotel.starRating || 3) * 1200 + 600).toLocaleString('tr-TR')}` : '₺0'}
-                          <span className="text-xs font-normal text-on-surface-variant"> /gece</span>
-                        </p>
+                        <p className="text-sm font-medium text-primary">Fiyat icin tarih secin</p>
+                        <p className="text-xs text-on-surface-variant">Musaitlik ve fiyatlari gor</p>
                       </div>
                       <span className="px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-medium shadow-sm flex items-center gap-1">
                         Detaylar <span className="material-symbols-outlined text-[14px]">chevron_right</span>

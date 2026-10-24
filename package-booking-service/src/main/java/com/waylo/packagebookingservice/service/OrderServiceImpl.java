@@ -1,8 +1,11 @@
 package com.waylo.packagebookingservice.service;
 
+import com.waylo.packagebookingservice.client.HotelHoldClient;
 import com.waylo.packagebookingservice.domain.Order;
+import com.waylo.packagebookingservice.domain.OrderItemVertical;
 import com.waylo.packagebookingservice.domain.OrderItem;
 import com.waylo.packagebookingservice.domain.OrderStatus;
+import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemResponse;
@@ -13,9 +16,12 @@ import com.waylo.packagebookingservice.event.OrderEventPublisher;
 import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.exception.AuthenticationRequiredException;
 import com.waylo.packagebookingservice.exception.BusinessRuleException;
+import com.waylo.packagebookingservice.exception.HotelRejectedException;
 import com.waylo.packagebookingservice.exception.ResourceNotFoundException;
 import com.waylo.packagebookingservice.repository.OrderItemRepository;
 import com.waylo.packagebookingservice.repository.OrderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +41,82 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderEventPublisher eventPublisher;
+    private final HotelHoldClient hotelHoldClient;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                              OrderItemRepository orderItemRepository,
-                             OrderEventPublisher eventPublisher) {
+                             OrderEventPublisher eventPublisher,
+                             HotelHoldClient hotelHoldClient) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.eventPublisher = eventPublisher;
+        this.hotelHoldClient = hotelHoldClient;
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+
+    /**
+     * Hotel order from a quote. Every monetary/product field is taken from the hotel hold response,
+     * the request carries only quoteId + notes. productRef = roomTypeId. supplierOrganizationId = hold.organizationId()
+     * (null only for legacy hotels without an organization).
+     */
+    @Override
+    public OrderResponse createHotelOrder(UUID actorUserId, HotelOrderCreateRequest request) {
+        requireIdentity(actorUserId);
+
+        List<Order> existing = orderRepository.findByCustomerIdAndQuoteId(actorUserId, request.quoteId());
+        if (!existing.isEmpty()) {
+            Order prior = existing.get(0);
+            if (prior.getStatus() == OrderStatus.CANCELLED || prior.getStatus() == OrderStatus.FAILED) {
+                throw new BusinessRuleException("QUOTE_ALREADY_USED",
+                        "An earlier order for this quote was cancelled, please request a new quote");
+            }
+            return toResponse(prior, orderItemRepository.findByOrderId(prior.getId()));
+        }
+
+        UUID orderId = UUID.randomUUID();
+        String idempotencyKey = "ho-" + UUID.nameUUIDFromBytes(
+                (actorUserId + ":" + request.quoteId()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        HotelHoldClient.HoldDto hold = hotelHoldClient.hold(new HotelHoldClient.HoldRequest(
+                request.quoteId(), idempotencyKey, actorUserId, orderId)).data();
+
+        try {
+            Order order = new Order();
+            order.setId(orderId);
+            order.setCustomerId(actorUserId);
+            order.setCurrency(hold.currency());
+            order.setQuoteId(request.quoteId());
+            order.setNotes(request.notes());
+            order.setTotalAmount(hold.totalAmount());
+            order.setStatus(OrderStatus.PENDING);
+            order.setHoldExpiresAt(hold.expiresAt());
+            order = orderRepository.saveAndFlush(order);
+
+            OrderItem item = new OrderItem();
+            item.setOrderId(order.getId());
+            item.setVertical(OrderItemVertical.HOTEL);
+            item.setSupplierOrganizationId(hold.organizationId());
+            item.setProductRef(hold.roomTypeId());
+            item.setFulfillmentRef(hold.holdId());
+            item.setDescription(hold.checkIn() + "-" + hold.checkOut() + ", " + hold.nights() + " gece, "
+                    + hold.rooms() + " oda");
+            item.setUnitAmount(hold.totalAmount());
+            item.setQuantity(1);
+            item.setCurrency(hold.currency());
+            OrderItem savedItem = orderItemRepository.saveAndFlush(item);
+
+            eventPublisher.publishOrderCreated(new OrderCreatedEvent(
+                    order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+            return toResponse(order, List.of(savedItem));
+        } catch (RuntimeException e) {
+            try {
+                hotelHoldClient.release(hold.holdId());
+            } catch (RuntimeException releaseFailure) {
+                log.error("Could not release hold {} after order save failure; expiry scheduler will reclaim it",
+                        hold.holdId(), releaseFailure);
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -52,6 +127,12 @@ public class OrderServiceImpl implements OrderService {
         }
 
         List<OrderItemCreateRequest> itemRequests = request.items();
+        for (OrderItemCreateRequest item : itemRequests) {
+            if (item.vertical() == OrderItemVertical.HOTEL) {
+                throw new BusinessRuleException("USE_QUOTE_ENDPOINT",
+                        "Hotel orders must be created from a quote via POST /api/orders/hotel");
+            }
+        }
         for (OrderItemCreateRequest item : itemRequests) {
             if (!item.currency().equals(request.currency())) {
                 throw new BusinessRuleException("CURRENCY_MISMATCH",
@@ -127,6 +208,18 @@ public class OrderServiceImpl implements OrderService {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Order.class, order.getId().toString());
         }
 
+        // Release hotel holds first: if hotel-service is down this throws 503 and the order stays unchanged.
+        for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
+            if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
+                try {
+                    hotelHoldClient.release(item.getFulfillmentRef());
+                } catch (HotelRejectedException alreadyGone) {
+                    log.info("Hold {} not releasable ({}), continuing cancel", item.getFulfillmentRef(),
+                            alreadyGone.getCode());
+                }
+            }
+        }
+
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.saveAndFlush(order);
 
@@ -167,7 +260,8 @@ public class OrderServiceImpl implements OrderService {
                 order.getVersion(),
                 itemResponses,
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getHoldExpiresAt()
         );
     }
 

@@ -20,7 +20,7 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: (redirectTo?: string) => void;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
@@ -71,28 +71,22 @@ async function authFetch<T>(endpoint: string, options?: RequestInit): Promise<Ap
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const storedUser = localStorage.getItem('waylo_user');
+    if (!storedUser) return null;
+    try { return JSON.parse(storedUser) as User; } catch { return null; }
+  });
+  const [token, setToken] = useState<string | null>(() => typeof window === 'undefined' ? null : localStorage.getItem('waylo_token'));
+  const [loading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Load persisted session
   useEffect(() => {
-    const storedUser = localStorage.getItem('waylo_user');
-    const storedToken = localStorage.getItem('waylo_token');
-    if (storedUser && storedToken) {
-      try {
-        setUser(JSON.parse(storedUser));
-        setToken(storedToken);
-      } catch {
-        localStorage.removeItem('waylo_user');
-        localStorage.removeItem('waylo_token');
-        localStorage.removeItem('waylo_refresh');
-      }
-    }
-    setLoading(false);
-  }, []);
+    const handleSessionExpired = () => router.replace('/login');
+    window.addEventListener('waylo:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('waylo:session-expired', handleSessionExpired);
+  }, [router]);
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -145,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/');
   }, [router, persistAuth]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback((redirectTo = '/login') => {
     const refreshToken = localStorage.getItem('waylo_refresh');
     if (refreshToken) {
       fetch(`${API_BASE}/api/auth/logout`, {
@@ -159,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('waylo_user');
     localStorage.removeItem('waylo_token');
     localStorage.removeItem('waylo_refresh');
-    router.push('/login');
+    router.push(redirectTo);
   }, [router]);
 
   const forgotPassword = useCallback(async (email: string) => {

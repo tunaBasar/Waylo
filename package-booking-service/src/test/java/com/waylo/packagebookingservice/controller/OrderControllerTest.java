@@ -44,7 +44,7 @@ class OrderControllerTest {
                 UUID.randomUUID(), orderId, OrderItemVertical.HOTEL, UUID.randomUUID(), UUID.randomUUID(), null,
                 "Deluxe room", new BigDecimal("100.00"), 2, new BigDecimal("200.00"), "USD", Instant.now());
         return new OrderResponse(orderId, userId, OrderStatus.PENDING, "USD", null,
-                new BigDecimal("200.00"), null, 0L, List.of(item), Instant.now(), Instant.now());
+                new BigDecimal("200.00"), null, 0L, List.of(item), Instant.now(), Instant.now(), null);
     }
 
     @Test
@@ -56,10 +56,24 @@ class OrderControllerTest {
         OrderResponse response = buildResponse();
         when(orderService.create(eq(userId), any(OrderCreateRequest.class))).thenReturn(response);
 
-        ResponseEntity<ApiResponse<OrderResponse>> result = controller.create(userId, request);
+        ResponseEntity<ApiResponse<OrderResponse>> result = controller.create(userId, "ADMIN", request);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody().data()).isEqualTo(response);
+    }
+
+    @Test
+    void create_nonAdmin_forbidden() {
+        OrderCreateRequest request = new OrderCreateRequest(userId, "USD", null, null, List.of());
+        assertThatThrownBy(() -> controller.create(userId, "USER", request)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void createHotel_returns201() {
+        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null);
+        when(orderService.createHotelOrder(userId, req)).thenReturn(buildResponse());
+        assertThat(controller.createHotel(userId, req).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
@@ -94,7 +108,7 @@ class OrderControllerTest {
     @Test
     void cancel_returns200WithExpectedVersion() {
         OrderResponse cancelled = new OrderResponse(orderId, userId, OrderStatus.CANCELLED, "USD", null,
-                new BigDecimal("200.00"), null, 1L, List.of(), Instant.now(), Instant.now());
+                new BigDecimal("200.00"), null, 1L, List.of(), Instant.now(), Instant.now(), null);
         when(orderService.cancel(userId, orderId, 0L)).thenReturn(cancelled);
 
         ResponseEntity<ApiResponse<OrderResponse>> result = controller.cancel(userId, orderId, 0L);

@@ -42,9 +42,9 @@ class MeControllerDeleteTest {
     }
 
     @Test
-    void delete_wrongPassword_401() throws Exception {
-        doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "x")).when(service).deleteAccount(any(), any());
-        del("{\"password\":\"bad\"}").andExpect(status().isUnauthorized());
+    void delete_wrongPassword_400() throws Exception {
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mevcut sifre hatali")).when(service).deleteAccount(any(), any());
+        del("{\"password\":\"bad\"}").andExpect(status().isBadRequest());
     }
 
     @Test

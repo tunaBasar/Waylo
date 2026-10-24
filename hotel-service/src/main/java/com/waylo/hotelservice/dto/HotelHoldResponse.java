@@ -14,6 +14,7 @@ public record HotelHoldResponse(
         UUID holdId,
         UUID quoteId,
         UUID hotelId,
+        UUID organizationId,
         UUID roomTypeId,
         UUID ratePlanId,
         LocalDate checkIn,

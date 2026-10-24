@@ -70,8 +70,12 @@ public class AccountService {
     @Transactional
     public void deleteAccount(UUID userId, String password) {
         User user = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Kimlik dogrulanamadi"));
-        if (user.getDeletedAt() != null || !passwordEncoder.matches(password, user.getPassword()))
+        if (user.getDeletedAt() != null)
             throw new ResponseStatusException(UNAUTHORIZED, "Kimlik dogrulanamadi");
+        // Wrong password is a form error, not an expired session: 400 like POST /api/me/password,
+        // so the client does not treat it as a logout-worthy 401.
+        if (!passwordEncoder.matches(password, user.getPassword()))
+            throw new ResponseStatusException(BAD_REQUEST, "Mevcut sifre hatali");
         {
             for (OrganizationMembership membership : membershipRepository.findByUserId(userId)) {
                 if (membership.getStatus() == MembershipStatus.ACTIVE

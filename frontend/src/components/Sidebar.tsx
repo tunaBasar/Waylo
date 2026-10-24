@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { useState } from 'react';
 
 const nav = [
   { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
@@ -34,7 +33,6 @@ const bottomTabs = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
 
   return (
     <>
@@ -86,7 +84,7 @@ export default function Sidebar() {
               </div>
             </div>
           )}
-          <button onClick={logout}
+          <button onClick={() => logout()}
             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-on-surface-variant hover:text-error hover:bg-error-container/50 rounded-xl transition-colors">
             <span className="material-symbols-outlined text-[18px]">logout</span>
             Cikis Yap

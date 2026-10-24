@@ -16,6 +16,10 @@ interface ProfileData {
   createdAt: string;
 }
 
+const PASSWORD_HINT = 'Sifre 10-128 karakter olmali, en az bir harf ve bir rakam icermeli ve e-posta ile ayni olmamali';
+const isStrongPassword = (p: string, email?: string) =>
+  p.length >= 10 && p.length <= 128 && /\p{L}/u.test(p) && /\p{N}/u.test(p) && (!email || p.toLowerCase() !== email.trim().toLowerCase());
+
 export default function ProfilePage() {
   const { updateUser, applyAuthResponse } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -93,8 +97,8 @@ export default function ProfilePage() {
         setPwdError('Tum alanlar zorunludur.');
         return;
       }
-      if (newPassword.length < 6) {
-        setPwdError('Yeni sifre en az 6 karakter olmalidir.');
+      if (!isStrongPassword(newPassword)) {
+        setPwdError(PASSWORD_HINT);
         return;
       }
       if (newPassword !== confirm) {
@@ -250,6 +254,7 @@ export default function ProfilePage() {
             <input type="password" autoComplete="new-password" value={pwdForm.newPassword}
               onChange={e => setPwdForm(f => ({...f, newPassword: e.target.value}))}
               className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            <p className="text-xs text-on-surface-variant">{PASSWORD_HINT}</p>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-on-surface-variant">Yeni Sifre (Tekrar)</label>

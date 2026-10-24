@@ -61,12 +61,14 @@ class HotelHoldServiceImplTest {
     private HotelHoldRepository holdRepository;
     @Mock
     private DailyInventoryRepository inventoryRepository;
+    @Mock
+    private com.waylo.hotelservice.repository.HotelRepository hotelRepository;
 
     private HotelHoldServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new HotelHoldServiceImpl(quoteRepository, holdRepository, inventoryRepository,
+        service = new HotelHoldServiceImpl(quoteRepository, holdRepository, inventoryRepository, hotelRepository,
                 FIXED_CLOCK, HOLD_TTL_MINUTES);
     }
 
@@ -198,6 +200,23 @@ class HotelHoldServiceImplTest {
         assertThatThrownBy(() -> service.hold(createHoldRequest()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("principal");
+    }
+
+    @Test
+    void hold_response_carriesHotelOrganizationId_nullForLegacyHotel() {
+        HotelQuote quote = createQuote(QUOTE_ID);
+        when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
+        HotelHold existing = createHeldHold(UUID.randomUUID(), QUOTE_ID);
+        when(holdRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
+
+        com.waylo.hotelservice.domain.Hotel hotel = new com.waylo.hotelservice.domain.Hotel();
+        UUID orgId = UUID.randomUUID();
+        hotel.setOrganizationId(orgId);
+        when(hotelRepository.findById(existing.getHotelId())).thenReturn(Optional.of(hotel));
+        assertThat(service.hold(createHoldRequest()).organizationId()).isEqualTo(orgId);
+
+        hotel.setOrganizationId(null);
+        assertThat(service.hold(createHoldRequest()).organizationId()).isNull();
     }
 
     @Test
@@ -565,7 +584,7 @@ class HotelHoldServiceImplTest {
         }
         MutableClock mutableClock = new MutableClock();
 
-        HotelHoldServiceImpl svc = new HotelHoldServiceImpl(quoteRepository, holdRepository, inventoryRepository,
+        HotelHoldServiceImpl svc = new HotelHoldServiceImpl(quoteRepository, holdRepository, inventoryRepository, hotelRepository,
                 mutableClock, HOLD_TTL_MINUTES);
 
         HotelQuote quote = createQuote(QUOTE_ID);

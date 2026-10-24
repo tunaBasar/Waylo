@@ -5,6 +5,10 @@ import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import VideoBackground from '@/components/VideoBackground';
 
+const PASSWORD_HINT = 'Sifre 10-128 karakter olmali, en az bir harf ve bir rakam icermeli ve e-posta ile ayni olmamali';
+const isStrongPassword = (p: string, email?: string) =>
+  p.length >= 10 && p.length <= 128 && /\p{L}/u.test(p) && /\p{N}/u.test(p) && (!email || p.toLowerCase() !== email.trim().toLowerCase());
+
 export default function RegisterPage() {
   const { register } = useAuth();
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '' });
@@ -16,7 +20,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     if (form.password !== form.confirm) { setError('Sifreler uyusmuyor'); return; }
-    if (form.password.length < 6) { setError('Sifre en az 6 karakter olmali'); return; }
+    if (!isStrongPassword(form.password, form.email)) { setError(PASSWORD_HINT); return; }
     setLoading(true);
     try {
       await register({ firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password });
@@ -87,11 +91,12 @@ export default function RegisterPage() {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">lock</span>
                 <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="En az 6 karakter" />
+                  placeholder="En az 10 karakter" />
                 <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2">
                   <span className="material-symbols-outlined text-outline text-[18px]">{showPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
+                <p className="text-xs text-on-surface-variant">{PASSWORD_HINT}</p>
             </div>
 
             <div className="flex flex-col gap-1">

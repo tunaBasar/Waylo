@@ -90,7 +90,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         localStorage.removeItem('waylo_user');
         localStorage.removeItem('waylo_token');
         localStorage.removeItem('waylo_refresh');
-        window.location.href = '/login';
+        Object.assign(window.location, { href: '/login' });
       }
 
       if (!retryRes.ok) {
@@ -104,7 +104,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     localStorage.removeItem('waylo_user');
     localStorage.removeItem('waylo_token');
     localStorage.removeItem('waylo_refresh');
-    window.location.href = '/login';
+    Object.assign(window.location, { href: '/login' });
   }
 
   if (!res.ok) {
@@ -145,5 +145,5 @@ export const api = {
     request<ApiResponse<T>>(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
     request<ApiResponse<T>>(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  del: (path: string) => request(path, { method: 'DELETE' }),
+  del: (path: string, body?: unknown) => request(path, { method: 'DELETE', ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
 };

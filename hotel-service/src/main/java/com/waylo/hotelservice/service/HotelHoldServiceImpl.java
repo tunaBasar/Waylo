@@ -11,6 +11,7 @@ import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.repository.DailyInventoryRepository;
 import com.waylo.hotelservice.repository.HotelHoldRepository;
 import com.waylo.hotelservice.repository.HotelQuoteRepository;
+import com.waylo.hotelservice.repository.HotelRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,17 +41,20 @@ public class HotelHoldServiceImpl implements HotelHoldService {
     private final HotelQuoteRepository quoteRepository;
     private final HotelHoldRepository holdRepository;
     private final DailyInventoryRepository inventoryRepository;
+    private final HotelRepository hotelRepository;
     private final Clock clock;
     private final int holdTtlMinutes;
 
     public HotelHoldServiceImpl(HotelQuoteRepository quoteRepository,
                                 HotelHoldRepository holdRepository,
                                 DailyInventoryRepository inventoryRepository,
+                                HotelRepository hotelRepository,
                                 Clock clock,
                                 @Value("${waylo.hold.ttl-minutes:15}") int holdTtlMinutes) {
         this.quoteRepository = quoteRepository;
         this.holdRepository = holdRepository;
         this.inventoryRepository = inventoryRepository;
+        this.hotelRepository = hotelRepository;
         this.clock = clock;
         this.holdTtlMinutes = holdTtlMinutes;
     }
@@ -383,6 +387,7 @@ public class HotelHoldServiceImpl implements HotelHoldService {
                 hold.getId(),
                 hold.getQuoteId(),
                 hold.getHotelId(),
+                hotelRepository.findById(hold.getHotelId()).map(h -> h.getOrganizationId()).orElse(null),
                 hold.getRoomTypeId(),
                 hold.getRatePlanId(),
                 hold.getCheckIn(),

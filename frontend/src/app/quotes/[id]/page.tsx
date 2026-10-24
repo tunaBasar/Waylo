@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import type { Hotel } from '@/lib/types';
@@ -12,6 +12,7 @@ import {
 import type { Quote } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
 import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
+import { useAuth } from '@/lib/auth';
 
 function ErrorState({ message }: { message: string }) {
   return (
@@ -95,6 +96,8 @@ function QuoteExpired({ quote }: { quote: Quote }) {
 function QuoteContent() {
   const params = useParams();
   const id = params?.id as string;
+  const router = useRouter();
+  const { user } = useAuth();
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
@@ -102,6 +105,8 @@ function QuoteContent() {
   const [isExpired, setIsExpired] = useState(false);
   const [hotelName, setHotelName] = useState<string | null>(null);
   const [hotelLoading, setHotelLoading] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Load quote
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -137,6 +142,32 @@ function QuoteContent() {
     });
   }, [quote?.hotelId]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const bookQuote = async () => {
+    if (!user || !quote) return;
+    setBooking(true);
+    setBookingError(null);
+    try {
+      const response = await api.post<{ id: string }>('/api/orders/hotel', {
+        quoteId: quote.quoteId,
+        notes: null,
+      });
+      router.push(`/orders?created=${response.data.id}`);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.status === 404) setBookingError('Teklif bulunamadi');
+        else if (error.status === 409) setBookingError('Secilen oda icin musaitlik kalmadi veya teklif baska bir islemde kullaniliyor');
+        else if (error.status === 422) setBookingError('Teklifin suresi dolmus olabilir. Lutfen yeniden arayin');
+        else if (error.status === 503) setBookingError('Otel servisi su an yanit vermiyor, lutfen biraz sonra tekrar deneyin');
+        else setBookingError('Rezervasyon olusturulamadi');
+      } else {
+        setBookingError('Rezervasyon olusturulamadi');
+      }
+    } finally {
+      setBooking(false);
+    }
+  };
+
 
   if (quoteLoading) return <LoadingState />;
   if (quoteError || !quote) return <ErrorState message={quoteError ?? 'Teklif bulunamadi'} />;
@@ -252,7 +283,10 @@ function QuoteContent() {
       {/* Not expired section */}
       {!quote.expired && !isExpired && (
         <div className="text-center py-4">
-          <p className="text-sm text-on-surface-variant mb-1">Rezervasyon adimi yakinda</p>
+          {bookingError && <p className="text-sm text-error mb-3">{bookingError}</p>}
+          <button onClick={bookQuote} disabled={booking || !user} className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50">
+            {booking ? 'Rezervasyon olusturuluyor...' : 'Rezervasyon yap'}
+          </button>
         </div>
       )}
 

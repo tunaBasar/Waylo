@@ -330,6 +330,7 @@ services:
     ports:
       - "127.0.0.1:8085:8085"
     environment:
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"

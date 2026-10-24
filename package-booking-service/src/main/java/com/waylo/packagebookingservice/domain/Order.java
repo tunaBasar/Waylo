@@ -4,9 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
@@ -28,8 +27,8 @@ import java.util.UUID;
 @Table(name = "orders")
 public class Order {
 
+    // Id is assigned by the service (hotel flow pre-generates it as hold orderCorrelationId), else in @PrePersist.
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
@@ -52,6 +51,9 @@ public class Order {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "hold_expires_at")
+    private Instant holdExpiresAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -65,6 +67,14 @@ public class Order {
     private Instant updatedAt;
 
     public Order() {}
+
+    @PrePersist
+    void assignId() {
+        if (id == null) id = UUID.randomUUID();
+    }
+
+    public Instant getHoldExpiresAt() { return holdExpiresAt; }
+    public void setHoldExpiresAt(Instant holdExpiresAt) { this.holdExpiresAt = holdExpiresAt; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

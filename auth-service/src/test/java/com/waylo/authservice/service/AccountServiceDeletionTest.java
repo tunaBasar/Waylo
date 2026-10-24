@@ -86,10 +86,10 @@ class AccountServiceDeletionTest {
     }
 
     @Test
-    void deleteAccount_wrongPassword_401NoSideEffects() {
+    void deleteAccount_wrongPassword_400NoSideEffects() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> service.deleteAccount(userId, "bad"));
-        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertNoSideEffects(null);
     }
 

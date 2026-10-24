@@ -1,7 +1,9 @@
 package com.waylo.packagebookingservice.controller;
 
 import com.waylo.packagebookingservice.dto.ApiResponse;
+import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
+import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.dto.OrderResponse;
 import com.waylo.packagebookingservice.service.OrderService;
 import jakarta.validation.Valid;
@@ -35,10 +37,24 @@ public class OrderController {
         this.orderService = orderService;
     }
 
+    /** Hotel orders: price comes from the server-side hotel hold, never from the client. */
+    @PostMapping("/hotel")
+    public ResponseEntity<ApiResponse<OrderResponse>> createHotel(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @Valid @RequestBody HotelOrderCreateRequest request) {
+        OrderResponse response = orderService.createHotelOrder(userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Order created"));
+    }
+
+    /** Generic client-priced creation is ADMIN-only: no customer-facing caller remains. Anonymous still gets 401 from the service. */
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> create(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @Valid @RequestBody OrderCreateRequest request) {
+        if (userId != null && !"ADMIN".equals(role)) {
+            throw new AccessDeniedException("Only administrators may create orders with explicit prices");
+        }
         OrderResponse response = orderService.create(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Order created"));
     }

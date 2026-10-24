@@ -93,6 +93,37 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
     }
 
+    @ExceptionHandler({HotelUnavailableException.class, feign.FeignException.class})
+    public ResponseEntity<ErrorResponse> handleHotelUnavailable(RuntimeException ex,
+                                                                 HttpServletRequest request) {
+        log.error("Hotel service unavailable: {}", ex.getMessage());
+        var response = new ErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "HOTEL_SERVICE_UNAVAILABLE",
+                "Hotel service is temporarily unavailable, please retry",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
+    /** hotel 404 -> 404, inventory/hold-state conflicts -> 409, other hotel business errors (expired, not owner) -> 422. Hotel code is passed through. */
+    @ExceptionHandler(HotelRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleHotelRejected(HotelRejectedException ex,
+                                                              HttpServletRequest request) {
+        log.warn("Hotel service rejected request [{}]: {}", ex.getCode(), ex.getMessage());
+        HttpStatus status;
+        if (ex.getHotelStatus() == 404) {
+            status = HttpStatus.NOT_FOUND;
+        } else if (java.util.Set.of("INVENTORY_UNAVAILABLE", "QUOTE_ALREADY_HELD", "IDEMPOTENCY_CONFLICT")
+                .contains(ex.getCode())) {
+            status = HttpStatus.CONFLICT;
+        } else {
+            status = HttpStatus.UNPROCESSABLE_ENTITY;
+        }
+        var response = new ErrorResponse(status.value(), ex.getCode(), ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(status).body(response);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex,
                                                            HttpServletRequest request) {

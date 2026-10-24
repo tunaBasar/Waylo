@@ -22,7 +22,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import com.waylo.packagebookingservice.client.HotelHoldClient;
+import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
+import com.waylo.packagebookingservice.exception.HotelRejectedException;
+import com.waylo.packagebookingservice.exception.HotelUnavailableException;
+
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,18 +49,21 @@ class OrderServiceImplTest {
     @Mock
     private OrderEventPublisher eventPublisher;
 
+    @Mock
+    private com.waylo.packagebookingservice.client.HotelHoldClient hotelHoldClient;
+
     private OrderServiceImpl service;
 
     private final UUID customerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient);
     }
 
     private OrderItemCreateRequest validItem(String currency) {
         return new OrderItemCreateRequest(
-                OrderItemVertical.HOTEL, UUID.randomUUID(), UUID.randomUUID(),
+                OrderItemVertical.CAR, UUID.randomUUID(), UUID.randomUUID(),
                 "Deluxe room, 2 nights", new BigDecimal("100.00"), 2, currency);
     }
 
@@ -231,5 +241,173 @@ class OrderServiceImplTest {
 
         assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
         verify(eventPublisher).publishOrderCancelled(any());
+    }
+
+    // --- hotel orders ---
+
+    private final UUID quoteId = UUID.randomUUID();
+    private final UUID orgId = UUID.randomUUID();
+
+    private HotelHoldClient.HoldDto hold() {
+        return new HotelHoldClient.HoldDto(UUID.randomUUID(), quoteId, UUID.randomUUID(), orgId, UUID.randomUUID(),
+                UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD",
+                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"));
+    }
+
+    private void stubSaves() {
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setVersion(0L);
+            return o;
+        });
+        when(orderItemRepository.saveAndFlush(any(OrderItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void createHotelOrder_buildsEverythingFromHold() {
+        HotelHoldClient.HoldDto hold = hold();
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
+        when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
+        stubSaves();
+
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, "hi"));
+
+        ArgumentCaptor<HotelHoldClient.HoldRequest> req = ArgumentCaptor.forClass(HotelHoldClient.HoldRequest.class);
+        verify(hotelHoldClient).hold(req.capture());
+        assertThat(req.getValue().quoteId()).isEqualTo(quoteId);
+        assertThat(req.getValue().principalUserId()).isEqualTo(customerId);
+        assertThat(req.getValue().idempotencyKey()).isNotBlank().hasSizeLessThanOrEqualTo(100);
+
+        ArgumentCaptor<Order> oc = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).saveAndFlush(oc.capture());
+        assertThat(oc.getValue().getId()).isEqualTo(req.getValue().orderCorrelationId());
+
+        assertThat(r.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(r.currency()).isEqualTo("EUR");
+        assertThat(r.totalAmount()).isEqualByComparingTo("321.50");
+        assertThat(r.holdExpiresAt()).isEqualTo(hold.expiresAt());
+        var item = r.items().get(0);
+        assertThat(item.vertical()).isEqualTo(OrderItemVertical.HOTEL);
+        assertThat(item.productRef()).isEqualTo(hold.roomTypeId());
+        assertThat(item.fulfillmentRef()).isEqualTo(hold.holdId());
+        assertThat(item.supplierOrganizationId()).isEqualTo(orgId);
+        assertThat(item.unitAmount()).isEqualByComparingTo("321.50");
+        assertThat(item.quantity()).isEqualTo(1);
+        assertThat(item.description()).isEqualTo("2026-12-01-2026-12-03, 2 gece, 1 oda");
+        verify(eventPublisher).publishOrderCreated(any());
+    }
+
+    @Test
+    void createHotelOrder_requestRecordHasNoPriceFields() {
+        assertThat(HotelOrderCreateRequest.class.getRecordComponents())
+                .extracting(c -> c.getName()).containsExactlyInAnyOrder("quoteId", "notes");
+    }
+
+    @Test
+    void createHotelOrder_noIdentity_throws() {
+        assertThatThrownBy(() -> service.createHotelOrder(null, new HotelOrderCreateRequest(quoteId, null)))
+                .isInstanceOf(AuthenticationRequiredException.class);
+        verifyNoInteractions(hotelHoldClient);
+    }
+
+    @Test
+    void createHotelOrder_sameQuoteTwice_returnsExistingWithoutNewHold() {
+        UUID orderId = UUID.randomUUID();
+        Order existing = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L);
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of(existing));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
+
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null));
+
+        assertThat(r.id()).isEqualTo(orderId);
+        verifyNoInteractions(hotelHoldClient);
+        verify(orderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createHotelOrder_hotelRejects_noOrderSaved() {
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
+        when(hotelHoldClient.hold(any())).thenThrow(new HotelRejectedException(404, "NOT_FOUND", "no quote"));
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+                .isInstanceOf(HotelRejectedException.class);
+
+        doThrow(new HotelUnavailableException("down")).when(hotelHoldClient).hold(any());
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+                .isInstanceOf(HotelUnavailableException.class);
+
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createHotelOrder_saveFails_releasesHoldAndRethrows() {
+        HotelHoldClient.HoldDto hold = hold();
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
+        when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("db down");
+        verify(hotelHoldClient).release(hold.holdId());
+    }
+
+    @Test
+    void create_genericEndpointRejectsHotelItems() {
+        OrderItemCreateRequest hotel = new OrderItemCreateRequest(OrderItemVertical.HOTEL, null, UUID.randomUUID(),
+                "x", new BigDecimal("0.01"), 1, "USD");
+        OrderCreateRequest request = new OrderCreateRequest(customerId, "USD", null, null, List.of(hotel));
+        assertThatThrownBy(() -> service.create(customerId, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting(ex -> ((BusinessRuleException) ex).getRuleCode())
+                .isEqualTo("USE_QUOTE_ENDPOINT");
+        verifyNoInteractions(orderRepository);
+    }
+
+    private OrderItem hotelItem(UUID orderId, UUID holdId) {
+        OrderItem item = new OrderItem();
+        item.setOrderId(orderId);
+        item.setVertical(OrderItemVertical.HOTEL);
+        item.setFulfillmentRef(holdId);
+        item.setUnitAmount(BigDecimal.TEN);
+        item.setQuantity(1);
+        return item;
+    }
+
+    @Test
+    void cancel_hotelOrder_releasesHold() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L)));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(hotelItem(orderId, holdId)));
+
+        assertThat(service.cancel(customerId, orderId, null).status()).isEqualTo(OrderStatus.CANCELLED);
+        verify(hotelHoldClient).release(holdId);
+    }
+
+    @Test
+    void cancel_hotelOrder_holdAlreadyGone_stillCancels() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L)));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(hotelItem(orderId, holdId)));
+        when(hotelHoldClient.release(holdId)).thenThrow(new HotelRejectedException(422, "HOLD_INVALID_STATE", "confirmed"));
+
+        assertThat(service.cancel(customerId, orderId, null).status()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void cancel_hotelOrder_hotelDown_orderUnchanged() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(hotelItem(orderId, holdId)));
+        when(hotelHoldClient.release(holdId)).thenThrow(new HotelUnavailableException("down"));
+
+        assertThatThrownBy(() -> service.cancel(customerId, orderId, null)).isInstanceOf(HotelUnavailableException.class);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+        verify(orderRepository, never()).saveAndFlush(any());
     }
 }
