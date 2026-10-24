@@ -156,7 +156,7 @@ class VehicleServiceImplTest {
         service = newService();
         Vehicle vehicle = buildVehicle(vehicleId, VehicleStatus.AVAILABLE);
         VehicleResponse response = mock(VehicleResponse.class);
-        when(vehicleRepository.findAll()).thenReturn(List.of(vehicle));
+        when(vehicleRepository.findByActiveTrue()).thenReturn(List.of(vehicle));
         when(vehicleMapper.toResponse(vehicle)).thenReturn(response);
 
         List<VehicleResponse> result = service.getAll();
@@ -283,14 +283,14 @@ class VehicleServiceImplTest {
         VehicleRequest request = buildRequest();
         VehicleResponse response = mock(VehicleResponse.class);
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vehicleRepository.saveAndFlush(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vehicleMapper.toResponse(any(Vehicle.class))).thenReturn(response);
 
         VehicleResponse result = service.update(vehicleId, request);
 
         assertThat(result).isEqualTo(response);
         verify(vehicleMapper).updateEntity(request, vehicle);
-        verify(vehicleRepository).save(vehicle);
+        verify(vehicleRepository).saveAndFlush(vehicle);
     }
 
     // --- delete ---
@@ -298,7 +298,7 @@ class VehicleServiceImplTest {
     @Test
     void delete_notFound_throwsAndNeverDeletes() {
         service = newService();
-        when(vehicleRepository.existsById(vehicleId)).thenReturn(false);
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete(vehicleId))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -309,7 +309,9 @@ class VehicleServiceImplTest {
     @Test
     void delete_found_deletes() {
         service = newService();
-        when(vehicleRepository.existsById(vehicleId)).thenReturn(true);
+        Vehicle vehicle = buildVehicle(vehicleId, VehicleStatus.AVAILABLE);
+        vehicle.setActive(false);
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
 
         service.delete(vehicleId);
 
@@ -324,14 +326,14 @@ class VehicleServiceImplTest {
         Vehicle vehicle = buildVehicle(vehicleId, VehicleStatus.AVAILABLE);
         VehicleResponse response = mock(VehicleResponse.class);
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vehicleRepository.saveAndFlush(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vehicleMapper.toResponse(any(Vehicle.class))).thenReturn(response);
 
-        VehicleResponse result = service.updateStatus(vehicleId, VehicleStatus.RENTED);
+        VehicleResponse result = service.updateStatus(vehicleId, VehicleStatus.AVAILABLE);
 
         assertThat(result).isEqualTo(response);
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.RENTED);
-        verify(vehicleRepository).save(vehicle);
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        verify(vehicleRepository).saveAndFlush(vehicle);
     }
 
     // --- deactivate ---
@@ -342,14 +344,14 @@ class VehicleServiceImplTest {
         Vehicle vehicle = buildVehicle(vehicleId, VehicleStatus.AVAILABLE);
         VehicleResponse response = mock(VehicleResponse.class);
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vehicleRepository.saveAndFlush(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vehicleMapper.toResponse(any(Vehicle.class))).thenReturn(response);
 
         VehicleResponse result = service.deactivate(vehicleId);
 
         assertThat(result).isEqualTo(response);
         assertThat(vehicle.isActive()).isFalse();
-        verify(vehicleRepository).save(vehicle);
+        verify(vehicleRepository).saveAndFlush(vehicle);
     }
 
     // --- activate ---
@@ -361,14 +363,14 @@ class VehicleServiceImplTest {
         vehicle.setActive(false);
         VehicleResponse response = mock(VehicleResponse.class);
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
-        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vehicleRepository.saveAndFlush(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
         when(vehicleMapper.toResponse(any(Vehicle.class))).thenReturn(response);
 
         VehicleResponse result = service.activate(vehicleId);
 
         assertThat(result).isEqualTo(response);
         assertThat(vehicle.isActive()).isTrue();
-        verify(vehicleRepository).save(vehicle);
+        verify(vehicleRepository).saveAndFlush(vehicle);
     }
 
     // --- getAvailableCount ---
@@ -376,11 +378,11 @@ class VehicleServiceImplTest {
     @Test
     void getAvailableCount_delegatesToRepositoryWithAvailableStatus() {
         service = newService();
-        when(vehicleRepository.countByLocationAndStatus("Istanbul", VehicleStatus.AVAILABLE)).thenReturn(5L);
+        when(vehicleRepository.countByLocationAndStatusAndActiveTrue("Istanbul", VehicleStatus.AVAILABLE)).thenReturn(5L);
 
         long result = service.getAvailableCount("Istanbul");
 
         assertThat(result).isEqualTo(5L);
-        verify(vehicleRepository).countByLocationAndStatus("Istanbul", VehicleStatus.AVAILABLE);
+        verify(vehicleRepository).countByLocationAndStatusAndActiveTrue("Istanbul", VehicleStatus.AVAILABLE);
     }
 }

@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
+import java.time.Year;
 
 @Service
 @Transactional
@@ -31,10 +32,12 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse create(VehicleRequest request) {
-        if (vehicleRepository.existsByPlateNumber(request.plateNumber())) {
-            throw new DuplicateResourceException("Vehicle", "plateNumber", request.plateNumber());
+        VehicleRequest normalized = normalize(request);
+        validateYear(normalized.year());
+        if (vehicleRepository.existsByPlateNumber(normalized.plateNumber())) {
+            throw new DuplicateResourceException("Vehicle", "plateNumber", normalized.plateNumber());
         }
-        Vehicle vehicle = vehicleMapper.toEntity(request);
+        Vehicle vehicle = vehicleMapper.toEntity(normalized);
         vehicle.setStatus(VehicleStatus.AVAILABLE);
         vehicle = vehicleRepository.save(vehicle);
         return vehicleMapper.toResponse(vehicle);
@@ -49,7 +52,7 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     @Transactional(readOnly = true)
     public VehicleResponse getByPlateNumber(String plateNumber) {
-        Vehicle vehicle = vehicleRepository.findByPlateNumber(plateNumber)
+        Vehicle vehicle = vehicleRepository.findByPlateNumber(normalizePlate(plateNumber))
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", "plateNumber", plateNumber));
         return vehicleMapper.toResponse(vehicle);
     }
@@ -57,7 +60,7 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     @Transactional(readOnly = true)
     public List<VehicleResponse> getAll() {
-        return vehicleRepository.findAll().stream().map(vehicleMapper::toResponse).toList();
+        return vehicleRepository.findByActiveTrue().stream().map(vehicleMapper::toResponse).toList();
     }
 
     @Override
@@ -81,30 +84,35 @@ public class VehicleServiceImpl implements VehicleService {
         if (maxDailyRate != null) {
             stream = stream.filter(v -> v.getDailyRate().compareTo(maxDailyRate) <= 0);
         }
-        return stream.map(vehicleMapper::toResponse).toList();
+        return stream.filter(Vehicle::isActive).map(vehicleMapper::toResponse).toList();
     }
 
     @Override
     public VehicleResponse update(UUID id, VehicleRequest request) {
         Vehicle vehicle = findOrThrow(id);
-        vehicleMapper.updateEntity(request, vehicle);
-        vehicle = vehicleRepository.save(vehicle);
+        VehicleRequest normalized = normalize(request);
+        validateYear(normalized.year());
+        if (vehicleRepository.existsByPlateNumberAndIdNot(normalized.plateNumber(), id))
+            throw new DuplicateResourceException("Vehicle", "plateNumber", normalized.plateNumber());
+        vehicleMapper.updateEntity(normalized, vehicle);
+        vehicle = vehicleRepository.saveAndFlush(vehicle);
         return vehicleMapper.toResponse(vehicle);
     }
 
     @Override
     public void delete(UUID id) {
-        if (!vehicleRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Vehicle", "id", id);
-        }
+        Vehicle vehicle = findOrThrow(id);
+        if (vehicle.isActive()) throw new com.waylo.carrentalservice.exception.BusinessRuleException("VEHICLE_ACTIVE", "Vehicle must be inactive before deletion");
         vehicleRepository.deleteById(id);
     }
 
     @Override
     public VehicleResponse updateStatus(UUID id, VehicleStatus status) {
+        if (status != VehicleStatus.AVAILABLE && status != VehicleStatus.MAINTENANCE)
+            throw new IllegalArgumentException("Status may only be AVAILABLE or MAINTENANCE");
         Vehicle vehicle = findOrThrow(id);
         vehicle.setStatus(status);
-        vehicle = vehicleRepository.save(vehicle);
+        vehicle = vehicleRepository.saveAndFlush(vehicle);
         return vehicleMapper.toResponse(vehicle);
     }
 
@@ -112,7 +120,7 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse deactivate(UUID id) {
         Vehicle vehicle = findOrThrow(id);
         vehicle.setActive(false);
-        vehicle = vehicleRepository.save(vehicle);
+        vehicle = vehicleRepository.saveAndFlush(vehicle);
         return vehicleMapper.toResponse(vehicle);
     }
 
@@ -120,15 +128,22 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse activate(UUID id) {
         Vehicle vehicle = findOrThrow(id);
         vehicle.setActive(true);
-        vehicle = vehicleRepository.save(vehicle);
+        vehicle = vehicleRepository.saveAndFlush(vehicle);
         return vehicleMapper.toResponse(vehicle);
     }
 
     @Override
     @Transactional(readOnly = true)
     public long getAvailableCount(String location) {
-        return vehicleRepository.countByLocationAndStatus(location, VehicleStatus.AVAILABLE);
+        return vehicleRepository.countByLocationAndStatusAndActiveTrue(location, VehicleStatus.AVAILABLE);
     }
+
+    private VehicleRequest normalize(VehicleRequest r) {
+        return new VehicleRequest(normalizePlate(r.plateNumber()), r.brand().trim(), r.model().trim(), r.year(), r.vehicleType(),
+                r.color() == null ? null : r.color().trim(), r.seatCount(), r.dailyRate(), r.location().trim(), r.mileage());
+    }
+    private String normalizePlate(String plate) { return plate.trim().replaceAll("\\s+", "").toUpperCase(); }
+    private void validateYear(Integer year) { if (year < 1990 || year > Year.now().getValue() + 1) throw new IllegalArgumentException("Year must be between 1990 and next year"); }
 
     private Vehicle findOrThrow(UUID id) {
         return vehicleRepository.findById(id)

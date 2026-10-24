@@ -20,6 +20,15 @@ public record VehicleResponse(
         String location,
         Integer mileage,
         boolean active,
+        long version,
         Instant createdAt,
         Instant updatedAt
-) {}
+) {
+    public VehicleResponse(UUID id, String plateNumber, String brand, String model, int year,
+                            VehicleType vehicleType, VehicleStatus status, String color, int seatCount,
+                            BigDecimal dailyRate, String location, Integer mileage, boolean active,
+                            Instant createdAt, Instant updatedAt) {
+        this(id, plateNumber, brand, model, year, vehicleType, status, color, seatCount, dailyRate,
+                location, mileage, active, 0L, createdAt, updatedAt);
+    }
+}

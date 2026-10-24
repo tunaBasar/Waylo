@@ -1192,4 +1192,108 @@ class JwtAuthenticationFilterTest {
         assertThat(capturedRequest.get()).isNull();
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    void publicVehicleGet_anon_passesWithoutIdentity() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehicles/available?from=2026-11-01&to=2026-11-03").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+    }
+
+    @Test
+    void publicVehicleGet_withValidToken_forwardIdentityHeaders() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehicles/available?from=2026-11-01&to=2026-11-03")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+    }
+
+    @Test
+    void anonPOST_toVehicles_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.post("/api/vehicles").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void anonGET_toRentalsMe_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/rentals/me").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void vehiclesX_notPublic_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehiclesX/available").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }

@@ -17,6 +17,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     Optional<Vehicle> findByPlateNumber(String plateNumber);
 
     boolean existsByPlateNumber(String plateNumber);
+    boolean existsByPlateNumberAndIdNot(String plateNumber, UUID id);
 
     List<Vehicle> findByLocation(String location);
 
@@ -33,4 +34,5 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findByActiveTrue();
 
     long countByLocationAndStatus(String location, VehicleStatus status);
+    long countByLocationAndStatusAndActiveTrue(String location, VehicleStatus status);
 }

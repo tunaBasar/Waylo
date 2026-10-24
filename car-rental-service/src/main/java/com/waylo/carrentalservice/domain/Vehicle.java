@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -62,6 +63,10 @@ public class Vehicle {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -112,6 +117,8 @@ public class Vehicle {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public long getVersion() { return version; }
+    public void setVersion(long version) { this.version = version; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
