@@ -6,6 +6,10 @@ import com.waylo.authservice.dto.AdminUserResponse;
 import com.waylo.authservice.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +22,8 @@ import java.util.UUID;
 public class AdminUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserService.class);
+
+    static final int MAX_PAGE_SIZE = 100;
 
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
@@ -33,6 +39,14 @@ public class AdminUserService {
         User user = userRepository.findByEmailIgnoreCase(normalized)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         return toResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> list(String q, int page, int size) {
+        String term = q == null || q.isBlank() ? null : q.trim().toLowerCase(Locale.ROOT);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id")));
+        return userRepository.search(term, pageable).map(AdminUserService::toResponse);
     }
 
     @Transactional
@@ -59,6 +73,7 @@ public class AdminUserService {
     }
 
     private static AdminUserResponse toResponse(User u) {
-        return new AdminUserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole().name(), u.isEmailVerified());
+        return new AdminUserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole().name(), u.isEmailVerified(),
+                u.getDeletedAt());
     }
 }

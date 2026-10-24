@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
                                                              HttpServletRequest request) {
         var response = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
-                "FORBIDDEN",
+                ex.getCode(),
                 ex.getMessage(),
                 request.getRequestURI()
         );

@@ -28,4 +28,10 @@ public interface HotelService {
     HotelResponse activate(UUID id);
 
     List<HotelResponse> getByOrganization(UUID organizationId);
+
+    /** Public projection scoped to one organization (what a non-member may see). */
+    List<HotelResponse> getPublicByOrganization(UUID organizationId);
+
+    /** True if the hotel is in the public projection (active, and its organization ACTIVE or none). */
+    boolean isPublic(UUID id);
 }

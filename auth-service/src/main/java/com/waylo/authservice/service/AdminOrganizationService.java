@@ -6,12 +6,15 @@ import com.waylo.authservice.dto.OrganizationResponse;
 import com.waylo.authservice.repository.OrganizationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -19,22 +22,30 @@ public class AdminOrganizationService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminOrganizationService.class);
 
+    static final int MAX_PAGE_SIZE = 100;
+
     private final OrganizationRepository organizationRepository;
 
     public AdminOrganizationService(OrganizationRepository organizationRepository) {
         this.organizationRepository = organizationRepository;
     }
 
+    /** status absent -> PENDING (legacy default), status=ALL -> every status. */
     @Transactional(readOnly = true)
-    public List<OrganizationResponse> listPending(String statusParam) {
-        OrganizationStatus status = OrganizationStatus.PENDING;
-        if (statusParam != null && !statusParam.isBlank()) {
-            status = OrganizationStatus.valueOf(statusParam.toUpperCase());
+    public Page<OrganizationResponse> list(String statusParam, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id")));
+        Page<Organization> result;
+        if (statusParam != null && statusParam.trim().equalsIgnoreCase("ALL")) {
+            result = organizationRepository.findAll(pageable);
+        } else {
+            OrganizationStatus status = OrganizationStatus.PENDING;
+            if (statusParam != null && !statusParam.isBlank()) {
+                status = OrganizationStatus.valueOf(statusParam.trim().toUpperCase());
+            }
+            result = organizationRepository.findByStatus(status, pageable);
         }
-        List<Organization> organizations = organizationRepository.findByStatus(status);
-        return organizations.stream()
-                .map(org -> new OrganizationResponse(org.getId(), org.getName(), org.getStatus()))
-                .toList();
+        return result.map(org -> new OrganizationResponse(org.getId(), org.getName(), org.getStatus()));
     }
 
     @Transactional

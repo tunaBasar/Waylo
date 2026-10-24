@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from '@/lib/api';
 import type { Hotel } from '@/lib/types';
 import {
   hotelStayApi,
@@ -155,7 +155,8 @@ function QuoteContent() {
       router.push(`/orders?created=${response.data.id}`);
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.status === 404) setBookingError('Teklif bulunamadi');
+        if (error.code === 'ADMIN_CANNOT_PURCHASE') setBookingError(ADMIN_CANNOT_PURCHASE_MESSAGE);
+        else if (error.status === 404) setBookingError('Teklif bulunamadi');
         else if (error.status === 409) setBookingError('Secilen oda icin musaitlik kalmadi veya teklif baska bir islemde kullaniliyor');
         else if (error.status === 422) setBookingError('Teklifin suresi dolmus olabilir. Lutfen yeniden arayin');
         else if (error.status === 503) setBookingError('Otel servisi su an yanit vermiyor, lutfen biraz sonra tekrar deneyin');

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from '@/lib/api';
 import type { Hotel } from '@/lib/types';
 import {
   todayIso, addDaysIso, validateStay, stayQueryString, parseStayQuery,
@@ -341,7 +341,9 @@ function HotelsDetailContent() {
       router.push(`/quotes/${res.data.quoteId}`);
     }).catch((err: unknown) => {
       setPendingQuote(false);
-      if (err instanceof ApiError && (err.status === 409 || err.status === 422)) {
+      if (err instanceof ApiError && err.code === 'ADMIN_CANNOT_PURCHASE') {
+        setOfferError(ADMIN_CANNOT_PURCHASE_MESSAGE);
+      } else if (err instanceof ApiError && (err.status === 409 || err.status === 422)) {
         setNoticeMessage('Fiyat veya musaitlik degisti, lutfen tekrar arayin');
         // Re-run availability to refresh
         if (searchQuery) {

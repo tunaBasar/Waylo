@@ -76,6 +76,31 @@ class AccessServiceTest {
         }
 
         @Test
+        @DisplayName("HOTEL_READ allowed for any active member, denied for no grants")
+        void hotelRead_anyMember() {
+            var grant = makeGrant(Role.HOTEL_STAFF, ScopeType.HOTEL, HOTEL_ID);
+            when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+            assertTrue(accessService.check(USER_ID, ORG_ID, null, Permission.HOTEL_READ).allowed());
+
+            UUID other = UUID.randomUUID();
+            when(accessQueryRepository.findActiveGrants(USER_ID, other)).thenReturn(List.of());
+            assertFalse(accessService.check(USER_ID, other, null, Permission.HOTEL_READ).allowed());
+        }
+
+        @Test
+        @DisplayName("RESERVATION_READ allowed for every business role, denied for no grants")
+        void reservationRead_allRoles() {
+            for (Role role : Role.values()) {
+                var grant = makeGrant(role, ScopeType.ORGANIZATION, ORG_ID);
+                when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+                assertTrue(accessService.check(USER_ID, ORG_ID, null, Permission.RESERVATION_READ).allowed(), role.name());
+            }
+            UUID other = UUID.randomUUID();
+            when(accessQueryRepository.findActiveGrants(USER_ID, other)).thenReturn(List.of());
+            assertFalse(accessService.check(USER_ID, other, null, Permission.RESERVATION_READ).allowed());
+        }
+
+        @Test
         @DisplayName("null permission -> denied")
         void nullPermission_denied() {
             AccessDecision decision = accessService.check(USER_ID, ORG_ID, HOTEL_ID, null);

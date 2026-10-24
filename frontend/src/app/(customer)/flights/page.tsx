@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import type { Flight } from '@/lib/types';
 
@@ -9,19 +10,24 @@ const statusMap: Record<Flight['status'], { label: string; class: string }> = {
   CANCELLED: { label: 'IPTAL EDILDI', class: 'text-error bg-error-container' },
 };
 
-export default function FlightsPage() {
+function FlightsContent() {
+  const params = useSearchParams();
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Flight['status']>('all');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [date, setDate] = useState('');
+  const [from, setFrom] = useState(params.get('from') ?? '');
+  const [to, setTo] = useState(params.get('to') ?? '');
+  const [date, setDate] = useState(params.get('date') ?? '');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get<Flight[]>('/api/flights').then(res => setFlights(res.data)).catch(() => setError('Ucuslar yuklenemedi.')).finally(() => setLoading(false));
-  }, []);
+    const f = params.get('from'), t = params.get('to'), d = params.get('date');
+    const request = f && t && d
+      ? api.get<Flight[]>(`/api/flights/search?${new URLSearchParams({ from: f.toUpperCase(), to: t.toUpperCase(), date: d })}`)
+      : api.get<Flight[]>('/api/flights');
+    request.then(res => setFlights(res.data)).catch(() => setError('Ucuslar yuklenemedi.')).finally(() => setLoading(false));
+  }, [params]);
 
   async function searchFlights(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,4 +65,8 @@ export default function FlightsPage() {
       {loading ? <div className="text-center py-12 text-sm text-on-surface-variant">Ucuslar yukleniyor...</div> : filtered.length === 0 ? <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">flight_takeoff</span><p className="text-on-surface-variant text-sm">Ucus bulunamadi</p></div> : <div className="space-y-space-sm">{filtered.map(flight => { const status = statusMap[flight.status]; return <div key={flight.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-4"><div className="flex items-center justify-between mb-3"><div><span className="text-lg font-bold text-on-surface">{flight.flightNumber}</span><span className="text-xs text-on-surface-variant ml-1.5">{flight.airline}</span></div><span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${status.class}`}>{status.label}</span></div><div className="flex items-center justify-between"><div><p className="text-xl font-bold text-on-surface">{new Date(flight.departureTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p><p className="text-sm font-bold text-on-surface">{flight.departureAirportCode}</p></div><div className="flex-1 mx-4 h-px bg-primary-fixed" /><div className="text-right"><p className="text-xl font-bold text-on-surface">{new Date(flight.arrivalTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p><p className="text-sm font-bold text-on-surface">{flight.arrivalAirportCode}</p></div></div></div>; })}</div>}
     </div>
   );
+}
+
+export default function FlightsPage() {
+  return <Suspense fallback={null}><FlightsContent /></Suspense>;
 }

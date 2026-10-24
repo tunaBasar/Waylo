@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
-@FeignClient(name = "package-booking-service", path = "/api/bookings")
+@FeignClient(name = "package-booking-service", path = "/api/bookings", configuration = InternalTokenFeignConfig.class)
 public interface PackageBookingClient {
 
     @PostMapping("/{id}/status")

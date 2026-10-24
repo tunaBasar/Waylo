@@ -53,6 +53,8 @@ waylo:
     from-name: Waylo Travel
     verification-url: http://localhost:3000/verify
     suppressed-domains: example.com,example.net,example.org,email.com
+  internal:
+    token: ${INTERNAL_API_TOKEN}
 
 eureka:
   client:

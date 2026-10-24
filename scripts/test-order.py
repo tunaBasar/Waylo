@@ -182,9 +182,9 @@ def main():
         generic = {'currency': 'USD', 'items': [{'vertical': 'HOTEL', 'productRef': room['id'],
                    'description': 'tamper', 'unitAmount': 0.01, 'quantity': 1, 'currency': 'USD'}]}
         s, _ = req('POST', '/api/orders', dict(generic, customerId=cust_a['userId']), tok_a)
-        ok(s == 403, f'generic POST /api/orders as customer 403 (got {s})')
-        s, d = req('POST', '/api/orders', dict(generic, customerId=admin['userId']), tok_admin)
-        ok(s == 422 and d.get('error') == 'USE_QUOTE_ENDPOINT', f'generic POST as admin with HOTEL 422 USE_QUOTE_ENDPOINT (got {s})')
+        ok(s in (404, 405), f'generic POST /api/orders no longer exists (got {s})')
+        s, d = req('POST', '/api/orders/hotel', {'quoteId': quote['quoteId']}, tok_admin)
+        ok(s == 403 and d.get('error') == 'ADMIN_CANNOT_PURCHASE', f'admin POST /api/orders/hotel 403 ADMIN_CANNOT_PURCHASE (got {s})')
 
         # --- cancel ---
         s, d = req('POST', f"/api/orders/{order['id']}/cancel", token=tok_a)

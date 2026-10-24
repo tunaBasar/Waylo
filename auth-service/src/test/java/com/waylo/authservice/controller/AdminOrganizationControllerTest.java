@@ -37,7 +37,7 @@ class AdminOrganizationControllerTest {
     void listPending_userRole_returns403() {
         // Act & Assert
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                controller.listPending("PENDING", ADMIN_ID, "USER"));
+                controller.list("PENDING", 0, 100, ADMIN_ID, "USER"));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("Platform admin required", ex.getReason());
@@ -47,16 +47,17 @@ class AdminOrganizationControllerTest {
     @Test
     void listPending_adminRole_delegatesToService() {
         // Arrange
-        when(adminService.listPending("PENDING")).thenReturn(List.of());
+        when(adminService.list("PENDING", 0, 100)).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
         // Act
-        ResponseEntity<ApiResponse<List<OrganizationResponse>>> response =
-                controller.listPending("PENDING", ADMIN_ID, "ADMIN");
+        ResponseEntity<com.waylo.authservice.dto.PagedApiResponse<OrganizationResponse>> response =
+                controller.list("PENDING", 0, 100, ADMIN_ID, "ADMIN");
 
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
-        verify(adminService).listPending("PENDING");
+        assertEquals(0L, response.getBody().total());
+        verify(adminService).list("PENDING", 0, 100);
     }
 
     @Test

@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { partnerApi } from '@/lib/partner';
 import type { Hotel } from '@/lib/types';
 import {
   todayIso,
@@ -15,17 +14,15 @@ import {
   hotelStayApi,
 } from '@/lib/hotel-stay';
 
-export default function HotelsPage() {
-  const { user } = useAuth();
-  const [isPartner, setIsPartner] = useState(false);
+function HotelsContent() {
+  const initialCity = useSearchParams().get('city') ?? '';
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [starFilter, setStarFilter] = useState<number | null>(null);
-  const [view, setView] = useState<'cards' | 'rooms'>('cards');
 
   // Search form state
-  const [formCity, setFormCity] = useState('');
+  const [formCity, setFormCity] = useState(initialCity);
   const [formCheckIn, setFormCheckIn] = useState(() => addDaysIso(todayIso(), 1));
   const [formCheckOut, setFormCheckOut] = useState(() => addDaysIso(todayIso(), 2));
   const [formRooms, setFormRooms] = useState(1);
@@ -47,15 +44,6 @@ export default function HotelsPage() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    partnerApi.myMemberships()
-      .then(res => { if (!cancelled) setIsPartner((res.data ?? []).length > 0); })
-      .catch(() => { if (!cancelled) setIsPartner(false); });
-    return () => { cancelled = true; };
-  }, [user]);
 
   const clearSearch = () => {
     setSearchActive(false);
@@ -131,12 +119,6 @@ export default function HotelsPage() {
             {headerCount}
           </span>
         </div>
-        {isPartner && (
-          <Link href="/partner" className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary text-on-secondary text-sm font-medium shadow-sm active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            <span>Yeni Otel Ekle</span>
-          </Link>
-        )}
       </div>
 
       {/* Search Form */}
@@ -234,24 +216,6 @@ export default function HotelsPage() {
             Tarih filtresini temizle
           </button>
         )}
-      </div>
-
-      {/* View Switcher */}
-      <div className="bg-surface-container-low p-1 rounded-xl flex items-center gap-1">
-        <button onClick={() => setView('cards')}
-          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all ${
-            view === 'cards' ? 'bg-surface-container-lowest text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
-          }`}>
-          <span className="material-symbols-outlined text-[18px]">grid_view</span>
-          <span>Kart Gorunumu</span>
-        </button>
-        <button onClick={() => setView('rooms')}
-          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all ${
-            view === 'rooms' ? 'bg-surface-container-lowest text-primary font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
-          }`}>
-          <span className="material-symbols-outlined text-[18px]">meeting_room</span>
-          <span>Oda Listesi</span>
-        </button>
       </div>
 
       {/* Search */}
@@ -384,4 +348,8 @@ export default function HotelsPage() {
       )}
     </div>
   );
+}
+
+export default function HotelsPage() {
+  return <Suspense fallback={null}><HotelsContent /></Suspense>;
 }

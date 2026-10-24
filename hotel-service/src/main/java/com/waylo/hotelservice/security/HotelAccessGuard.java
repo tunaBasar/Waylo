@@ -53,6 +53,23 @@ public class HotelAccessGuard {
         check(userId, hotel.getOrganizationId(), hotelId, "ROOM_MANAGE");
     }
 
+    /** True for ADMIN or any active member of the organization. Fails closed (false) on missing identity or auth outage. */
+    public boolean canReadOrganization(UUID userId, String role, UUID organizationId) {
+        if ("ADMIN".equals(role)) {
+            return true;
+        }
+        if (userId == null || organizationId == null) {
+            return false;
+        }
+        try {
+            AccessDecision decision = authAccessClient.check(userId, organizationId, null, "HOTEL_READ");
+            return decision != null && decision.allowed();
+        } catch (RuntimeException e) {
+            log.warn("Authorization service unavailable for userId={}, permission=HOTEL_READ", userId);
+            return false;
+        }
+    }
+
     private void check(UUID userId, UUID organizationId, UUID hotelId, String permission) {
         if (userId == null) {
             throw new AuthenticationRequiredException("Authentication required");

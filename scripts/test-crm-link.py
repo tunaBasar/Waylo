@@ -3,8 +3,9 @@
 
 Registers a user through the gateway (no manual CRM call), then asserts:
   1. crm-service created a Customer whose id equals the auth userId (via auth-events)
-  2. a booking for that user produces a notification addressed to the user's email
-  3. crm-service added booking loyalty points to that customer
+  2. registering the same email again does not create a second CRM customer
+(Customers are created only from auth-events. Legacy /api/bookings is internal-only now and
+order-events have no CRM or notification consumer, so no booking/loyalty assertions here.)
 Standard library only.
 """
 import argparse, json, secrets, sys, time, uuid
@@ -71,20 +72,11 @@ def main():
     ok(c is not None and c["email"] == email and c["firstName"] == "Plain" and c["lastName"] == "User",
        "CRM customer auto-created with id == auth userId")
 
-    s, b = poll(lambda: (lambda r: r if r[0] == 201 else None)(req("POST", "/api/bookings", {
-        "customerId": uid, "flightId": str(uuid.uuid4()),
-        "hotelReservationId": None, "vehicleReservationId": None, "notes": "crm link test"}, tok)), 15) or (None, None)
-    ok(s == 201, f"booking created (got {s})")
-
-    def notified():
-        s, n = req("GET", f"/api/notifications/customer/{uid}", None, tok)
-        return s == 200 and any(x["recipient"] == email and x["subject"] == "Rezervasyonunuz alindi"
-                                for x in (n or {}).get("data", []))
-
-    ok(poll(notified), "booking notification addressed to the user's email")
-
-    pts = poll(lambda: (customer() or {}).get("loyaltyPoints") == 100)
-    ok(pts, "booking loyalty points added (100)")
+    s2, _ = req("POST", "/api/auth/register",
+                {"firstName": "Plain", "lastName": "User", "email": email, "password": secrets.token_urlsafe(16)})
+    ok(s2 in (400, 409, 422), f"duplicate register rejected (got {s2})")
+    s3, lst = req("GET", f"/api/customers/email/{email}", None, tok)
+    ok(s3 == 200 and lst and lst.get("data", {}).get("id") == uid, "exactly the same CRM customer found by email")
 
     print(f"\n{P} passed, {F} failed")
     sys.exit(1 if F else 0)

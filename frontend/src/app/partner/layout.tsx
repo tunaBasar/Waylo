@@ -1,21 +1,20 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { PartnerProvider, usePartner } from '@/lib/partner-context';
-import { cn } from '@/lib/utils';
+import { SurfaceShell, type NavItem } from '@/components/SurfaceShell';
+import { SurfaceGuard } from '@/components/SurfaceGuard';
 import { inputClass } from '@/components/partner/ui';
 
 const UNSAVED_LEAVE_MESSAGE =
   'Kaydedilmemis degisiklikler kaybolacak. Sayfadan ayrilmak istiyor musunuz?';
 
-const tabs = [
-  { href: '/partner', label: 'Isletmeler', icon: 'business' },
+const nav: NavItem[] = [
+  { href: '/partner', label: 'Isletmeler', icon: 'business', exact: true },
   { href: '/partner/room-types', label: 'Oda tipleri', icon: 'bed' },
   { href: '/partner/rate-plans', label: 'Fiyat planlari', icon: 'sell' },
   { href: '/partner/calendar', label: 'Takvim', icon: 'calendar_month' },
-  { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
 ];
 
 function WorkspaceBar() {
@@ -122,32 +121,9 @@ function PartnerChrome({ children }: { children: React.ReactNode }) {
       }
     };
   }, [hasUnsavedChanges]);
-  // Orders are per account, not per hotel: the organization/hotel selector would be misleading there.
-  const showWorkspace = !pathname.startsWith('/partner/orders');
   return (
     <div className="space-y-space-md">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>storefront</span>
-          <h1 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Partner Paneli</h1>
-        </div>
-        {showWorkspace && <WorkspaceBar />}
-        <nav className="flex gap-1 overflow-x-auto no-scrollbar border-b border-outline-variant">
-          {tabs.map(t => {
-            const active = t.href === '/partner' ? pathname === '/partner' : pathname.startsWith(t.href);
-            return (
-              <Link key={t.href} href={t.href}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors',
-                  active ? 'border-primary text-primary font-semibold' : 'border-transparent text-on-surface-variant hover:text-on-surface',
-                )}>
-                <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
-                {t.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+      <WorkspaceBar />
       {/* key: switching hotel remounts the page, so it starts clean (no stale data, no request with
           the previous hotel's ids). Unsaved calendar edits are protected by the calendar itself. */}
       <div key={hotelId ?? 'none'}>{children}</div>
@@ -155,10 +131,24 @@ function PartnerChrome({ children }: { children: React.ReactNode }) {
   );
 }
 
+function PartnerFrame({ children }: { children: React.ReactNode }) {
+  const { memberships, loading, error, membership } = usePartner();
+  // null = still unknown (loading or failed to load): never redirect on a transient error.
+  const hasMembership = loading || error ? null : memberships.length > 0;
+  return (
+    <SurfaceGuard hasMembership={hasMembership}>
+      <SurfaceShell brand="WAYLO" subtitle={membership?.organizationName ?? 'Isletme Paneli'} icon="storefront"
+        nav={nav} bottomNav={nav}>
+        <PartnerChrome>{children}</PartnerChrome>
+      </SurfaceShell>
+    </SurfaceGuard>
+  );
+}
+
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
   return (
     <PartnerProvider>
-      <PartnerChrome>{children}</PartnerChrome>
+      <PartnerFrame>{children}</PartnerFrame>
     </PartnerProvider>
   );
 }

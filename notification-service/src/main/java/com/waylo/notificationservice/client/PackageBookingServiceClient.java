@@ -12,7 +12,7 @@ import java.util.UUID;
  * Looks up package bookings affected by an upstream flight event, so FlightEventListener
  * can notify the right customers. Response is wrapped in the standard ApiResponse envelope.
  */
-@FeignClient(name = "package-booking-service", path = "/api/bookings")
+@FeignClient(name = "package-booking-service", path = "/api/bookings", configuration = InternalTokenFeignConfig.class)
 public interface PackageBookingServiceClient {
 
     @GetMapping("/flight/{flightId}")

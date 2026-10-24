@@ -434,4 +434,31 @@ class HotelServiceImplTest {
         assertThat(result).isEqualTo(response);
         verify(authAccessClient, never()).activeOrganizationIds();
     }
+
+    @Test
+    void isPublic_inactiveHotel_false() {
+        Hotel hotel = buildHotel(testId, "Draft", "Istanbul", "Turkey");
+        hotel.setActive(false);
+        when(hotelRepository.findById(testId)).thenReturn(Optional.of(hotel));
+        assertThat(hotelService.isPublic(testId)).isFalse();
+    }
+
+    @Test
+    void isPublic_activeHotelOfPendingOrg_false() {
+        Hotel hotel = buildHotel(testId, "Pending", "Istanbul", "Turkey");
+        hotel.setOrganizationId(UUID.randomUUID());
+        when(hotelRepository.findById(testId)).thenReturn(Optional.of(hotel));
+        when(authAccessClient.activeOrganizationIds()).thenReturn(List.of());
+        assertThat(hotelService.isPublic(testId)).isFalse();
+    }
+
+    @Test
+    void getPublicByOrganization_hidesInactive() {
+        UUID orgId = UUID.randomUUID();
+        Hotel hidden = buildHotel(UUID.randomUUID(), "Draft", "Istanbul", "Turkey");
+        hidden.setOrganizationId(orgId);
+        hidden.setActive(false);
+        when(hotelRepository.findByOrganizationId(orgId)).thenReturn(List.of(hidden));
+        assertThat(hotelService.getPublicByOrganization(orgId)).isEmpty();
+    }
 }

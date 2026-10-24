@@ -405,6 +405,8 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 
 **Port:** 8085 | **DB:** package_booking_db
 
+> The `/api/bookings` endpoints below are legacy and internal-only (see "Legacy bookings"). Customers use `/api/orders/hotel`.
+
 #### `POST /api/bookings` - Create Booking
 
 ```json
@@ -451,65 +453,50 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 #### `POST /api/bookings/{id}/status?status=CONFIRMED` - Update Status
 #### `POST /api/bookings/{id}/cancel` - Cancel Booking
 
-### Order / OrderItem (additive, same service)
+### Orders (customer)
 
-Self-service customer orders. `customerId` in the request body must equal the caller's
-`X-User-Id` (forwarded by api-gateway from a verified JWT); mismatches return 403. v1 accepts
-exactly one `OrderItem` per order (array of size 1); the model is ready for multiple items.
-Legacy `/api/bookings` is unaffected and untouched by this addition.
+`X-User-Id` is set by api-gateway from a verified JWT. There is no generic `POST /api/orders` any more
+(removed: it trusted client prices). Prices come from the server-side hotel hold.
 
-#### `POST /api/orders` - Create Order
+#### `POST /api/orders/hotel` - Create hotel order (201)
 
-```json
-// Request
-{
-  "customerId": "customer-uuid",         // required, must equal caller
-  "currency": "USD",                     // required, 3-letter ISO 4217
-  "quoteId": null,                       // optional, pricing-service not implemented yet
-  "notes": "Honeymoon package",          // optional, max 2000 chars
-  "items": [
-    {
-      "vertical": "HOTEL",                       // required: HOTEL, FLIGHT, CAR
-      "supplierOrganizationId": "org-uuid",      // optional
-      "productRef": "room-type-or-rate-uuid",    // required
-      "description": "Deluxe room, 2 nights",    // required, max 500 chars
-      "unitAmount": 100.00,                      // required, >= 0.01
-      "quantity": 2,                             // required, 1-20
-      "currency": "USD"                          // required, must equal order currency or 422
-    }
-  ]
-}
-
-// Response: 201 Created - status PENDING, totalAmount = sum(unitAmount * quantity)
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "customerId": "customer-uuid",
-    "status": "PENDING",
-    "currency": "USD",
-    "quoteId": null,
-    "totalAmount": 200.00,
-    "notes": "Honeymoon package",
-    "version": 0,
-    "items": [ { "id": "uuid", "orderId": "uuid", "vertical": "HOTEL", "productRef": "...",
-                 "unitAmount": 100.00, "quantity": 2, "subtotal": 200.00, "currency": "USD" } ],
-    "createdAt": "...", "updatedAt": "..."
-  }
-}
-```
-
-Errors: 401 no identity, 403 `customerId` does not match caller or order not owned by caller,
-422 `CURRENCY_MISMATCH` item currency differs from order currency, 400 validation (more than
-one item, non-positive amount, lowercase/invalid currency), 404 order not found.
+Body: `{ "quoteId": "uuid", "notes": "optional" }`. Price/currency come from the hotel-service hold, client price
+fields are ignored. Repeating the same quote returns the same order. Errors: 401 no identity,
+403 `ADMIN_CANNOT_PURCHASE` (platform ADMIN), 404/409/422 passed through from hotel-service (hold rejected, inventory
+unavailable), 503 `HOTEL_SERVICE_UNAVAILABLE`.
+Response: `{success, data: {id, customerId, status, currency, quoteId, totalAmount, notes, version, holdExpiresAt,
+items:[{id, orderId, vertical, supplierOrganizationId, productRef, fulfillmentRef, description, unitAmount, quantity,
+subtotal, currency, createdAt}], createdAt, updatedAt}}`.
 
 #### `GET /api/orders/{id}` - Get own order (403 if not owner)
 #### `GET /api/orders` - List caller's own orders
 #### `POST /api/orders/{id}/cancel?expectedVersion=0` - Cancel own order
 
-`expectedVersion` is optional; when provided and stale, returns 409 `CONCURRENT_MODIFICATION`.
-Cancelling an already-`CANCELLED` or `FAILED` order returns 422 (`ALREADY_CANCELLED` /
-`TERMINAL_STATE`). The response reflects the persisted version (flushed before responding).
+`expectedVersion` optional, stale -> 409 `CONCURRENT_MODIFICATION`. Already `CANCELLED`/`FAILED` -> 422.
+Cancelling releases the hotel hold.
+
+### Legacy bookings: internal only
+
+`/api/bookings/**` is no longer a customer API. Allowed: calls carrying a valid `X-Internal-Token` (saga,
+notification-service) and read-only GET/HEAD by a gateway-verified ADMIN. Everything else gets 403.
+
+### Partner order items
+
+#### `GET /api/partner/organizations/{organizationId}/order-items`
+
+Query: `status` (PENDING|CONFIRMED|CANCELLED|FAILED, optional), `from`, `to` (ISO dates, UTC, inclusive, on order
+creation time), `page` (default 0), `size` (default 20, max 100). Routed by the gateway to package-booking-service
+for this exact path shape only. Only items whose `supplierOrganizationId` equals the path organization are returned,
+newest first.
+Authorization: caller `X-User-Id` must hold `RESERVATION_READ` on the organization (auth-service `GET /internal/access`;
+granted to ORGANIZATION_OWNER, HOTEL_OWNER, HOTEL_MANAGER, HOTEL_STAFF). Status codes: 200, 401 no identity,
+403 not a member / no permission, 503 `AUTHORIZATION_UNAVAILABLE` (auth-service unreachable, fails closed).
+```json
+{ "success": true, "data": { "items": [ { "orderItemId": "uuid", "orderId": "uuid", "orderStatus": "CONFIRMED",
+  "orderCreatedAt": "...", "description": "...", "amount": 200.00, "currency": "USD", "fulfillmentRef": "uuid" } ],
+  "page": 0, "size": 20, "total": 1 } }
+```
+No guest name, email, phone, payment data or other items are returned (no CRM lookup is done).
 
 ---
 
@@ -913,3 +900,19 @@ open http://localhost:8761
 # View pgAdmin
 open http://localhost:5050  # admin@waylo.com / admin
 ```
+
+## Other changes (2026-10-24)
+
+- **Quotes (`POST /api/quotes`), rentals (`POST /api/rentals/**`) and seat reserve (`POST /api/seat-inventory/seats/{flightNumber}/reserve`)**:
+  platform ADMIN gets 403 `ADMIN_CANNOT_PURCHASE`.
+- **Account deletion**: `DELETE /api/me` with body `{"password": "..."}` -> 204. The user is soft-deleted (`deletedAt`),
+  email anonymized to `deleted+{id}@deleted.invalid`, memberships revoked.
+- **Admin organizations**: `GET /api/admin/organizations?status=&page=&size=` (ADMIN only, 403 otherwise).
+  `status` omitted -> `PENDING` (legacy default); `status=ALL` -> every status; or one of PENDING|ACTIVE|SUSPENDED|ARCHIVED.
+  `page` default 0, `size` default 100, max 100. Response: `{success, message, data:[{id,name,status}], total}`.
+- **Admin users**: `GET /api/admin/users?page=&size=&q=` (ADMIN only). `q` is a case-insensitive prefix match on email,
+  first name, last name or full name; `size` default 20, max 100. Response: `{success, message, data:[{id,email,fullName,role,
+  verified,deletedAt}], total}`; deleted users have non-null `deletedAt` and an anonymized email.
+  `GET /api/admin/users?email=x` still returns the single-user `{success,message,data:{...same fields}}` (404 if missing).
+- **Rate limits (gateway, per client IP, per minute)**: login 10, register 5, forgot-password 3, resend-verification 3,
+  refresh 30. Exceeding returns 429. Fails open if Redis is down.

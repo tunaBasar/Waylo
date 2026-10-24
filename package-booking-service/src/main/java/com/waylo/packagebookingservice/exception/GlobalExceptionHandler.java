@@ -47,11 +47,23 @@ public class GlobalExceptionHandler {
                                                               HttpServletRequest request) {
         var response = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
-                "FORBIDDEN",
+                ex.getCode(),
                 ex.getMessage(),
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(AuthorizationUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAuthorizationUnavailable(AuthorizationUnavailableException ex,
+                                                                         HttpServletRequest request) {
+        var response = new ErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "AUTHORIZATION_UNAVAILABLE",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }
 
     @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)

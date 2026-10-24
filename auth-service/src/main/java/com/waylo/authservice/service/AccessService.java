@@ -89,6 +89,15 @@ public class AccessService {
         ScopeType scopeType = grant.getScopeType();
         UUID scopeId = grant.getScopeId();
 
+        if (permission == Permission.HOTEL_READ) {
+            return true; // any active grant on the organization
+        }
+
+        if (permission == Permission.RESERVATION_READ) {
+            return role == Role.ORGANIZATION_OWNER || role == Role.HOTEL_OWNER
+                    || role == Role.HOTEL_MANAGER || role == Role.HOTEL_STAFF;
+        }
+
         switch (role) {
             case ORGANIZATION_OWNER:
                 // ORGANIZATION_OWNER with scope ORGANIZATION -> allows all permissions for any hotel

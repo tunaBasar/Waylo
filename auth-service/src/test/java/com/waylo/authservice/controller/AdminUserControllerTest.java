@@ -52,6 +52,7 @@ class AdminUserControllerTest {
         var req = new ChangeUserRoleRequest(UserRole.ADMIN);
         assertEquals(403, statusOf(() -> controller.changeRole(TARGET_ID, req, ADMIN_ID, "USER")));
         assertEquals(403, statusOf(() -> controller.findByEmail("a@b.com", ADMIN_ID, "USER")));
+        assertEquals(403, statusOf(() -> controller.list(null, 0, 20, ADMIN_ID, "USER")));
         verifyNoInteractions(repo, tokens);
     }
 
@@ -106,5 +107,30 @@ class AdminUserControllerTest {
         var res = controller.findByEmail("  X@Y.com ", ADMIN_ID, "ADMIN");
 
         assertEquals("x@y.com", res.getBody().data().email());
+    }
+
+    @Test
+    void list_flagsDeletedAndCapsSize() {
+        User deleted = user(UUID.randomUUID(), UserRole.USER);
+        deleted.setDeletedAt(java.time.LocalDateTime.now());
+        var captor = org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        when(repo.search(eq("jo"), captor.capture())).thenReturn(new org.springframework.data.domain.PageImpl<>(
+                java.util.List.of(user(TARGET_ID, UserRole.USER), deleted),
+                org.springframework.data.domain.PageRequest.of(0, 2), 42));
+
+        var res = controller.list("  Jo ", 0, 1000, ADMIN_ID, "ADMIN");
+
+        assertEquals(42L, res.getBody().total());
+        assertEquals(2, res.getBody().data().size());
+        assertNull(res.getBody().data().get(0).deletedAt());
+        assertNotNull(res.getBody().data().get(1).deletedAt());
+        assertEquals(100, captor.getValue().getPageSize());
+    }
+
+    @Test
+    void list_blankQueryMeansNoFilter() {
+        when(repo.search(isNull(), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+        assertEquals(0L, controller.list("  ", 0, 20, ADMIN_ID, "ADMIN").getBody().total());
     }
 }

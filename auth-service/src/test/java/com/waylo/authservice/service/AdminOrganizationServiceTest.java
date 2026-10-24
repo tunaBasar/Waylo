@@ -116,4 +116,32 @@ class AdminOrganizationServiceTest {
         assertEquals("Organization is not active or pending", ex.getReason());
         verify(organizationRepository, never()).save(any());
     }
+
+    @Test
+    void list_defaultsToPending_andReportsTotal() {
+        var pageable = org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        when(organizationRepository.findByStatus(eq(OrganizationStatus.PENDING), pageable.capture()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(pendingOrg),
+                        org.springframework.data.domain.PageRequest.of(0, 5), 11));
+        var result = adminOrganizationService.list(null, 0, 500);
+        assertEquals(11, result.getTotalElements());
+        assertEquals(1, result.getContent().size());
+        assertEquals(100, pageable.getValue().getPageSize());
+    }
+
+    @Test
+    void list_statusAll_returnsEveryStatus() {
+        when(organizationRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(pendingOrg, activeOrg, archivedOrg)));
+        var result = adminOrganizationService.list("all", 0, 20);
+        assertEquals(3, result.getContent().size());
+        verify(organizationRepository, never()).findByStatus(any(OrganizationStatus.class), any(org.springframework.data.domain.Pageable.class));
+    }
+
+    @Test
+    void list_explicitStatus_filters() {
+        when(organizationRepository.findByStatus(eq(OrganizationStatus.ACTIVE), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(activeOrg)));
+        assertEquals(1, adminOrganizationService.list("active", 0, 20).getContent().size());
+    }
 }

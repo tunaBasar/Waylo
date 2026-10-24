@@ -51,6 +51,12 @@ public class SeatAccessFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (reserve && "POST".equals(method) && "ADMIN".equals(request.getHeader(HEADER_USER_ROLE))) {
+            send(response, 403, "ADMIN_CANNOT_PURCHASE",
+                    "Platform administrators cannot reserve seats, use a customer account", path);
+            return;
+        }
+
         chain.doFilter(request, response);
     }
 

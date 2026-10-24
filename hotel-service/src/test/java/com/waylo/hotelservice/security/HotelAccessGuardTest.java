@@ -170,4 +170,29 @@ class HotelAccessGuardTest {
 
         verify(authAccessClient, never()).check(any(), any(), any(), any());
     }
+
+    @Test
+    void canReadOrganization_admin_trueWithoutAuthCall() {
+        assertThat(guard.canReadOrganization(userId, "ADMIN", orgId)).isTrue();
+        verifyNoInteractions(authAccessClient);
+    }
+
+    @Test
+    void canReadOrganization_member_true() {
+        when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenReturn(new AccessDecision(true, List.of("HOTEL_STAFF")));
+        assertThat(guard.canReadOrganization(userId, "USER", orgId)).isTrue();
+    }
+
+    @Test
+    void canReadOrganization_nonMember_false() {
+        when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenReturn(new AccessDecision(false, List.of()));
+        assertThat(guard.canReadOrganization(userId, "USER", orgId)).isFalse();
+    }
+
+    @Test
+    void canReadOrganization_anonymousOrOutage_false() {
+        assertThat(guard.canReadOrganization(null, null, orgId)).isFalse();
+        when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenThrow(new RuntimeException("down"));
+        assertThat(guard.canReadOrganization(userId, "USER", orgId)).isFalse();
+    }
 }

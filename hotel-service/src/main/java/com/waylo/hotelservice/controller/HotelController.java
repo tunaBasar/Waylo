@@ -3,6 +3,7 @@ package com.waylo.hotelservice.controller;
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
+import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
 import com.waylo.hotelservice.service.HotelSearchService;
@@ -48,16 +49,30 @@ public class HotelController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<HotelResponse>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.of(hotelService.getById(id)));
+    public ResponseEntity<ApiResponse<HotelResponse>> getById(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                               @RequestHeader(value = "X-User-Role", required = false) String role,
+                                                               @PathVariable UUID id) {
+        HotelResponse response = hotelService.getById(id);
+        if (!hotelService.isPublic(id) && !accessGuard.canReadOrganization(userId, role, response.organizationId())) {
+            // Unpublished hotels are invisible to everyone but the owning organization's members and ADMIN.
+            throw new ResourceNotFoundException("Hotel", "id", id);
+        }
+        return ResponseEntity.ok(ApiResponse.of(response));
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<HotelResponse>>> getAll(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestParam(required = false) UUID organizationId) {
-        List<HotelResponse> hotels = organizationId != null
-                ? hotelService.getByOrganization(organizationId)
-                : hotelService.getAll();
+        List<HotelResponse> hotels;
+        if (organizationId == null) {
+            hotels = hotelService.getAll();
+        } else if (accessGuard.canReadOrganization(userId, role, organizationId)) {
+            hotels = hotelService.getByOrganization(organizationId);
+        } else {
+            hotels = hotelService.getPublicByOrganization(organizationId);
+        }
         return ResponseEntity.ok(ApiResponse.of(hotels));
     }
 

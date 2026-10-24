@@ -54,7 +54,7 @@ spring:
             - id: package-booking-service
               uri: lb://package-booking-service
               predicates:
-                - Path=/api/bookings/**,/api/orders/**
+                - Path=/api/bookings/**,/api/orders/**,/api/partner/organizations/*/order-items
             - id: pricing-service
               uri: lb://pricing-service
               predicates:

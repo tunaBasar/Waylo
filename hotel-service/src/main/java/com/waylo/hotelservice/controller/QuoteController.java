@@ -3,6 +3,7 @@ package com.waylo.hotelservice.controller;
 import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.QuoteCreateRequest;
 import com.waylo.hotelservice.dto.QuoteResponse;
+import com.waylo.hotelservice.exception.AccessDeniedException;
 import com.waylo.hotelservice.exception.AuthenticationRequiredException;
 import com.waylo.hotelservice.service.QuoteService;
 import jakarta.validation.Valid;
@@ -35,7 +36,13 @@ public class QuoteController {
     @PostMapping
     public ResponseEntity<ApiResponse<QuoteResponse>> createQuote(
             @RequestHeader(value = "X-User-Id", required = true) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @Valid @RequestBody QuoteCreateRequest request) {
+
+        if ("ADMIN".equals(role)) {
+            throw new AccessDeniedException("Platform administrators cannot request quotes, use a customer account",
+                    AccessDeniedException.ADMIN_CANNOT_PURCHASE);
+        }
 
         if (userId == null) {
             throw new AuthenticationRequiredException("X-User-Id header is required");

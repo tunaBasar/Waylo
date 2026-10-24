@@ -19,7 +19,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, new URLSearchParams(window.location.search).get('next'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Giris basarisiz');
     } finally {
@@ -44,8 +44,8 @@ export default function LoginPage() {
               <span className="material-symbols-outlined text-secondary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>luggage</span>
               <span className="text-xs text-secondary uppercase tracking-wider font-semibold">Seyahatini Paketle</span>
             </div>
-            <h1 className="text-lg font-semibold text-on-surface mb-1">Yonetim Paneline Giris Yap</h1>
-            <p className="text-sm text-on-surface-variant max-w-xs">Ucus, otel ve seyahat paketlerini tek panelden yonetin</p>
+            <h1 className="text-lg font-semibold text-on-surface mb-1">Giris Yap</h1>
+            <p className="text-sm text-on-surface-variant max-w-xs">Seyahatini planla: ucus, otel ve arac kiralama bir arada</p>
           </div>
 
           <Suspense fallback={null}>

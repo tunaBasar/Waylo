@@ -30,5 +30,14 @@ class CarRentalAccessFilterTest {
     @Test void vehicleWriteAdminPasses() throws Exception { assertThat(run("DELETE", "/api/vehicles/1", UUID.randomUUID().toString(), "ADMIN").getStatus()).isEqualTo(200); }
     @Test void rentalWithoutIdUnauthorized() throws Exception { assertThat(run("GET", "/api/rentals", null, null).getStatus()).isEqualTo(401); }
     @Test void rentalWithIdPasses() throws Exception { assertThat(run("POST", "/api/rentals", UUID.randomUUID().toString(), "USER").getStatus()).isEqualTo(200); }
+    @Test void rentalCreateAdminForbidden() throws Exception {
+        MockHttpServletResponse r = run("POST", "/api/rentals", UUID.randomUUID().toString(), "ADMIN");
+        assertThat(r.getStatus()).isEqualTo(403);
+        assertThat(r.getContentAsString()).contains("ADMIN_CANNOT_PURCHASE");
+    }
+    @Test void rentalAdminKeepsReadAndCancel() throws Exception {
+        assertThat(run("GET", "/api/rentals", UUID.randomUUID().toString(), "ADMIN").getStatus()).isEqualTo(200);
+        assertThat(run("POST", "/api/rentals/abc/cancel", UUID.randomUUID().toString(), "ADMIN").getStatus()).isEqualTo(200);
+    }
     @Test void vehiclePrefixLookalikeNotMatched() throws Exception { assertThat(run("POST", "/api/vehiclesX", null, null).getStatus()).isEqualTo(200); }
 }

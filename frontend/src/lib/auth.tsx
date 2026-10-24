@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { homeFor, postLoginTarget } from './surface';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -18,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, next?: string | null) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: (redirectTo?: string) => void;
   forgotPassword: (email: string) => Promise<void>;
@@ -91,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user && !PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-      router.replace('/login');
+      router.replace(pathname === '/' ? '/login' : `/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [user, loading, pathname, router]);
 
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('waylo_refresh', authData.refreshToken);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, next?: string | null) => {
     const res = await authFetch<AuthData>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -122,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     persistAuth(res.data);
-    router.push('/');
+    router.push(postLoginTarget(res.data.role, next));
   }, [router, persistAuth]);
 
   const register = useCallback(async (data: RegisterData) => {
@@ -136,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     persistAuth(res.data);
-    router.push('/');
+    router.push(homeFor(res.data.role));
   }, [router, persistAuth]);
 
   const logout = useCallback((redirectTo = '/login') => {

@@ -57,6 +57,14 @@ class SeatAccessFilterTest {
     }
 
     @Test
+    void adminCannotReserveButCanRelease() throws Exception {
+        MockHttpServletResponse r = run("POST", B + "/seats/TK100/reserve", uid, "ADMIN", false);
+        assertEquals(403, r.getStatus());
+        assertTrue(r.getContentAsString().contains("ADMIN_CANNOT_PURCHASE"));
+        run("DELETE", B + "/seats/TK100/reserve", uid, "ADMIN", true);
+    }
+
+    @Test
     void adminWritesWithoutUserIdIs401() throws Exception {
         assertEquals(401, run("POST", B + "/seats", null, "ADMIN", false).getStatus());
     }

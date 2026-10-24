@@ -90,8 +90,9 @@ class HotelControllerTest {
     void getById_returns200() {
         HotelResponse response = buildResponse(hotelId);
         when(hotelService.getById(hotelId)).thenReturn(response);
+        when(hotelService.isPublic(hotelId)).thenReturn(true);
 
-        ResponseEntity<ApiResponse<HotelResponse>> result = controller.getById(hotelId);
+        ResponseEntity<ApiResponse<HotelResponse>> result = controller.getById(null, null, hotelId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -103,7 +104,7 @@ class HotelControllerTest {
         HotelResponse response = buildResponse(hotelId);
         when(hotelService.getAll()).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.getAll(null);
+        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.getAll(null, null, null);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(hotelService).getAll();
@@ -113,9 +114,10 @@ class HotelControllerTest {
     @Test
     void getAll_withOrganizationId_callsGetByOrganization() {
         HotelResponse response = buildResponse(hotelId);
+        when(accessGuard.canReadOrganization(userId, "ADMIN", orgId)).thenReturn(true);
         when(hotelService.getByOrganization(orgId)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.getAll(orgId);
+        ResponseEntity<ApiResponse<List<HotelResponse>>> result = controller.getAll(userId, "ADMIN", orgId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(hotelService).getByOrganization(orgId);
@@ -229,5 +231,53 @@ class HotelControllerTest {
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
+    }
+
+    @Test
+    void getById_unpublished_nonMember_is404() {
+        when(hotelService.getById(hotelId)).thenReturn(buildResponse(hotelId));
+        when(hotelService.isPublic(hotelId)).thenReturn(false);
+        when(accessGuard.canReadOrganization(userId, "USER", orgId)).thenReturn(false);
+
+        assertThatThrownBy(() -> controller.getById(userId, "USER", hotelId))
+                .isInstanceOf(com.waylo.hotelservice.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void getById_unpublished_anonymous_is404() {
+        when(hotelService.getById(hotelId)).thenReturn(buildResponse(hotelId));
+        when(hotelService.isPublic(hotelId)).thenReturn(false);
+
+        assertThatThrownBy(() -> controller.getById(null, null, hotelId))
+                .isInstanceOf(com.waylo.hotelservice.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void getById_unpublished_member_is200() {
+        when(hotelService.getById(hotelId)).thenReturn(buildResponse(hotelId));
+        when(hotelService.isPublic(hotelId)).thenReturn(false);
+        when(accessGuard.canReadOrganization(userId, "USER", orgId)).thenReturn(true);
+
+        assertThat(controller.getById(userId, "USER", hotelId).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void getAll_otherOrganization_nonMember_getsPublicOnly() {
+        when(accessGuard.canReadOrganization(userId, "USER", orgId)).thenReturn(false);
+        when(hotelService.getPublicByOrganization(orgId)).thenReturn(List.of());
+
+        controller.getAll(userId, "USER", orgId);
+
+        verify(hotelService).getPublicByOrganization(orgId);
+        verify(hotelService, never()).getByOrganization(any());
+    }
+
+    @Test
+    void getAll_ownOrganization_member_getsAll() {
+        when(accessGuard.canReadOrganization(userId, "USER", orgId)).thenReturn(true);
+        when(hotelService.getByOrganization(orgId)).thenReturn(List.of(buildResponse(hotelId)));
+
+        assertThat(controller.getAll(userId, "USER", orgId).getBody().data()).hasSize(1);
+        verify(hotelService, never()).getPublicByOrganization(any());
     }
 }

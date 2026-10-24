@@ -2,6 +2,8 @@ package com.waylo.authservice.controller;
 
 import com.waylo.authservice.dto.ApiResponse;
 import com.waylo.authservice.dto.OrganizationResponse;
+import com.waylo.authservice.dto.PagedApiResponse;
+import org.springframework.data.domain.Page;
 import com.waylo.authservice.dto.SuspendOrganizationRequest;
 import com.waylo.authservice.service.AdminOrganizationService;
 import jakarta.validation.Valid;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -31,15 +32,17 @@ public class AdminOrganizationController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<OrganizationResponse>>> listPending(
+    public ResponseEntity<PagedApiResponse<OrganizationResponse>> list(
             @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
             @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole) {
         if (!"ADMIN".equals(userRole)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Platform admin required");
         }
-        List<OrganizationResponse> list = adminOrganizationService.listPending(status);
-        return ResponseEntity.ok(ApiResponse.success("OK", list));
+        Page<OrganizationResponse> result = adminOrganizationService.list(status, page, size);
+        return ResponseEntity.ok(PagedApiResponse.of(result.getContent(), result.getTotalElements()));
     }
 
     @PostMapping("/{id}/approve")

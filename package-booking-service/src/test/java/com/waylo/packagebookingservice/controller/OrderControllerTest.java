@@ -3,8 +3,6 @@ package com.waylo.packagebookingservice.controller;
 import com.waylo.packagebookingservice.domain.OrderItemVertical;
 import com.waylo.packagebookingservice.domain.OrderStatus;
 import com.waylo.packagebookingservice.dto.ApiResponse;
-import com.waylo.packagebookingservice.dto.OrderCreateRequest;
-import com.waylo.packagebookingservice.dto.OrderItemCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemResponse;
 import com.waylo.packagebookingservice.dto.OrderResponse;
 import com.waylo.packagebookingservice.exception.AccessDeniedException;
@@ -48,32 +46,19 @@ class OrderControllerTest {
     }
 
     @Test
-    void create_returns201() {
-        OrderItemCreateRequest item = new OrderItemCreateRequest(
-                OrderItemVertical.HOTEL, UUID.randomUUID(), UUID.randomUUID(), "Deluxe room",
-                new BigDecimal("100.00"), 2, "USD");
-        OrderCreateRequest request = new OrderCreateRequest(userId, "USD", null, null, List.of(item));
-        OrderResponse response = buildResponse();
-        when(orderService.create(eq(userId), any(OrderCreateRequest.class))).thenReturn(response);
-
-        ResponseEntity<ApiResponse<OrderResponse>> result = controller.create(userId, "ADMIN", request);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(result.getBody().data()).isEqualTo(response);
-    }
-
-    @Test
-    void create_nonAdmin_forbidden() {
-        OrderCreateRequest request = new OrderCreateRequest(userId, "USD", null, null, List.of());
-        assertThatThrownBy(() -> controller.create(userId, "USER", request)).isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(orderService);
-    }
-
-    @Test
     void createHotel_returns201() {
         var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null);
         when(orderService.createHotelOrder(userId, req)).thenReturn(buildResponse());
-        assertThat(controller.createHotel(userId, req).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(controller.createHotel(userId, "USER", req).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void createHotel_admin_forbiddenWithCode() {
+        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null);
+        assertThatThrownBy(() -> controller.createHotel(userId, "ADMIN", req))
+                .isInstanceOfSatisfying(AccessDeniedException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("ADMIN_CANNOT_PURCHASE"));
+        verifyNoInteractions(orderService);
     }
 
     @Test

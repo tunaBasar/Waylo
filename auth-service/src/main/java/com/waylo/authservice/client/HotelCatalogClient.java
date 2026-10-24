@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.UUID;
 
-@FeignClient(name = "hotel-service")
+@FeignClient(name = "hotel-service", configuration = InternalHotelFeignConfig.class)
 public interface HotelCatalogClient {
 
-    @GetMapping("/api/hotels/{id}")
+    @GetMapping("/internal/hotels/{id}")
     HotelLookupResponse getHotel(@PathVariable("id") UUID id);
 }

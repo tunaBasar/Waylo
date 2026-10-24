@@ -38,6 +38,11 @@ public class CarRentalAccessFilter extends OncePerRequestFilter {
         if (vehicles && !"ADMIN".equals(request.getHeader("X-User-Role"))) {
             send(response, 403, "FORBIDDEN", "Admin role required for vehicle write operations", path); return;
         }
+        if (rentals && request.getMethod().equals("POST") && path.equals("/api/rentals")
+                && "ADMIN".equals(request.getHeader("X-User-Role"))) {
+            send(response, 403, "ADMIN_CANNOT_PURCHASE",
+                    "Platform administrators cannot rent vehicles, use a customer account", path); return;
+        }
         chain.doFilter(request, response);
     }
 

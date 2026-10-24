@@ -141,3 +141,16 @@ test('failed refresh clears stored session and redirects to login', async () => 
     assert.equal(window.location.href, '/login');
   });
 });
+
+test('403 ADMIN_CANNOT_PURCHASE maps to the customer-account message', async () => {
+  await withBrowser(async ({ api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE }) => {
+    globalThis.fetch = async () => json({ message: 'raw backend text', error: 'ADMIN_CANNOT_PURCHASE' }, 403);
+    await assert.rejects(api.post('/api/orders/hotel', {}), err => {
+      assert.ok(err instanceof ApiError);
+      assert.equal(err.status, 403);
+      assert.equal(err.code, 'ADMIN_CANNOT_PURCHASE');
+      assert.equal(err.message, ADMIN_CANNOT_PURCHASE_MESSAGE);
+      return true;
+    });
+  });
+});

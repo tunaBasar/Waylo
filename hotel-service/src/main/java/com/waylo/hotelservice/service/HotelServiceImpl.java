@@ -138,6 +138,20 @@ public class HotelServiceImpl implements HotelService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<HotelResponse> getPublicByOrganization(UUID organizationId) {
+        return filterPublic(hotelRepository.findByOrganizationId(organizationId)).stream()
+                .map(hotelMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isPublic(UUID id) {
+        return !filterPublic(List.of(findHotelOrThrow(id))).isEmpty();
+    }
+
     /**
      * Filters a candidate list down to the public projection: active hotels only, and for
      * hotels with a non-null organizationId, only those whose organization is currently ACTIVE.
