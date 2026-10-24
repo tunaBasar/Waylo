@@ -47,7 +47,9 @@ class AccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(userRepository, passwordEncoder, jwtUtil, refreshTokenService);
+        accountService = new AccountService(userRepository, passwordEncoder, jwtUtil, refreshTokenService,
+                event -> {}, mock(com.waylo.authservice.repository.OrganizationMembershipRepository.class),
+                mock(com.waylo.authservice.repository.RoleAssignmentRepository.class));
 
         user = new User();
         user.setId(USER_ID);

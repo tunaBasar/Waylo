@@ -117,7 +117,7 @@ public class AuthService {
                 .orElse(null);
 
         // 1. Unknown user -> same generic error (don't reveal existence)
-        if (user == null) {
+        if (user == null || user.getDeletedAt() != null) {
             return ApiResponse.error("E-posta veya sifre hatali");
         }
 
@@ -167,7 +167,7 @@ public class AuthService {
         User user = userRepository.findByVerificationToken(token)
                 .orElse(null);
 
-        if (user == null) {
+        if (user == null || user.getDeletedAt() != null) {
             return ApiResponse.error("Gecersiz dogrulama linki");
         }
 
@@ -280,7 +280,7 @@ public class AuthService {
         String userId = result.userId().toString();
         User user = userRepository.findById(result.userId()).orElse(null);
 
-        if (user == null) {
+        if (user == null || user.getDeletedAt() != null) {
             return ApiResponse.error("Kullanici bulunamadi");
         }
 

@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import com.waylo.authservice.validation.PasswordPolicy;
 import java.util.Optional;
 
 /** Ensures a platform admin exists from WAYLO_BOOTSTRAP_ADMIN_EMAIL / _PASSWORD. Idempotent. */
@@ -19,7 +20,6 @@ import java.util.Optional;
 public class AdminBootstrapRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrapRunner.class);
-    private static final int MIN_PASSWORD_LENGTH = 6; // same rule as RegisterRequest
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -47,9 +47,8 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             return;
         }
         String normalized = email.trim().toLowerCase(Locale.ROOT);
-        if (password.length() < MIN_PASSWORD_LENGTH) {
-            log.error("Bootstrap admin skipped for {}: password must be at least {} characters",
-                    normalized, MIN_PASSWORD_LENGTH);
+        if (!PasswordPolicy.isValid(password, normalized)) {
+            log.error("Bootstrap admin skipped for {}: {}", normalized, PasswordPolicy.MESSAGE);
             return;
         }
         try {

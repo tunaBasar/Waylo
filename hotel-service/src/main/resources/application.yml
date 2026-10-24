@@ -12,7 +12,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/hotel_db}
     username: ${DB_USERNAME:waylo}
-    password: ${DB_PASSWORD:waylo}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5

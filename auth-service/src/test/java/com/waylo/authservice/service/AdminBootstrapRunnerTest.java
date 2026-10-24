@@ -34,7 +34,7 @@ class AdminBootstrapRunnerTest {
     void createsAdminWithNormalizedEmail() {
         when(repo.findByEmailIgnoreCase("admin@waylo.io")).thenReturn(Optional.empty());
 
-        runner("  Admin@Waylo.IO ", "secret1").run(null);
+        runner("  Admin@Waylo.IO ", "secret12345").run(null);
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
         verify(repo).save(cap.capture());
@@ -53,7 +53,7 @@ class AdminBootstrapRunnerTest {
         u.setRole(UserRole.USER);
         when(repo.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(u));
 
-        runner("a@b.com", "secret1").run(null);
+        runner("a@b.com", "secret12345").run(null);
 
         assertEquals(UserRole.ADMIN, u.getRole());
         assertEquals("OLD", u.getPassword());
@@ -67,7 +67,7 @@ class AdminBootstrapRunnerTest {
         u.setRole(UserRole.ADMIN);
         when(repo.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(u));
 
-        runner("a@b.com", "secret1").run(null);
+        runner("a@b.com", "secret12345").run(null);
 
         verify(repo, never()).save(any());
     }
@@ -80,9 +80,16 @@ class AdminBootstrapRunnerTest {
     }
 
     @Test
+    void passwordEqualToEmailDoesNothing() {
+        runner("admin12345@x.io", "ADMIN12345@x.io").run(null);
+
+        verifyNoInteractions(repo);
+    }
+
+    @Test
     void onlyOneVarSetDoesNothing() {
         runner("a@b.com", "").run(null);
-        runner("", "secret1").run(null);
+        runner("", "secret12345").run(null);
 
         verifyNoInteractions(repo);
     }
@@ -91,6 +98,6 @@ class AdminBootstrapRunnerTest {
     void repositoryFailureDoesNotCrash() {
         when(repo.findByEmailIgnoreCase(any())).thenThrow(new RuntimeException("db"));
 
-        assertDoesNotThrow(() -> runner("a@b.com", "secret1").run(null));
+        assertDoesNotThrow(() -> runner("a@b.com", "secret12345").run(null));
     }
 }

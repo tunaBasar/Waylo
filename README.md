@@ -26,6 +26,8 @@ Proje kökünde:
 docker compose up -d --build
 ```
 
+Proje kökündeki `.env` dosyasında `POSTGRES_PASSWORD` ve `PGADMIN_PASSWORD` değişkenleri tanımlı olmalıdır; aksi halde Compose başlatmayı reddeder.
+
 Bu komut backend kaynaklarını Java 21 ile derler, frontend için `npm ci` ve production build çalıştırır, ardından altyapı ve uygulama servislerini başlatır. İlk derleme internet bağlantısı gerektirir ve sonraki derlemelerden daha uzun sürer.
 
 Başlatmanın tamamlanması için `docker compose up -d --build --wait --wait-timeout 240` kullanılabilir. İlk açılışta Eureka kayıtlarının gateway'e ulaşması kısa süre alabilir, bu sırada API geçici olarak 503 dönebilir.

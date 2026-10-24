@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: api-gateway
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      timeout: 500ms
   config:
     import: "optional:configserver:http://localhost:8888"
   cloud:
@@ -86,6 +90,9 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
 
 management:
+  health:
+    redis:
+      enabled: false # rate limiting fails open, gateway health must not depend on Redis
   endpoints:
     web:
       exposure:
@@ -100,5 +107,12 @@ logging:
     reactor.netty.http.server: INFO
 
 waylo:
+  gateway:
+    trust-forwarded-for: false
+    login-per-minute: 10
+    register-per-minute: 5
+    forgot-password-per-minute: 3
+    resend-verification-per-minute: 3
+    refresh-per-minute: 30
   jwt:
     secret: ${JWT_SECRET}

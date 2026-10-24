@@ -11,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.stream.Collectors;
 
-@RestControllerAdvice(assignableTypes = {OrganizationController.class, RoleGrantController.class, MeController.class})
+@RestControllerAdvice(assignableTypes = {AuthController.class, OrganizationController.class, RoleGrantController.class, MeController.class})
 public class AuthErrorAdvice {
 
     @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)

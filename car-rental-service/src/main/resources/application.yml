@@ -9,7 +9,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/car_rental_db
     username: ${DB_USERNAME:waylo}
-    password: ${DB_PASSWORD:waylo}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5

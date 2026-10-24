@@ -28,7 +28,7 @@ class AuthControllerTest {
     void setUp() {
         authService = mock(AuthService.class);
         AuthController controller = new AuthController(authService);
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new AuthErrorAdvice()).build();
     }
 
     @Nested
@@ -43,7 +43,7 @@ class AuthControllerTest {
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"firstName\":\"John\",\"lastName\":\"Doe\",\"email\":\"a@b.com\",\"password\":\"pass123\"}"))
+                            .content("{\"firstName\":\"John\",\"lastName\":\"Doe\",\"email\":\"a@b.com\",\"password\":\"pass123456\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.message").value("Bu e-posta adresi zaten kullaniliyor"));
@@ -56,10 +56,22 @@ class AuthControllerTest {
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"firstName\":\"John\",\"lastName\":\"Doe\",\"email\":\"a@b.com\",\"password\":\"pass123\"}"))
+                            .content("{\"firstName\":\"John\",\"lastName\":\"Doe\",\"email\":\"a@b.com\",\"password\":\"pass123456\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.message").value("Kayit basarisiz"));
+        }
+
+        @Test
+        @DisplayName("Weak password -> HTTP 400 with ApiResponse body (not forwarded to /error)")
+        void weakPassword_returns400Body() throws Exception {
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"firstName\":\"John\",\"lastName\":\"Doe\",\"email\":\"a@b.com\",\"password\":\"abc123\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("password")));
+            verifyNoInteractions(authService);
         }
     }
 

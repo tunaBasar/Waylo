@@ -51,11 +51,27 @@ public class AuthEventListener {
             JsonNode node = JSON.readTree(raw);
             String userIdText = node.path("userId").asText(null);
             String email = node.path("email").asText(null);
-            if (userIdText == null || email == null || email.isBlank()) {
+            if (userIdText == null) {
                 log.warn("[CRM] auth event userId/email eksik, atlaniyor (offset={})", record.offset());
                 return;
             }
             UUID userId = UUID.fromString(userIdText);
+            String eventType = node.path("eventType").asText("");
+            if ("USER_DELETED".equals(eventType)) {
+                customerRepository.findById(userId).filter(c -> c.isActive()).ifPresent(c -> {
+                    c.setEmail("deleted+" + userId + "@deleted.invalid"); c.setFirstName("Silinmis"); c.setLastName("Kullanici");
+                    c.setPhone(null); c.setPassportNumber(null); c.setActive(false); customerRepository.save(c);
+                });
+                return;
+            }
+            if ("PROFILE_UPDATED".equals(eventType)) {
+                customerRepository.findById(userId).filter(c -> c.isActive()).ifPresent(c -> { String[] n = node.path("name").asText("").trim().split("\\s+", 2); c.setFirstName(n.length > 0 ? n[0] : ""); c.setLastName(n.length > 1 ? n[1] : ""); if (email != null) c.setEmail(email); customerRepository.save(c); });
+                return;
+            }
+            if (email == null || email.isBlank()) {
+                log.warn("[CRM] auth event email eksik, atlaniyor (offset={})", record.offset());
+                return;
+            }
             boolean created = customerService.ensureCustomerForUser(userId, node.path("name").asText(""), email);
             if (created) {
                 log.info("[CRM] Auth kullanicisi icin musteri olusturuldu - customerId={}", userId);

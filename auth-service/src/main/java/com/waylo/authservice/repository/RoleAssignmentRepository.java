@@ -24,4 +24,7 @@ public interface RoleAssignmentRepository extends JpaRepository<RoleAssignment, 
             @Param("scopeId") UUID scopeId);
 
     RoleAssignment findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    @Query("select count(r) from RoleAssignment r where r.membership.organization.id = :organizationId and r.membership.status = com.waylo.authservice.domain.MembershipStatus.ACTIVE and r.role = com.waylo.authservice.domain.Role.ORGANIZATION_OWNER")
+    long countActiveOrganizationOwners(@Param("organizationId") UUID organizationId);
 }

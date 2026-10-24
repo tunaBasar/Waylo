@@ -277,6 +277,28 @@ class AuthServiceTest {
         }
     }
 
+    @Test
+    void login_deletedUser_sameErrorAsWrongCredentials() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        user.setDeletedAt(LocalDateTime.now());
+        when(userRepository.findByEmailIgnoreCase("x@example.com")).thenReturn(Optional.of(user));
+        ApiResponse<AuthResponse> resp = authService.login(new LoginRequest("x@example.com", "pw"));
+        assertFalse(resp.success());
+        assertEquals("E-posta veya sifre hatali", resp.message());
+        verifyNoInteractions(refreshTokenService);
+    }
+
+    @Test
+    void refreshToken_deletedUser_rejected() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        user.setDeletedAt(LocalDateTime.now());
+        when(refreshTokenService.rotate("rt")).thenReturn(new RotationResult(USER_ID, "new"));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        ApiResponse<AuthResponse> resp = authService.refreshToken("rt");
+        assertFalse(resp.success());
+        verify(jwtUtil, never()).generateToken(any(), any(), any());
+    }
+
     // ==================== Helpers ====================
 
     private User createUser(UUID id, String email, String password, LocalDateTime lockedUntil, int failedAttempts) {

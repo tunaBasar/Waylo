@@ -93,6 +93,78 @@ class AuthEventListenerTest {
         verify(ack).acknowledge();
     }
 
+    private com.waylo.crmservice.domain.Customer customer() {
+        com.waylo.crmservice.domain.Customer c = new com.waylo.crmservice.domain.Customer();
+        c.setEmail("ada@waylo.test"); c.setFirstName("Ada"); c.setLastName("L");
+        c.setPhone("555"); c.setPassportNumber("P1");
+        return c;
+    }
+
+    @Test
+    void userDeleted_anonymizesKeepsRow_andIsIdempotent() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        String msg = "{\"eventType\":\"USER_DELETED\",\"userId\":\"" + userId + "\"}";
+
+        listener().handleAuthEvent(rec(msg), ack);
+        listener().handleAuthEvent(rec(msg), ack);
+
+        org.junit.jupiter.api.Assertions.assertEquals("deleted+" + userId + "@deleted.invalid", c.getEmail());
+        org.junit.jupiter.api.Assertions.assertEquals("Silinmis", c.getFirstName());
+        org.junit.jupiter.api.Assertions.assertNull(c.getPhone());
+        org.junit.jupiter.api.Assertions.assertNull(c.getPassportNumber());
+        org.junit.jupiter.api.Assertions.assertFalse(c.isActive());
+        verify(repository, times(1)).save(c);
+        verify(repository, never()).delete(any());
+        verify(repository, never()).insertIfAbsent(any(), anyString(), anyString(), anyString());
+        verify(ack, times(2)).acknowledge();
+    }
+
+    @Test
+    void userDeleted_missingCustomer_noop() {
+        when(repository.findById(userId)).thenReturn(java.util.Optional.empty());
+        listener().handleAuthEvent(rec("{\"eventType\":\"USER_DELETED\",\"userId\":\"" + userId + "\"}"), ack);
+        verify(repository, never()).save(any());
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    void profileUpdated_updatesNamesAndEmail() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        listener().handleAuthEvent(rec(json("PROFILE_UPDATED", "Grace Brewster Hopper", "grace@waylo.test")), ack);
+        org.junit.jupiter.api.Assertions.assertEquals("Grace", c.getFirstName());
+        org.junit.jupiter.api.Assertions.assertEquals("Brewster Hopper", c.getLastName());
+        org.junit.jupiter.api.Assertions.assertEquals("grace@waylo.test", c.getEmail());
+        verify(repository).save(c);
+        verify(repository, never()).insertIfAbsent(any(), anyString(), anyString(), anyString());
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    void profileUpdated_missingCustomer_doesNotCreate() {
+        when(repository.findById(userId)).thenReturn(java.util.Optional.empty());
+        listener().handleAuthEvent(rec(json("PROFILE_UPDATED", "A B", "a@waylo.test")), ack);
+        verify(repository, never()).save(any());
+        verify(repository, never()).insertIfAbsent(any(), anyString(), anyString(), anyString());
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    void profileUpdated_anonymizedCustomer_notResurrected() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        c.setActive(false);
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        listener().handleAuthEvent(rec(json("PROFILE_UPDATED", "A B", "a@waylo.test")), ack);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void malformedDeletePayload_ackedWithoutException() {
+        listener().handleAuthEvent(rec("{\"eventType\":\"USER_DELETED\",\"userId\":\"nope\"}"), ack);
+        verify(ack).acknowledge();
+    }
+
     @Test
     void nonStringPayload_isSkippedAndAcked() {
         listener().handleAuthEvent(rec(new Object()), ack);

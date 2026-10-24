@@ -8,7 +8,7 @@ services:
     container_name: waylo-postgres
     environment:
       POSTGRES_USER: waylo
-      POSTGRES_PASSWORD: waylo
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       POSTGRES_MULTIPLE_DATABASES: >-
         flight_db,flight_seat_inventory_db,hotel_db,car_rental_db,
         package_booking_db,pricing_db,payment_db,crm_db,checkin_db,
@@ -80,7 +80,7 @@ services:
     container_name: waylo-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@waylo.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set in .env}"
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "5050:80"
@@ -155,8 +155,11 @@ services:
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
+      SPRING_DATA_REDIS_HOST: redis
     depends_on:
       discovery-service:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health"]
@@ -183,7 +186,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/flight_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -220,7 +223,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/flight_seat_inventory_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -257,7 +260,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/hotel_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
@@ -295,7 +298,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/car_rental_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -332,7 +335,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/package_booking_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -369,7 +372,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/pricing_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -406,7 +409,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/payment_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -443,7 +446,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/crm_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -480,7 +483,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/checkin_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -517,7 +520,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/notification_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_MAIL_USERNAME: "${MAIL_USERNAME:-waylo353241@gmail.com}"
       SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
@@ -554,7 +557,7 @@ services:
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/auth_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       WAYLO_BOOTSTRAP_ADMIN_EMAIL: "${WAYLO_BOOTSTRAP_ADMIN_EMAIL:-}"
@@ -591,7 +594,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/saga_db"
       SPRING_DATASOURCE_USERNAME: waylo
-      SPRING_DATASOURCE_PASSWORD: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
