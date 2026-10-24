@@ -5,10 +5,52 @@ set -euo pipefail
 
 BASE="http://localhost:8080"
 H='Content-Type: application/json'
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$ROOT_DIR/.env"
+
+# Safe single-key reader: never sources the file, never echoes values.
+env_file_value() {
+  local key="$1" line
+  [ -f "$ENV_FILE" ] || return 0
+  line=$(grep -m1 "^${key}=" "$ENV_FILE" || true)
+  line="${line#"${key}="}"
+  line="${line%$'\r'}"
+  if [[ "$line" == \"*\" ]] || [[ "$line" == \'*\' ]]; then line="${line:1:${#line}-2}"; fi
+  printf '%s' "$line"
+}
+
+SEED_ADMIN_EMAIL="${SEED_ADMIN_EMAIL:-}"
+SEED_ADMIN_PASSWORD="${SEED_ADMIN_PASSWORD:-}"
+[ -n "$SEED_ADMIN_EMAIL" ] || SEED_ADMIN_EMAIL="$(env_file_value SEED_ADMIN_EMAIL)"
+[ -n "$SEED_ADMIN_PASSWORD" ] || SEED_ADMIN_PASSWORD="$(env_file_value SEED_ADMIN_PASSWORD)"
+[ -n "$SEED_ADMIN_EMAIL" ] || SEED_ADMIN_EMAIL="$(env_file_value WAYLO_BOOTSTRAP_ADMIN_EMAIL)"
+[ -n "$SEED_ADMIN_PASSWORD" ] || SEED_ADMIN_PASSWORD="$(env_file_value WAYLO_BOOTSTRAP_ADMIN_PASSWORD)"
+if [ -z "$SEED_ADMIN_EMAIL" ] || [ -z "$SEED_ADMIN_PASSWORD" ]; then
+  echo "HATA: Admin bilgisi yok. SEED_ADMIN_EMAIL ve SEED_ADMIN_PASSWORD ortam degiskenlerini ayarlayin" >&2
+  echo "      (veya .env icinde WAYLO_BOOTSTRAP_ADMIN_EMAIL / WAYLO_BOOTSTRAP_ADMIN_PASSWORD tanimlayip auth-service'i yeniden baslatin)." >&2
+  exit 1
+fi
+
+TOKEN=""
+FAIL_COUNT=0
+FAIL_COUNT_FILE=$(mktemp)
+printf '0\n' > "$FAIL_COUNT_FILE"
+trap 'rm -f "$FAIL_COUNT_FILE"' EXIT
+# Access token omru 15 dk: her bolumun basinda yeniden giris yapilir.
+login() {
+  local payload resp
+  payload=$(SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" python3 -c 'import json,os; print(json.dumps({"email":os.environ["SEED_ADMIN_EMAIL"],"password":os.environ["SEED_ADMIN_PASSWORD"]}))')
+  resp=$(curl -s -X POST "$BASE/api/auth/login" -H "$H" -d "$payload" || true)
+  TOKEN=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["token"])' 2>/dev/null || echo "")
+  if [ -z "$TOKEN" ]; then
+    echo "HATA: admin girisi basarisiz (kimlik bilgilerini ve auth-service bootstrap'ini kontrol edin)" >&2
+    exit 1
+  fi
+}
 
 post() {
   local path="$1" body="$2" label="$3"
-  RESP=$(curl -s -w '\n%{http_code}' -X POST "$BASE$path" -H "$H" -d "$body")
+  RESP=$(curl -s -w '\n%{http_code}' -X POST "$BASE$path" -H "$H" -H "Authorization: Bearer $TOKEN" -d "$body")
   CODE=$(echo "$RESP" | tail -1)
   BODY=$(echo "$RESP" | sed '$d')
   if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
@@ -19,10 +61,35 @@ post() {
     echo "  [SKIP] $label (zaten var)"
     echo ""
   else
+    printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
     echo "  [FAIL:$CODE] $label"
     echo "$BODY" | head -1
     echo ""
   fi
+}
+
+get_data() {
+  local path="$1"
+  curl -s "$BASE$path" -H "Authorization: Bearer $TOKEN" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin).get("data", [])))'
+}
+
+find_id_by_field() {
+  local json="$1" field="$2" value="$3"
+  FIELD="$field" VALUE="$value" python3 -c 'import json,os,sys
+items=json.loads(sys.stdin.read())
+for item in items if isinstance(items,list) else []:
+    if str(item.get(os.environ["FIELD"], "")) == os.environ["VALUE"]:
+        print(item.get("id", "")); break' <<< "$json"
+}
+
+find_id_by_fields() {
+  local json="$1" fields_json="$2"
+  FIELDS="$fields_json" python3 -c 'import json,os,sys
+items=json.loads(sys.stdin.read())
+fields=json.loads(os.environ["FIELDS"])
+for item in items if isinstance(items,list) else []:
+    if all(str(item.get(k, "")) == str(v) for k,v in fields.items()):
+        print(item.get("id", "")); break' <<< "$json"
 }
 
 # Helper: son satir ID, onceki satirlar log
@@ -39,16 +106,24 @@ echo ""
 # 1. AIRPORTS
 # =============================================
 echo "--- 1. HAVAALANLARI ---"
+login
 
 declare -a AIRPORT_CODES=()
 
 create_airport() {
   local code="$1" name="$2" city="$3" country="$4" tz="$5" lat="$6" lon="$7"
-  local result
+  local result existing
+  existing=$(find_id_by_field "$(get_data "/api/airports")" "iataCode" "$code")
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] $code - $name (zaten var)"
+    return
+  fi
   result=$(post "/api/airports" "{\"iataCode\":\"$code\",\"name\":\"$name\",\"city\":\"$city\",\"country\":\"$country\",\"timezone\":\"$tz\",\"latitude\":$lat,\"longitude\":$lon}" "$code - $name")
   AIRPORT_CODES+=("$code")
 }
 
+create_airport "IST" "Istanbul Havalimani"      "Istanbul"   "Turkey" "Europe/Istanbul"    41.2753  28.7519
+create_airport "SAW" "Sabiha Gokcen Havalimani"  "Istanbul"   "Turkey" "Europe/Istanbul"    40.8986  29.3092
 create_airport "AYT" "Antalya Havalimani"       "Antalya"    "Turkey" "Europe/Istanbul"    36.8987  30.8005
 create_airport "ESB" "Esenboga Havalimani"       "Ankara"     "Turkey" "Europe/Istanbul"    40.1281  32.9951
 create_airport "ADB" "Adnan Menderes Havalimani" "Izmir"      "Turkey" "Europe/Istanbul"    38.2924  27.1570
@@ -72,16 +147,28 @@ echo ""
 # 2. FLIGHTS
 # =============================================
 echo "--- 2. UCUSLAR ---"
+login
 
 declare -a FLIGHT_IDS=()
+declare -a FLIGHT_NUMBERS=()
 
 create_flight() {
   local fn="$1" from="$2" to="$3" dep="$4" arr="$5" airline="$6"
-  local result
+  local result existing
+  existing=$(curl -s "$BASE/api/flights/number/$fn" | python3 -c 'import sys,json;
+try: print(json.load(sys.stdin)["data"]["id"])
+except Exception: pass' 2>/dev/null || true)
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] $fn $from->$to (zaten var)"
+    FLIGHT_IDS+=("$existing")
+    FLIGHT_NUMBERS+=("$fn")
+    return
+  fi
   result=$(post "/api/flights" "{\"flightNumber\":\"$fn\",\"departureAirportCode\":\"$from\",\"arrivalAirportCode\":\"$to\",\"departureTime\":\"$dep\",\"arrivalTime\":\"$arr\",\"airline\":\"$airline\"}" "$fn $from->$to")
   local id
   id=$(echo "$result" | extract_id)
-  [ -n "$id" ] && FLIGHT_IDS+=("$id")
+  if [ -n "$id" ]; then FLIGHT_IDS+=("$id"); fi
+  FLIGHT_NUMBERS+=("$fn")
 }
 
 # Ic hat ucuslari
@@ -109,21 +196,72 @@ create_flight "PC1801" "SAW" "CDG" "2026-12-22T07:00:00Z" "2026-12-22T10:00:00Z"
 create_flight "PC1803" "SAW" "AMS" "2026-12-22T09:00:00Z" "2026-12-22T12:00:00Z" "Pegasus Airlines"
 
 echo ""
+echo "--- 2b. KOLTUKLAR (satir 1-20, ABCDEF, ECONOMY 1500.00) ---"
+login
+for fn in "${FLIGHT_NUMBERS[@]}"; do
+  existing=$(get_data "/api/seat-inventory/seats/$fn" | python3 -c 'import sys,json; print("1" if json.load(sys.stdin) else "")')
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] Koltuklar $fn (zaten var)"
+  else
+    result=$(post "/api/seat-inventory/seats/bulk" "{\"flightNumber\":\"$fn\",\"seatType\":\"ECONOMY\",\"price\":1500.00,\"fromRow\":1,\"toRow\":20,\"letters\":\"ABCDEF\"}" "Koltuklar $fn")
+    echo "$result" | head -1
+  fi
+done
+
+echo ""
 
 # =============================================
 # 3. HOTELS
 # =============================================
 echo "--- 3. OTELLER ---"
+login
 
 declare -a HOTEL_IDS=()
 
+# hotel-service her otel icin organizationId ister ve yazma izni ORGANIZATION_OWNER'dan gelir.
+# Admin kullanici bir organizasyon olusturur (otomatik owner olur), admin endpoint'i ile onaylanir.
+ORG_NAME="Waylo Seed Organization"
+ORG_ID=$(curl -s "$BASE/api/me/memberships" -H "Authorization: Bearer $TOKEN" | ORG_NAME="$ORG_NAME" python3 -c '
+import sys,json,os
+try:
+    for m in json.load(sys.stdin)["data"]:
+        if m["organizationName"] == os.environ["ORG_NAME"] and m["organizationStatus"] in ("ACTIVE","PENDING"):
+            print(m["organizationId"] + " " + m["organizationStatus"]); break
+except Exception:
+    pass
+' 2>/dev/null || echo "")
+ORG_STATUS="${ORG_ID#* }"
+ORG_ID="${ORG_ID%% *}"
+if [ -z "$ORG_ID" ]; then
+  ORG_ID=$(curl -s -X POST "$BASE/api/organizations" -H "$H" -H "Authorization: Bearer $TOKEN" -d "{\"name\":\"$ORG_NAME\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["id"])' 2>/dev/null || echo "")
+  ORG_STATUS="PENDING"
+fi
+if [ -n "$ORG_ID" ] && [ "$ORG_STATUS" = "PENDING" ]; then
+  curl -s -o /dev/null -X POST "$BASE/api/admin/organizations/$ORG_ID/approve" -H "Authorization: Bearer $TOKEN" || true
+fi
+if [ -n "$ORG_ID" ]; then
+  echo "  [OK] Organizasyon hazir: $ORG_ID"
+else
+  echo "  [!] Organizasyon olusturulamadi, oteller ve odalar atlaniyor"
+fi
+
 create_hotel() {
   local name="$1" city="$2" country="$3" addr="$4" star="$5" desc="$6"
-  local result
-  result=$(post "/api/hotels" "{\"name\":\"$name\",\"city\":\"$city\",\"country\":\"$country\",\"address\":\"$addr\",\"starRating\":$star,\"description\":\"$desc\"}" "$name")
+  [ -n "$ORG_ID" ] || return 0
+  local result existing
+  existing=$(get_data "/api/hotels?organizationId=$ORG_ID" | NAME="$name" python3 -c 'import json,os,sys
+for h in json.loads(sys.stdin.read()):
+    if h.get("name") == os.environ["NAME"]:
+        print(h.get("id", "")); break')
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] $name (zaten var)"
+    HOTEL_IDS+=("$existing")
+    return
+  fi
+  result=$(post "/api/hotels" "{\"name\":\"$name\",\"city\":\"$city\",\"country\":\"$country\",\"address\":\"$addr\",\"starRating\":$star,\"description\":\"$desc\",\"organizationId\":\"$ORG_ID\"}" "$name")
   local id
   id=$(echo "$result" | extract_id)
-  [ -n "$id" ] && HOTEL_IDS+=("$id")
+  if [ -n "$id" ]; then HOTEL_IDS+=("$id"); fi
 }
 
 create_hotel "Waylo Grand Istanbul"     "Istanbul"   "Turkey" "Beyoglu, Istiklal Caddesi 42"       5 "Bogaz manzarali luks otel, spa ve havuzlu"
@@ -143,12 +281,19 @@ echo ""
 # 4. ROOMS (her otel icin 3-5 oda)
 # =============================================
 echo "--- 4. ODALAR ---"
+login
 
 create_room() {
   local hotel_id="$1" num="$2" type="$3" cap="$4" price="$5" floor="$6" desc="$7"
   if [ -z "$hotel_id" ]; then return; fi
-  post "/api/hotels/$hotel_id/rooms" "{\"roomNumber\":\"$num\",\"roomType\":\"$type\",\"capacity\":$cap,\"pricePerNight\":$price,\"floor\":$floor,\"description\":\"$desc\"}" "Oda $num ($type)" > /dev/null
-  echo "  [+] Oda $num ($type)"
+  local existing
+  existing=$(find_id_by_field "$(get_data "/api/hotels/$hotel_id/rooms")" "roomNumber" "$num")
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] Oda $num ($type) (zaten var)"
+    return
+  fi
+  result=$(post "/api/hotels/$hotel_id/rooms" "{\"roomNumber\":\"$num\",\"roomType\":\"$type\",\"capacity\":$cap,\"pricePerNight\":$price,\"floor\":$floor,\"description\":\"$desc\"}" "Oda $num ($type)")
+  echo "$result" | head -1
 }
 
 # Hotel rooms - her otel icin cesitli odalar
@@ -171,11 +316,20 @@ echo ""
 # 5. VEHICLES
 # =============================================
 echo "--- 5. ARACLAR ---"
+login
 
 create_vehicle() {
   local plate="$1" brand="$2" model="$3" year="$4" type="$5" seat="$6" rate="$7" loc="$8" color="$9" mileage="${10}"
-  post "/api/vehicles" "{\"plateNumber\":\"$plate\",\"brand\":\"$brand\",\"model\":\"$model\",\"year\":$year,\"vehicleType\":\"$type\",\"seatCount\":$seat,\"dailyRate\":$rate,\"location\":\"$loc\",\"color\":\"$color\",\"mileage\":$mileage}" "$brand $model ($plate)" > /dev/null
-  echo "  [+] $brand $model ($plate)"
+  local existing
+  existing=$(curl -s "$BASE/api/vehicles/plate/$plate" | python3 -c 'import sys,json;
+try: print(json.load(sys.stdin)["data"]["id"])
+except Exception: pass' 2>/dev/null || true)
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] $brand $model ($plate) (zaten var)"
+    return
+  fi
+  result=$(post "/api/vehicles" "{\"plateNumber\":\"$plate\",\"brand\":\"$brand\",\"model\":\"$model\",\"year\":$year,\"vehicleType\":\"$type\",\"seatCount\":$seat,\"dailyRate\":$rate,\"location\":\"$loc\",\"color\":\"$color\",\"mileage\":$mileage}" "$brand $model ($plate)")
+  echo "$result" | head -1
 }
 
 create_vehicle "34 WYL 10" "Toyota"     "Corolla"     2024 "ECONOMY"  5  250  "Istanbul Havalimani"  "Beyaz"   15000
@@ -200,37 +354,53 @@ echo ""
 # 6. CUSTOMERS
 # =============================================
 echo "--- 6. MUSTERILER ---"
+login
 
 declare -a CUSTOMER_IDS=()
 
+SEED_CUSTOMER_PASSWORD="${SEED_CUSTOMER_PASSWORD:-}"
+if [ -z "$SEED_CUSTOMER_PASSWORD" ]; then
+  SEED_CUSTOMER_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(16))')
+  echo "  [INFO] SEED_CUSTOMER_PASSWORD ayarlanmadigi icin bu calisma icin bir sifre uretildi"
+fi
+
 create_customer() {
   local fn="$1" ln="$2" email="$3" phone="$4" passport="$5"
-  local body="{\"firstName\":\"$fn\",\"lastName\":\"$ln\",\"email\":\"$email\""
-  [ -n "$phone" ] && body="$body,\"phone\":\"$phone\""
-  [ -n "$passport" ] && body="$body,\"passportNumber\":\"$passport\""
-  body="$body}"
-  local result
-  result=$(post "/api/customers" "$body" "$fn $ln")
-  local id
-  id=$(echo "$result" | extract_id)
-  [ -n "$id" ] && CUSTOMER_IDS+=("$id")
+  # CRM phone/passport updates are not authenticated endpoints, so these fields are intentionally not posted.
+  local body response code id
+  body=$(FN="$fn" LN="$ln" EMAIL="$email" PASSWORD="$SEED_CUSTOMER_PASSWORD" python3 -c 'import json,os; print(json.dumps({"firstName":os.environ["FN"],"lastName":os.environ["LN"],"email":os.environ["EMAIL"],"password":os.environ["PASSWORD"]}))')
+  response=$(curl -s -w '\n%{http_code}' -X POST "$BASE/api/auth/register" -H "$H" -d "$body")
+  code=$(echo "$response" | tail -1)
+  response=$(echo "$response" | sed '$d')
+  if [ "$code" = "201" ] || [ "$code" = "200" ]; then
+    id=$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["userId"])' 2>/dev/null || echo "")
+    echo "  [OK] $fn $ln -> $id"
+  elif [ "$code" = "409" ]; then
+    echo "  [SKIP] $fn $ln (zaten kayitli)"
+    id=""
+  else
+    echo "  [FAIL:$code] $fn $ln"
+    echo "$response" | head -1
+    id=""
+  fi
+  if [ -n "$id" ]; then CUSTOMER_IDS+=("$id"); fi
 }
 
-create_customer "Mehmet"   "Kaya"      "mehmet.kaya@email.com"      "+905321112233" "TR12345678"
-create_customer "Ayse"     "Demir"     "ayse.demir@email.com"       "+905339998877" "TR23456789"
-create_customer "Fatma"    "Celik"     "fatma.celik@email.com"      "+905347776655" "TR34567890"
-create_customer "Mustafa"  "Sahin"     "mustafa.sahin@email.com"    "+905355554433" "TR45678901"
-create_customer "Zeynep"   "Yildiz"    "zeynep.yildiz@email.com"    "+905363332211" "TR56789012"
-create_customer "Emre"     "Ozturk"    "emre.ozturk@email.com"      "+905371110099" "TR67890123"
-create_customer "Elif"     "Arslan"    "elif.arslan@email.com"      "+905389998877" ""
-create_customer "Burak"    "Dogan"     "burak.dogan@email.com"      "+905391112233" "TR89012345"
-create_customer "Selin"    "Acar"      "selin.acar@email.com"       "+905401234567" ""
-create_customer "Kerem"    "Polat"     "kerem.polat@email.com"      "+905417654321" "TR01234567"
-create_customer "Deniz"    "Koc"       "deniz.koc@email.com"        "+905428765432" "TR11223344"
-create_customer "Hakan"    "Erdem"     "hakan.erdem@email.com"      "+905439876543" ""
-create_customer "Gamze"    "Tekin"     "gamze.tekin@email.com"      "+905441122334" "TR22334455"
-create_customer "Cem"      "Gunes"     "cem.gunes@email.com"        "+905455566778" "TR33445566"
-create_customer "Pinar"    "Bulut"     "pinar.bulut@email.com"      "+905466677889" ""
+create_customer "Mehmet"   "Kaya"      "mehmet.kaya@example.com"      "+905321112233" "TR12345678"
+create_customer "Ayse"     "Demir"     "ayse.demir@example.com"       "+905339998877" "TR23456789"
+create_customer "Fatma"    "Celik"     "fatma.celik@example.com"      "+905347776655" "TR34567890"
+create_customer "Mustafa"  "Sahin"     "mustafa.sahin@example.com"    "+905355554433" "TR45678901"
+create_customer "Zeynep"   "Yildiz"    "zeynep.yildiz@example.com"    "+905363332211" "TR56789012"
+create_customer "Emre"     "Ozturk"    "emre.ozturk@example.com"      "+905371110099" "TR67890123"
+create_customer "Elif"     "Arslan"    "elif.arslan@example.com"      "+905389998877" ""
+create_customer "Burak"    "Dogan"     "burak.dogan@example.com"      "+905391112233" "TR89012345"
+create_customer "Selin"    "Acar"      "selin.acar@example.com"       "+905401234567" ""
+create_customer "Kerem"    "Polat"     "kerem.polat@example.com"      "+905417654321" "TR01234567"
+create_customer "Deniz"    "Koc"       "deniz.koc@example.com"        "+905428765432" "TR11223344"
+create_customer "Hakan"    "Erdem"     "hakan.erdem@example.com"      "+905439876543" ""
+create_customer "Gamze"    "Tekin"     "gamze.tekin@example.com"      "+905441122334" "TR22334455"
+create_customer "Cem"      "Gunes"     "cem.gunes@example.com"        "+905455566778" "TR33445566"
+create_customer "Pinar"    "Bulut"     "pinar.bulut@example.com"      "+905466677889" ""
 
 echo ""
 
@@ -238,101 +408,32 @@ echo ""
 # 7. PRICING RULES
 # =============================================
 echo "--- 7. FIYATLANDIRMA KURALLARI ---"
+login
 
-post "/api/pricing-rules" '{"name":"Ekonomi Ucus","pricingType":"FLIGHT","basePrice":500,"discountPercentage":0,"currency":"TRY","description":"Yurt ici ekonomi ucus fiyati"}' "Ekonomi Ucus" > /dev/null
-echo "  [+] Ekonomi Ucus"
-post "/api/pricing-rules" '{"name":"Business Ucus","pricingType":"FLIGHT","basePrice":1500,"discountPercentage":0,"currency":"TRY","description":"Business class ucus fiyati"}' "Business Ucus" > /dev/null
-echo "  [+] Business Ucus"
-post "/api/pricing-rules" '{"name":"Dis Hat Ucus","pricingType":"FLIGHT","basePrice":3000,"discountPercentage":0,"currency":"TRY","description":"Avrupa ucus fiyati"}' "Dis Hat Ucus" > /dev/null
-echo "  [+] Dis Hat Ucus"
-post "/api/pricing-rules" '{"name":"Standart Oda","pricingType":"HOTEL","basePrice":400,"discountPercentage":0,"currency":"TRY","description":"Standart otel oda fiyati"}' "Standart Oda" > /dev/null
-echo "  [+] Standart Oda"
-post "/api/pricing-rules" '{"name":"Suite Oda","pricingType":"HOTEL","basePrice":1200,"discountPercentage":0,"currency":"TRY","description":"Suite oda fiyati"}' "Suite Oda" > /dev/null
-echo "  [+] Suite Oda"
-post "/api/pricing-rules" '{"name":"Ekonomi Arac","pricingType":"CAR_RENTAL","basePrice":200,"discountPercentage":0,"currency":"TRY","description":"Ekonomi arac gunluk fiyat"}' "Ekonomi Arac" > /dev/null
-echo "  [+] Ekonomi Arac"
-post "/api/pricing-rules" '{"name":"SUV Arac","pricingType":"CAR_RENTAL","basePrice":600,"discountPercentage":0,"currency":"TRY","description":"SUV arac gunluk fiyat"}' "SUV Arac" > /dev/null
-echo "  [+] SUV Arac"
-post "/api/pricing-rules" '{"name":"Erken Rezervasyon","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":15,"currency":"TRY","description":"30 gun oncesi erken rezervasyon indirimi"}' "Erken Rezervasyon" > /dev/null
-echo "  [+] Erken Rezervasyon"
-post "/api/pricing-rules" '{"name":"Aile Paketi","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":10,"currency":"TRY","description":"4+ kisi aile paketi indirimi"}' "Aile Paketi" > /dev/null
-echo "  [+] Aile Paketi"
-post "/api/pricing-rules" '{"name":"Sadakat Indirimi","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":20,"currency":"TRY","description":"Gold ve Platinum musterilere ozel"}' "Sadakat Indirimi" > /dev/null
-echo "  [+] Sadakat Indirimi"
+create_pricing_rule() {
+  local name="$1" body="$2" existing
+  existing=$(find_id_by_field "$(get_data "/api/pricing-rules")" "name" "$name")
+  if [ -n "$existing" ]; then
+    echo "  [SKIP] $name (zaten var)"
+    return
+  fi
+  post "/api/pricing-rules" "$body" "$name" > /dev/null
+}
 
-echo ""
-
-# =============================================
-# 8. BOOKINGS + PAYMENTS
-# =============================================
-echo "--- 8. REZERVASYONLAR + ODEMELER ---"
-
-# Get actual flight IDs
-ALL_FLIGHTS=$(curl -s "$BASE/api/flights" | python3 -c 'import sys,json; [print(f["id"]) for f in json.load(sys.stdin)["data"]]')
-FLIGHT_ARR=()
-while IFS= read -r line; do [ -n "$line" ] && FLIGHT_ARR+=("$line"); done <<< "$ALL_FLIGHTS"
-
-# Get actual customer IDs
-ALL_CUSTOMERS=$(curl -s "$BASE/api/customers" | python3 -c 'import sys,json; [print(c["id"]) for c in json.load(sys.stdin)["data"]]')
-CUST_ARR=()
-while IFS= read -r line; do [ -n "$line" ] && CUST_ARR+=("$line"); done <<< "$ALL_CUSTOMERS"
-
-NUM_FLIGHTS=${#FLIGHT_ARR[@]}
-NUM_CUSTS=${#CUST_ARR[@]}
-
-if [ "$NUM_FLIGHTS" -gt 0 ] && [ "$NUM_CUSTS" -gt 0 ]; then
-  BOOKING_IDS=()
-  for i in $(seq 0 9); do
-    CIDX=$((i % NUM_CUSTS))
-    FIDX=$((i % NUM_FLIGHTS))
-    CID="${CUST_ARR[$CIDX]}"
-    FID="${FLIGHT_ARR[$FIDX]}"
-    NOTES=("Yilbasi tatili paketi" "Is seyahati" "Balayi paketi" "Aile tatili" "Hafta sonu kacamagi" "Konferans gezisi" "Kultur turu" "Plaj tatili" "Kayak tatili" "Ogrenci turu")
-    RESULT=$(post "/api/bookings" "{\"customerId\":\"$CID\",\"flightId\":\"$FID\",\"notes\":\"${NOTES[$i]}\"}" "Booking #$((i+1))")
-    BID=$(echo "$RESULT" | extract_id)
-    [ -n "$BID" ] && BOOKING_IDS+=("$BID")
-  done
-
-  echo ""
-  echo "--- 8b. ODEMELER ---"
-
-  AMOUNTS=(2500 4800 8500 3200 1900 5500 3700 6200 4100 2800)
-  METHODS=("CREDIT_CARD" "CREDIT_CARD" "CREDIT_CARD" "DEBIT_CARD" "BANK_TRANSFER" "CREDIT_CARD" "DEBIT_CARD" "CREDIT_CARD" "CREDIT_CARD" "BANK_TRANSFER")
-  CURRENCIES=("TRY" "TRY" "EUR" "TRY" "TRY" "USD" "TRY" "EUR" "TRY" "TRY")
-
-  for i in "${!BOOKING_IDS[@]}"; do
-    BID="${BOOKING_IDS[$i]}"
-    CIDX=$((i % NUM_CUSTS))
-    CID="${CUST_ARR[$CIDX]}"
-    AMT="${AMOUNTS[$i]}"
-    MTH="${METHODS[$i]}"
-    CUR="${CURRENCIES[$i]}"
-    post "/api/payments" "{\"bookingId\":\"$BID\",\"customerId\":\"$CID\",\"amount\":$AMT,\"currency\":\"$CUR\",\"paymentMethod\":\"$MTH\"}" "Payment $AMT $CUR" > /dev/null
-    echo "  [+] Payment $AMT $CUR for booking ${BID:0:8}..."
-  done
-else
-  echo "  [!] Ucus veya musteri verisi yok, booking/payment atlanıyor"
-fi
+create_pricing_rule "Ekonomi Ucus" '{"name":"Ekonomi Ucus","pricingType":"FLIGHT","basePrice":500,"discountPercentage":0,"currency":"TRY","description":"Yurt ici ekonomi ucus fiyati"}'
+create_pricing_rule "Business Ucus" '{"name":"Business Ucus","pricingType":"FLIGHT","basePrice":1500,"discountPercentage":0,"currency":"TRY","description":"Business class ucus fiyati"}'
+create_pricing_rule "Dis Hat Ucus" '{"name":"Dis Hat Ucus","pricingType":"FLIGHT","basePrice":3000,"discountPercentage":0,"currency":"TRY","description":"Avrupa ucus fiyati"}'
+create_pricing_rule "Standart Oda" '{"name":"Standart Oda","pricingType":"HOTEL","basePrice":400,"discountPercentage":0,"currency":"TRY","description":"Standart otel oda fiyati"}'
+create_pricing_rule "Suite Oda" '{"name":"Suite Oda","pricingType":"HOTEL","basePrice":1200,"discountPercentage":0,"currency":"TRY","description":"Suite oda fiyati"}'
+create_pricing_rule "Ekonomi Arac" '{"name":"Ekonomi Arac","pricingType":"CAR_RENTAL","basePrice":200,"discountPercentage":0,"currency":"TRY","description":"Ekonomi arac gunluk fiyat"}'
+create_pricing_rule "SUV Arac" '{"name":"SUV Arac","pricingType":"CAR_RENTAL","basePrice":600,"discountPercentage":0,"currency":"TRY","description":"SUV arac gunluk fiyat"}'
+create_pricing_rule "Erken Rezervasyon" '{"name":"Erken Rezervasyon","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":15,"currency":"TRY","description":"30 gun oncesi erken rezervasyon indirimi"}'
+create_pricing_rule "Aile Paketi" '{"name":"Aile Paketi","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":10,"currency":"TRY","description":"4+ kisi aile paketi indirimi"}'
+create_pricing_rule "Sadakat Indirimi" '{"name":"Sadakat Indirimi","pricingType":"PACKAGE_DISCOUNT","basePrice":0,"discountPercentage":20,"currency":"TRY","description":"Gold ve Platinum musterilere ozel"}'
 
 echo ""
 
-# =============================================
-# 9. NOTIFICATIONS (manual create)
-# =============================================
-echo "--- 9. BILDIRIMLER ---"
-
-if [ "$NUM_CUSTS" -gt 0 ]; then
-  for i in 0 1 2 3 4; do
-    CIDX=$((i % NUM_CUSTS))
-    CID="${CUST_ARR[$CIDX]}"
-    SUBJECTS=("Rezervasyon Onaylandi" "Odeme Basarili" "Check-in Hatirlatmasi" "Hosgeldiniz" "Ozel Kampanya")
-    BODIES=("Rezervasyonunuz basariyla onaylandi." "Odemeniz basariyla alindi." "Ucusunuza 24 saat kaldi, check-in yapabilirsiniz." "Waylo'ya hosgeldiniz! Ilk rezervasyonunuza %10 indirim." "Ozel kis kampanyasi: tum paketlerde %25 indirim!")
-    TYPES=("EMAIL" "EMAIL" "PUSH" "EMAIL" "SMS")
-    RECIPIENTS=("musteri${i}@email.com" "musteri${i}@email.com" "device-token-${i}" "musteri${i}@email.com" "+90555000${i}${i}${i}${i}")
-    post "/api/notifications" "{\"customerId\":\"$CID\",\"type\":\"${TYPES[$i]}\",\"recipient\":\"${RECIPIENTS[$i]}\",\"subject\":\"${SUBJECTS[$i]}\",\"body\":\"${BODIES[$i]}\"}" "${SUBJECTS[$i]}" > /dev/null
-    echo "  [+] ${SUBJECTS[$i]} (${TYPES[$i]})"
-  done
-fi
+# Transactional data only comes from real user flows.
 
 echo ""
 
@@ -343,19 +444,68 @@ echo "=========================================="
 echo "  SEED TAMAMLANDI - OZET"
 echo "=========================================="
 
-echo ""
-echo "Airports:       $(curl -s $BASE/api/airports | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Flights:        $(curl -s $BASE/api/flights | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Hotels:         $(curl -s $BASE/api/hotels | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-# Rooms counted by summing hotel roomCounts
-ROOM_TOTAL=$(curl -s $BASE/api/hotels | python3 -c 'import sys,json; print(sum(h["roomCount"] for h in json.load(sys.stdin)["data"]))' 2>/dev/null || echo 'N/A')
-echo "Rooms:          $ROOM_TOTAL"
-echo "Vehicles:       $(curl -s $BASE/api/vehicles | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Customers:      $(curl -s $BASE/api/customers | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Bookings:       $(curl -s $BASE/api/bookings | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Payments:       $(curl -s $BASE/api/payments | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Pricing Rules:  $(curl -s $BASE/api/pricing-rules | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
-echo "Notifications:  $(curl -s $BASE/api/notifications | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["data"]))')"
+count_endpoint() {
+  local path="$1" expression="$2" response code body
+  response=$(curl -s -w '\n%{http_code}' "$BASE$path" -H "Authorization: Bearer $TOKEN" || true)
+  code=$(echo "$response" | tail -1)
+  body=$(echo "$response" | sed '$d')
+  BODY="$body" CODE="$code" EXPRESSION="$expression" python3 -c '
+import json, os
+if os.environ["CODE"] not in {"200", "201"}:
+    print("N/A (HTTP " + os.environ["CODE"] + ")")
+    raise SystemExit
+try:
+    data=json.loads(os.environ["BODY"]).get("data", [])
+    print(eval(os.environ["EXPRESSION"], {"data": data}))
+except Exception:
+    print("N/A (HTTP " + os.environ["CODE"] + ")")
+'
+}
+
+login
+ROOM_TOTAL=0
+ROOM_STATUS=200
+for hotel_id in "${HOTEL_IDS[@]}"; do
+  room_response=$(curl -s -w '\n%{http_code}' "$BASE/api/hotels/$hotel_id/rooms" -H "Authorization: Bearer $TOKEN" || true)
+  room_code=$(echo "$room_response" | tail -1)
+  room_body=$(echo "$room_response" | sed '$d')
+  if [ "$room_code" != "200" ]; then
+    ROOM_STATUS="$room_code"
+    continue
+  fi
+  room_count=$(BODY="$room_body" python3 -c 'import os,json; print(len(json.loads(os.environ["BODY"]).get("data", [])))' 2>/dev/null || echo "")
+  if [ -n "$room_count" ]; then ROOM_TOTAL=$((ROOM_TOTAL + room_count)); else ROOM_STATUS=200; fi
+done
+if [ "$ROOM_TOTAL" = "0" ] && [ "$ROOM_STATUS" != "200" ]; then ROOM_TOTAL="N/A (HTTP $ROOM_STATUS)"; fi
+
+SEAT_TOTAL=0
+SEAT_STATUS=200
+for flight_number in "${FLIGHT_NUMBERS[@]}"; do
+  seat_response=$(curl -s -w '\n%{http_code}' "$BASE/api/seat-inventory/seats/$flight_number/count" -H "Authorization: Bearer $TOKEN" || true)
+  seat_code=$(echo "$seat_response" | tail -1)
+  seat_body=$(echo "$seat_response" | sed '$d')
+  if [ "$seat_code" != "200" ]; then SEAT_STATUS="$seat_code"; continue; fi
+  seat_count=$(BODY="$seat_body" python3 -c 'import os,json; print(json.loads(os.environ["BODY"]).get("data", 0))' 2>/dev/null || echo "")
+  if [[ "$seat_count" =~ ^[0-9]+$ ]]; then SEAT_TOTAL=$((SEAT_TOTAL + seat_count)); else SEAT_STATUS=200; fi
+done
+if [ "$SEAT_TOTAL" = "0" ] && [ "$SEAT_STATUS" != "200" ]; then SEAT_TOTAL="N/A (HTTP $SEAT_STATUS)"; fi
 
 echo ""
+echo "Airports:       $(count_endpoint "/api/airports" "len(data)")"
+echo "Flights:        $(count_endpoint "/api/flights" "len(data)")"
+echo "Seats:          $SEAT_TOTAL"
+echo "Hotels:         $(count_endpoint "/api/hotels" "len(data)")"
+echo "Rooms:          $ROOM_TOTAL"
+echo "Vehicles:       $(count_endpoint "/api/vehicles" "len(data)")"
+echo "Customers:      $(count_endpoint "/api/customers" "len(data)")"
+echo "Pricing Rules:  $(count_endpoint "/api/pricing-rules" "len(data)")"
+
+FAIL_COUNT=$(cat "$FAIL_COUNT_FILE")
+echo ""
 echo "Done!"
+echo "Failures:       $FAIL_COUNT"
+
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  exit 1
+fi
+exit 0

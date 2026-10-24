@@ -3,6 +3,7 @@ package com.waylo.authservice.service;
 import com.waylo.authservice.config.JwtUtil;
 import com.waylo.authservice.domain.User;
 import com.waylo.authservice.dto.*;
+import com.waylo.authservice.exception.DuplicateRegistrationException;
 import com.waylo.authservice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -75,7 +76,7 @@ public class AuthService {
     public ApiResponse<AuthResponse> register(RegisterRequest request) {
         String normalized = normalizeEmail(request.email());
         if (userRepository.existsByEmailIgnoreCase(normalized)) {
-            return ApiResponse.error("Bu e-posta adresi zaten kullaniliyor");
+            throw new DuplicateRegistrationException("Bu e-posta adresi zaten kullaniliyor");
         }
 
         User user = new User();

@@ -41,6 +41,9 @@ public class FlightSeat {
     @Column(name = "is_available", nullable = false)
     private boolean available = true;
 
+    @Column(name = "closed", nullable = false)
+    private boolean closed;
+
     @Column(name = "reservation_id", length = 64)
     private String reservationId;
 
@@ -83,6 +86,9 @@ public class FlightSeat {
 
     public boolean isAvailable() { return available; }
     public void setAvailable(boolean available) { this.available = available; }
+
+    public boolean isClosed() { return closed; }
+    public void setClosed(boolean closed) { this.closed = closed; }
 
     public String getReservationId() { return reservationId; }
     public void setReservationId(String reservationId) { this.reservationId = reservationId; }

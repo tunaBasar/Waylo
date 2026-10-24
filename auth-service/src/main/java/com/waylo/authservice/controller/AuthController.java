@@ -1,6 +1,7 @@
 package com.waylo.authservice.controller;
 
 import com.waylo.authservice.dto.*;
+import com.waylo.authservice.exception.DuplicateRegistrationException;
 import com.waylo.authservice.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +22,14 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        ApiResponse<AuthResponse> response = authService.register(request);
-        return response.success()
-                ? ResponseEntity.ok(response)
-                : ResponseEntity.badRequest().body(response);
+        try {
+            ApiResponse<AuthResponse> response = authService.register(request);
+            return response.success()
+                    ? ResponseEntity.ok(response)
+                    : ResponseEntity.badRequest().body(response);
+        } catch (DuplicateRegistrationException exception) {
+            return ResponseEntity.status(409).body(ApiResponse.error(exception.getMessage()));
+        }
     }
 
     @PostMapping("/login")

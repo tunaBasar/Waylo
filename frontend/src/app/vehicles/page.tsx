@@ -1,89 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import type { Vehicle } from '@/lib/types';
+import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ApiError, api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import type { AvailableVehicle } from '@/lib/types';
 
-const typeLabels: Record<string, string> = {
-  ECONOMY: 'Ekonomi', COMPACT: 'Kompakt', MIDSIZE: 'Orta', FULLSIZE: 'Buyuk', SUV: 'SUV', LUXURY: 'Luks', VAN: 'Van',
-};
-const statusLabels: Record<string, { label: string; class: string }> = {
-  AVAILABLE: { label: 'Musait', class: 'bg-secondary-container text-on-secondary-container' },
-  RESERVED: { label: 'Rezerve', class: 'bg-primary-fixed text-primary' },
-  RENTED: { label: 'Kirada', class: 'bg-tertiary-fixed text-on-tertiary-fixed-variant' },
-  MAINTENANCE: { label: 'Bakim', class: 'bg-error-container text-on-error-container' },
-};
+const typeLabels: Record<string, string> = { ECONOMY: 'Ekonomi', COMPACT: 'Kompakt', MIDSIZE: 'Orta', FULLSIZE: 'Buyuk', SUV: 'SUV', LUXURY: 'Luks', VAN: 'Van' };
+const errorLabels: Record<string, string> = { VEHICLE_NOT_AVAILABLE: 'Bu arac sectiginiz tarihlerde musait degil.', VEHICLE_NOT_RENTABLE: 'Bu arac su anda kiralanamaz.' };
+const daysBetween = (from: string, to: string) => Math.ceil((new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime()) / 86400000);
 
 export default function VehiclesPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [vehicles, setVehicles] = useState<AvailableVehicle[]>([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [location, setLocation] = useState('');
+  const [vehicleType, setVehicleType] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [renting, setRenting] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    api.get<Vehicle[]>('/api/vehicles').then(r => { setVehicles(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  async function searchVehicles(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (!from || !to || daysBetween(from, to) < 1 || daysBetween(from, to) > 30) { setError('Tarih araligi 1 ile 30 gun arasinda olmali.'); return; }
+    setLoading(true); setError('');
+    try { const params = new URLSearchParams({ from, to }); if (location) params.set('location', location); if (vehicleType) params.set('vehicleType', vehicleType); const res = await api.get<AvailableVehicle[]>(`/api/vehicles/available?${params}`); setVehicles(res.data); } catch { setError('Musait araclar yuklenemedi.'); } finally { setLoading(false); }
+  }
 
-  const filtered = vehicles.filter(v =>
-    !search || v.brand?.toLowerCase().includes(search.toLowerCase()) ||
-    v.model?.toLowerCase().includes(search.toLowerCase()) ||
-    v.plateNumber?.toLowerCase().includes(search.toLowerCase())
-  );
+  async function rent(vehicle: AvailableVehicle) {
+    if (authLoading || !user) { router.push('/login'); return; }
+    setRenting(vehicle.id); setError(''); setMessage('');
+    try { await api.post('/api/rentals', { vehicleId: vehicle.id, pickupDate: from, returnDate: to }); setMessage('Arac rezervasyonunuz olusturuldu.'); await searchVehicles(); } catch (cause) { const apiError = cause as ApiError; setError(errorLabels[apiError.code || ''] || (apiError.status === 400 ? 'Tarih bilgilerini kontrol edin.' : 'Arac kiralanamadi.')); } finally { setRenting(null); }
+  }
 
-  return (
-    <div className="space-y-space-md">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-space-xs">
-          <h2 className="text-xl font-semibold text-on-surface tracking-tight">Araclar</h2>
-          <span className="bg-tertiary-fixed text-on-tertiary-fixed-variant text-xs font-semibold px-2.5 py-0.5 rounded-full">{vehicles.length} Arac</span>
-        </div>
-        <button className="bg-tertiary hover:bg-tertiary-container text-on-tertiary text-sm font-medium px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-md active:scale-95 transition-all">
-          <span className="material-symbols-outlined text-[18px]">add</span> Yeni Arac
-        </button>
-      </div>
-
-      <div className="relative shadow-sm rounded-xl bg-surface-container-lowest">
-        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-outline text-[20px] pointer-events-none">search</span>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-transparent rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none"
-          placeholder="Marka, model veya plaka ara..." />
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-surface-container-lowest rounded-xl shadow-sm p-4 animate-pulse"><div className="h-5 bg-surface-container rounded w-1/3 mb-2"/><div className="h-4 bg-surface-container rounded w-1/2"/></div>)}</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">directions_car</span><p className="text-on-surface-variant text-sm">Arac bulunamadi</p></div>
-      ) : (
-        <div className="space-y-space-sm">
-          {filtered.map(v => {
-            const st = statusLabels[v.status] || statusLabels.AVAILABLE;
-            return (
-              <div key={v.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center">
-                      <span className="material-symbols-outlined text-tertiary text-xl">directions_car</span>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-on-surface">{v.brand} {v.model}</p>
-                      <p className="text-xs text-on-surface-variant">{v.plateNumber} · {v.year} · {typeLabels[v.vehicleType] || v.vehicleType}</p>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${st.class}`}>{st.label}</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-on-surface-variant mb-2">
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">airline_seat_recline_normal</span> {v.seatCount} Koltuk</span>
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">palette</span> {v.color || '-'}</span>
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">location_on</span> {v.location}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-lg font-bold text-tertiary">₺{v.dailyRate.toLocaleString('tr-TR')}<span className="text-xs font-normal text-on-surface-variant"> /gun</span></p>
-                  <button className="px-4 py-2 rounded-lg bg-tertiary text-on-tertiary text-xs font-medium shadow-sm hover:bg-tertiary-container active:scale-95 transition-all">Yonet</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  const days = from && to ? daysBetween(from, to) : 0;
+  return <div className="space-y-space-md"><div className="flex items-center gap-space-xs"><h2 className="text-xl font-semibold text-on-surface tracking-tight">Araclar</h2><span className="bg-tertiary-fixed text-on-tertiary-fixed-variant text-xs font-semibold px-2.5 py-0.5 rounded-full">{vehicles.length} Arac</span></div><form onSubmit={searchVehicles} className="grid gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm md:grid-cols-5"><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="rounded-lg bg-surface-container px-3 py-2 text-sm" /><input type="date" value={to} onChange={e => setTo(e.target.value)} className="rounded-lg bg-surface-container px-3 py-2 text-sm" /><input value={location} onChange={e => setLocation(e.target.value)} placeholder="Lokasyon (opsiyonel)" className="rounded-lg bg-surface-container px-3 py-2 text-sm" /><select value={vehicleType} onChange={e => setVehicleType(e.target.value)} className="rounded-lg bg-surface-container px-3 py-2 text-sm"><option value="">Tum tipler</option>{Object.entries(typeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><button className="rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-on-tertiary">Arac Ara</button></form>{(error || message) && <p className={`rounded-lg px-3 py-2 text-sm ${error ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container'}`}>{error || message}</p>}{loading ? <p className="py-12 text-center text-sm text-on-surface-variant">Araclar yukleniyor...</p> : vehicles.length === 0 ? <p className="py-12 text-center text-sm text-on-surface-variant">Musait arac bulunamadi</p> : <div className="space-y-space-sm">{vehicles.map(vehicle => <div key={vehicle.id} className="rounded-xl bg-surface-container-lowest p-4 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-base font-bold text-on-surface">{vehicle.brand} {vehicle.model}</p><p className="text-xs text-on-surface-variant">{vehicle.plateNumber} · {typeLabels[vehicle.vehicleType] || vehicle.vehicleType} · {vehicle.location}</p></div><p className="text-lg font-bold text-tertiary">₺{vehicle.dailyRate.toLocaleString('tr-TR')}<span className="text-xs font-normal text-on-surface-variant"> /gun</span></p></div><div className="mt-3 flex items-center justify-between"><span className="text-xs text-on-surface-variant">{vehicle.seatCount} koltuk{days > 0 && ` · Toplam: ₺${(vehicle.dailyRate * days).toLocaleString('tr-TR')} (${days} gun)`}</span><button onClick={() => rent(vehicle)} disabled={renting === vehicle.id} className="rounded-lg bg-tertiary px-4 py-2 text-xs font-medium text-on-tertiary disabled:opacity-50">{renting === vehicle.id ? 'Kiralanıyor...' : 'Kirala'}</button></div></div>)}</div>}</div>;
 }

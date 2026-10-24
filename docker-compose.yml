@@ -557,6 +557,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: waylo
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
+      WAYLO_BOOTSTRAP_ADMIN_EMAIL: "${WAYLO_BOOTSTRAP_ADMIN_EMAIL:-}"
+      WAYLO_BOOTSTRAP_ADMIN_PASSWORD: "${WAYLO_BOOTSTRAP_ADMIN_PASSWORD:-}"
     depends_on:
       discovery-service:
         condition: service_healthy

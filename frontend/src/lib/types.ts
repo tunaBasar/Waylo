@@ -26,7 +26,7 @@ export interface Flight {
   departureTime: string;
   arrivalTime: string;
   airline: string;
-  status: 'SCHEDULED' | 'CANCELLED' | 'ACTIVE' | 'COMPLETED' | 'DELAYED';
+  status: 'SCHEDULED' | 'CANCELLED';
   duration?: string;
   price?: number;
   totalSeats?: number;
@@ -76,7 +76,8 @@ export interface Vehicle {
   model: string;
   year: number;
   vehicleType: 'ECONOMY' | 'COMPACT' | 'MIDSIZE' | 'FULLSIZE' | 'SUV' | 'LUXURY' | 'VAN';
-  status: 'AVAILABLE' | 'RESERVED' | 'RENTED' | 'MAINTENANCE';
+  status: 'AVAILABLE' | 'MAINTENANCE';
+  version: number;
   color: string | null;
   seatCount: number;
   dailyRate: number;
@@ -87,7 +88,32 @@ export interface Vehicle {
   updatedAt: string;
 }
 
-// Booking types
+// Public availability and rental types
+export interface AvailableVehicle {
+  id: string;
+  plateNumber: string;
+  brand: string;
+  model: string;
+  vehicleType: 'ECONOMY' | 'COMPACT' | 'MIDSIZE' | 'FULLSIZE' | 'SUV' | 'LUXURY' | 'VAN';
+  seatCount: number;
+  dailyRate: number;
+  location: string;
+}
+
+export type RentalStatus = 'RESERVED' | 'CANCELLED';
+
+export interface Rental {
+  id: string;
+  vehicleId: string;
+  customerId: string;
+  pickupDate: string;
+  returnDate: string;
+  dailyRate: number;
+  totalPrice: number;
+  status: RentalStatus;
+  createdAt: string;
+}
+
 export interface PackageBooking {
   id: string;
   customerId: string;

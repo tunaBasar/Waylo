@@ -3,6 +3,7 @@ package com.waylo.authservice.service;
 import com.waylo.authservice.config.JwtUtil;
 import com.waylo.authservice.domain.User;
 import com.waylo.authservice.dto.*;
+import com.waylo.authservice.exception.DuplicateRegistrationException;
 import com.waylo.authservice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -193,10 +194,10 @@ class AuthServiceTest {
             when(userRepository.existsByEmailIgnoreCase("a@b.com")).thenReturn(true);
 
             RegisterRequest req = new RegisterRequest("John", "Doe", "A@B.COM", "pass123");
-            ApiResponse<AuthResponse> result = authService.register(req);
+            DuplicateRegistrationException exception = assertThrows(
+                    DuplicateRegistrationException.class, () -> authService.register(req));
 
-            assertFalse(result.success());
-            assertEquals("Bu e-posta adresi zaten kullaniliyor", result.message());
+            assertEquals("Bu e-posta adresi zaten kullaniliyor", exception.getMessage());
             verify(userRepository, never()).save(any());
         }
     }

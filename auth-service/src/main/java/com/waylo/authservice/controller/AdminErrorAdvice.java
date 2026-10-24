@@ -11,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.stream.Collectors;
 
-@RestControllerAdvice(assignableTypes = AdminOrganizationController.class)
+@RestControllerAdvice(assignableTypes = {AdminOrganizationController.class, AdminUserController.class})
 public class AdminErrorAdvice {
 
     @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)

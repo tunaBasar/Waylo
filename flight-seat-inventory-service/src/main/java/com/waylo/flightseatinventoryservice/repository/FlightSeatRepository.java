@@ -16,11 +16,11 @@ import java.util.UUID;
 public interface FlightSeatRepository extends JpaRepository<FlightSeat, UUID> {
 
     @Query("select s from FlightSeat s where s.flightNumber = :flightNumber "
-            + "and (s.available = true or s.holdExpiresAt < :now)")
+            + "and s.closed = false and (s.available = true or s.holdExpiresAt < :now)")
     List<FlightSeat> findAvailable(@Param("flightNumber") String flightNumber, @Param("now") Instant now);
 
     @Query("select count(s) from FlightSeat s where s.flightNumber = :flightNumber "
-            + "and (s.available = true or s.holdExpiresAt < :now)")
+            + "and s.closed = false and (s.available = true or s.holdExpiresAt < :now)")
     long countAvailable(@Param("flightNumber") String flightNumber, @Param("now") Instant now);
 
     Optional<FlightSeat> findByFlightNumberAndSeatNumber(String flightNumber, String seatNumber);
@@ -28,6 +28,12 @@ public interface FlightSeatRepository extends JpaRepository<FlightSeat, UUID> {
     List<FlightSeat> findByFlightNumber(String flightNumber);
 
     List<FlightSeat> findByFlightNumberAndSeatType(String flightNumber, String seatType);
+
+    @Modifying
+    @Query("update FlightSeat s set s.closed = true, s.available = false, s.reservedBy = null, "
+            + "s.reservationId = null, s.holdExpiresAt = null, s.version = s.version + 1 "
+            + "where s.flightNumber = :flightNumber and s.closed = false")
+    int closeFlightSeats(@Param("flightNumber") String flightNumber);
 
     boolean existsByFlightNumberAndSeatNumber(String flightNumber, String seatNumber);
 

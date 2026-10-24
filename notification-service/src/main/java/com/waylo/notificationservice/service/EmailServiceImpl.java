@@ -11,6 +11,11 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class EmailServiceImpl implements EmailService {
 
@@ -28,6 +33,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${waylo.mail.verification-url}")
     private String verificationBaseUrl;
 
+    @Value("${waylo.mail.suppressed-domains:example.com,example.net,example.org,email.com}")
+    private String suppressedDomains;
+
     public EmailServiceImpl(JavaMailSender mailSender, TemplateEngine templateEngine) {
         this.mailSender = mailSender;
         this.templateEngine = templateEngine;
@@ -41,8 +49,9 @@ public class EmailServiceImpl implements EmailService {
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("email-verification", ctx);
-        sendHtmlMail(to, "Waylo - E-posta Dogrulamasi", html);
-        log.info("Verification email sent to {}", to);
+        if (sendHtmlMail(to, "Waylo - E-posta Dogrulamasi", html)) {
+            log.info("Verification email sent to {}", to);
+        }
     }
 
     @Override
@@ -53,8 +62,9 @@ public class EmailServiceImpl implements EmailService {
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("password-reset", ctx);
-        sendHtmlMail(to, "Waylo - Sifre Sifirlama", html);
-        log.info("Password reset email sent to {}", to);
+        if (sendHtmlMail(to, "Waylo - Sifre Sifirlama", html)) {
+            log.info("Password reset email sent to {}", to);
+        }
     }
 
     @Override
@@ -64,8 +74,9 @@ public class EmailServiceImpl implements EmailService {
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("welcome", ctx);
-        sendHtmlMail(to, "Waylo'ya Hos Geldiniz!", html);
-        log.info("Welcome email sent to {}", to);
+        if (sendHtmlMail(to, "Waylo'ya Hos Geldiniz!", html)) {
+            log.info("Welcome email sent to {}", to);
+        }
     }
 
     @Override
@@ -73,7 +84,16 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlMail(to, subject, htmlContent);
     }
 
-    private void sendHtmlMail(String to, String subject, String htmlContent) {
+    private boolean sendHtmlMail(String to, String subject, String htmlContent) {
+        String domain = mailDomain(to);
+        if (domain == null) {
+            log.warn("Mail skipped because address is invalid: {}", to);
+            return false;
+        }
+        if (isSuppressedDomain(domain)) {
+            log.info("Mail suppressed for reserved/test domain: {}", domain);
+            return false;
+        }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -82,9 +102,41 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
             mailSender.send(message);
+            return true;
         } catch (MessagingException | java.io.UnsupportedEncodingException e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
             throw new RuntimeException("Email gonderilemedi: " + e.getMessage(), e);
         }
+    }
+
+    private String mailDomain(String address) {
+        if (address == null) {
+            return null;
+        }
+        int at = address.lastIndexOf('@');
+        if (at < 0 || at == address.length() - 1) {
+            return null;
+        }
+        return address.substring(at + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isSuppressedDomain(String domain) {
+        Set<String> configured = Arrays.stream(suppressedDomains.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        return configured.stream().anyMatch(domain::equals)
+                || configured.stream().anyMatch(value -> domain.endsWith("." + value))
+                || domain.endsWith(".test")
+                || domain.endsWith(".example")
+                || domain.endsWith(".invalid")
+                || domain.endsWith(".localhost")
+                || domain.endsWith(".local")
+                || domain.equals("test")
+                || domain.equals("example")
+                || domain.equals("invalid")
+                || domain.equals("localhost")
+                || domain.equals("local");
     }
 }

@@ -52,6 +52,7 @@ waylo:
     from: waylo353241@gmail.com
     from-name: Waylo Travel
     verification-url: http://localhost:3000/verify
+    suppressed-domains: example.com,example.net,example.org,email.com
 
 eureka:
   client:

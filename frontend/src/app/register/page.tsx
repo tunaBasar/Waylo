@@ -20,8 +20,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register({ firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password });
-    } catch {
-      setError('Kayit olusturulamadi. Bu e-posta zaten kullanilmis olabilir.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kayit olusturulamadi. Bu e-posta zaten kullanilmis olabilir.');
     } finally {
       setLoading(false);
     }

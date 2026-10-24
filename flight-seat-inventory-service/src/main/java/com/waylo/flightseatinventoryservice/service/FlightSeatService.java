@@ -92,7 +92,7 @@ public class FlightSeatService {
 
     private FlightSeatResponse toResponse(FlightSeat seat, Instant now) {
         return new FlightSeatResponse(seat.getId(), seat.getFlightNumber(), seat.getSeatNumber(),
-                seat.getSeatType(), seat.getPrice(), isFree(seat, now),
+                seat.getSeatType(), seat.getPrice(), !seat.isClosed() && isFree(seat, now),
                 seat.getCreatedAt(), seat.getUpdatedAt());
     }
 
@@ -216,6 +216,14 @@ public class FlightSeatService {
         return flightSeatRepository.countAvailable(normalize(flightNumber), Instant.now());
     }
 
+    @Transactional
+    public int closeFlightSeats(String rawFlightNumber) {
+        String flightNumber = normalize(rawFlightNumber);
+        int closed = flightSeatRepository.closeFlightSeats(flightNumber);
+        log.info("Flight seats closed: flight={}, count={}", flightNumber, closed);
+        return closed;
+    }
+
     // ---------- holds ----------
 
     private void assertFlightBookable(String flightNumber, Instant now) {
@@ -249,6 +257,10 @@ public class FlightSeatService {
         assertFlightBookable(flightNumber, now);
 
         FlightSeat seat = findSeat(flightNumber, seatNumber);
+        if (seat.isClosed()) {
+            throw new BusinessRuleException("FLIGHT_NOT_BOOKABLE",
+                    "Flight " + flightNumber + " is not open for booking");
+        }
         if (!isFree(seat, now)) {
             throw new ConflictException("SEAT_ALREADY_RESERVED", "Seat " + seatNumber + " is already reserved");
         }

@@ -12,6 +12,7 @@ const nav = [
   { href: '/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/hotels', label: 'Oteller', icon: 'hotel' },
   { href: '/vehicles', label: 'Araclar', icon: 'directions_car' },
+  { href: '/rentals', label: 'Kiralama', icon: 'car_rental' },
   { href: '/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
   { href: '/customers', label: 'Musteriler', icon: 'group' },
   { href: '/payments', label: 'Odemeler', icon: 'payments' },
