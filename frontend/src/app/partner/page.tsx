@@ -64,7 +64,7 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-const EMPTY_HOTEL = { name: '', city: '', country: 'Turkiye', address: '', starRating: 3, description: '' };
+const EMPTY_HOTEL = { name: '', city: '', country: '', address: '', starRating: 3, description: '' };
 
 function NewHotelForm({ organizationId, onDone }: { organizationId: string; onDone: () => void }) {
   const toast = useToast();

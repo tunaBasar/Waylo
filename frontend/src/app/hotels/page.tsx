@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { partnerApi } from '@/lib/partner';
 import type { Hotel } from '@/lib/types';
 import {
   todayIso,
@@ -15,6 +16,8 @@ import {
 } from '@/lib/hotel-stay';
 
 export default function HotelsPage() {
+  const { user } = useAuth();
+  const [isPartner, setIsPartner] = useState(false);
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -44,6 +47,15 @@ export default function HotelsPage() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    partnerApi.myMemberships()
+      .then(res => { if (!cancelled) setIsPartner((res.data ?? []).length > 0); })
+      .catch(() => { if (!cancelled) setIsPartner(false); });
+    return () => { cancelled = true; };
+  }, [user]);
 
   const clearSearch = () => {
     setSearchActive(false);
@@ -96,14 +108,6 @@ export default function HotelsPage() {
     return matchSearch && matchStar;
   });
 
-  const hotelImages: Record<number, string> = {
-    0: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=300&fit=crop',
-    1: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&h=300&fit=crop',
-    2: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&h=300&fit=crop',
-    3: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&h=300&fit=crop',
-    4: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=600&h=300&fit=crop',
-  };
-
   // Build children age selects - ensure array length matches formChildren
   const displayChildrenAges: number[] = formChildrenAges.slice(0, formChildren);
 
@@ -127,10 +131,12 @@ export default function HotelsPage() {
             {headerCount}
           </span>
         </div>
-        <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary text-on-secondary text-sm font-medium shadow-sm active:scale-95 transition-all">
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          <span>Yeni Otel Ekle</span>
-        </button>
+        {isPartner && (
+          <Link href="/partner" className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary text-on-secondary text-sm font-medium shadow-sm active:scale-95 transition-all">
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span>Yeni Otel Ekle</span>
+          </Link>
+        )}
       </div>
 
       {/* Search Form */}
@@ -311,7 +317,7 @@ export default function HotelsPage() {
         </div>
       ) : (
         <div className="space-y-space-md">
-          {filtered.map((hotel, idx) => {
+          {filtered.map(hotel => {
             const query = activeQuery ?? {
               checkIn: formCheckIn,
               checkOut: formCheckOut,
@@ -325,13 +331,9 @@ export default function HotelsPage() {
                 <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                   {/* Hotel Image */}
                   <div className="relative h-48 bg-surface-container overflow-hidden">
-                    <Image
-                      src={hotelImages[idx % 5]}
-                      alt={hotel.name}
-                      width={600}
-                      height={300}
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="w-full h-full flex items-center justify-center bg-surface-container-high">
+                      <span className="material-symbols-outlined text-outline text-6xl">hotel</span>
+                    </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
                     {/* Badges */}
@@ -340,21 +342,16 @@ export default function HotelsPage() {
                         {hotel.active ? 'AKTIF' : 'PASIF'}
                       </span>
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-surface-container-lowest/90 text-on-surface flex items-center gap-0.5">
-                        ★ {hotel.starRating}.0
+                        ★ {hotel.starRating}
                       </span>
                     </div>
-
-                    {/* Settings button */}
-                    <button className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-surface-container-lowest/80 flex items-center justify-center hover:bg-surface-container-lowest transition-colors" onClick={e => e.stopPropagation()}>
-                      <span className="material-symbols-outlined text-on-surface text-[18px]">tune</span>
-                    </button>
 
                     {/* Hotel name overlay */}
                     <div className="absolute bottom-3 left-3 right-3">
                       <h3 className="text-lg font-bold text-white">{hotel.name}</h3>
                       <div className="flex items-center gap-1 text-white/80 text-xs">
                         <span className="material-symbols-outlined text-[14px]">location_on</span>
-                        <span>{hotel.city}, {hotel.country || 'Turkiye'}</span>
+                        <span>{[hotel.city, hotel.country].filter(Boolean).join(', ')}</span>
                       </div>
                     </div>
                   </div>
@@ -365,29 +362,8 @@ export default function HotelsPage() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                         <span className="material-symbols-outlined text-[16px]">bed</span>
-                        <span>{hotel.roomCount || 0} Oda</span>
+                        <span>{hotel.roomCount} Oda</span>
                       </div>
-                      {hotel.roomCount > 0 && (
-                        <span className="text-xs font-medium text-primary px-2 py-0.5 rounded-full bg-primary-fixed">
-                          Yuksek Doluluk
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Amenities */}
-                    <div className="flex items-center gap-3 mb-3 text-xs text-on-surface-variant">
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">pool</span> Havuz
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">spa</span> Spa
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">restaurant</span> Restoran
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">local_parking</span> P
-                      </span>
                     </div>
 
                     <div className="flex items-center justify-between">

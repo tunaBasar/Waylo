@@ -14,10 +14,11 @@ public record AvailableVehicleResponse(
         VehicleType vehicleType,
         int seatCount,
         BigDecimal dailyRate,
+        String currency,
         String location
 ) {
     public static AvailableVehicleResponse from(Vehicle v) {
         return new AvailableVehicleResponse(v.getId(), v.getPlateNumber(), v.getBrand(), v.getModel(),
-                v.getVehicleType(), v.getSeatCount(), v.getDailyRate(), v.getLocation());
+                v.getVehicleType(), v.getSeatCount(), v.getDailyRate(), v.getCurrency(), v.getLocation());
     }
 }

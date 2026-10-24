@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -37,8 +38,17 @@ public record VehicleRequest(
         @DecimalMin("0.01") @Digits(integer = 8, fraction = 2)
         BigDecimal dailyRate,
 
+        @NotBlank(message = "Currency is required")
+        @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be three uppercase letters")
+        String currency,
+
         @NotBlank(message = "Location is required")
         @Size(max = 255) String location,
 
         @PositiveOrZero Integer mileage
-) {}
+) {
+    public VehicleRequest(String plateNumber, String brand, String model, Integer year, VehicleType vehicleType,
+                          String color, Integer seatCount, BigDecimal dailyRate, String location, Integer mileage) {
+        this(plateNumber, brand, model, year, vehicleType, color, seatCount, dailyRate, "TRY", location, mileage);
+    }
+}

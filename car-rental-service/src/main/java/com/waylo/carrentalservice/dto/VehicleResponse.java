@@ -17,6 +17,7 @@ public record VehicleResponse(
         String color,
         int seatCount,
         BigDecimal dailyRate,
+        String currency,
         String location,
         Integer mileage,
         boolean active,
@@ -25,10 +26,18 @@ public record VehicleResponse(
         Instant updatedAt
 ) {
     public VehicleResponse(UUID id, String plateNumber, String brand, String model, int year,
+                           VehicleType vehicleType, VehicleStatus status, String color, int seatCount,
+                           BigDecimal dailyRate, String location, Integer mileage, boolean active,
+                           Instant createdAt, Instant updatedAt) {
+        this(id, plateNumber, brand, model, year, vehicleType, status, color, seatCount, dailyRate, "TRY",
+                location, mileage, active, 0L, createdAt, updatedAt);
+    }
+
+    public VehicleResponse(UUID id, String plateNumber, String brand, String model, int year,
                             VehicleType vehicleType, VehicleStatus status, String color, int seatCount,
-                            BigDecimal dailyRate, String location, Integer mileage, boolean active,
+                            BigDecimal dailyRate, String currency, String location, Integer mileage, boolean active,
                             Instant createdAt, Instant updatedAt) {
-        this(id, plateNumber, brand, model, year, vehicleType, status, color, seatCount, dailyRate,
+        this(id, plateNumber, brand, model, year, vehicleType, status, color, seatCount, dailyRate, currency,
                 location, mileage, active, 0L, createdAt, updatedAt);
     }
 }

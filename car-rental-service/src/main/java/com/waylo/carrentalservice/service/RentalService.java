@@ -58,6 +58,7 @@ public class RentalService {
         rental.setPickupDate(req.pickupDate());
         rental.setReturnDate(req.returnDate());
         rental.setDailyRate(vehicle.getDailyRate());
+        rental.setCurrency(vehicle.getCurrency());
         rental.setTotalPrice(vehicle.getDailyRate().multiply(BigDecimal.valueOf(days))
                 .setScale(2, RoundingMode.HALF_UP));
         rental.setStatus(RentalStatus.RESERVED);

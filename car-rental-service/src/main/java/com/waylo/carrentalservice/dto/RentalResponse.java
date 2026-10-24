@@ -16,11 +16,17 @@ public record RentalResponse(
         LocalDate returnDate,
         BigDecimal dailyRate,
         BigDecimal totalPrice,
+        String currency,
         RentalStatus status,
         Instant createdAt
 ) {
+    public RentalResponse(UUID id, UUID vehicleId, UUID customerId, LocalDate pickupDate, LocalDate returnDate,
+                          BigDecimal dailyRate, BigDecimal totalPrice, RentalStatus status, Instant createdAt) {
+        this(id, vehicleId, customerId, pickupDate, returnDate, dailyRate, totalPrice, "TRY", status, createdAt);
+    }
+
     public static RentalResponse from(Rental r) {
         return new RentalResponse(r.getId(), r.getVehicleId(), r.getCustomerId(), r.getPickupDate(),
-                r.getReturnDate(), r.getDailyRate(), r.getTotalPrice(), r.getStatus(), r.getCreatedAt());
+                r.getReturnDate(), r.getDailyRate(), r.getTotalPrice(), r.getCurrency(), r.getStatus(), r.getCreatedAt());
     }
 }

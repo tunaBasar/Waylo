@@ -36,6 +36,9 @@ public class Rental {
     @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalPrice;
 
+    @Column(name = "currency", nullable = false, length = 3, columnDefinition = "bpchar(3)")
+    private String currency;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private RentalStatus status = RentalStatus.RESERVED;
@@ -68,6 +71,8 @@ public class Rental {
     public void setDailyRate(BigDecimal dailyRate) { this.dailyRate = dailyRate; }
     public BigDecimal getTotalPrice() { return totalPrice; }
     public void setTotalPrice(BigDecimal totalPrice) { this.totalPrice = totalPrice; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
     public RentalStatus getStatus() { return status; }
     public void setStatus(RentalStatus status) { this.status = status; }
     public Long getVersion() { return version; }

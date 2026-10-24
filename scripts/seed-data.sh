@@ -35,7 +35,8 @@ TOKEN=""
 FAIL_COUNT=0
 FAIL_COUNT_FILE=$(mktemp)
 printf '0\n' > "$FAIL_COUNT_FILE"
-trap 'rm -f "$FAIL_COUNT_FILE"' EXIT
+SEED_HDRS=$(mktemp)
+trap 'rm -f "$FAIL_COUNT_FILE" "$SEED_HDRS"' EXIT
 # Access token omru 15 dk: her bolumun basinda yeniden giris yapilir.
 login() {
   local payload resp
@@ -328,7 +329,7 @@ except Exception: pass' 2>/dev/null || true)
     echo "  [SKIP] $brand $model ($plate) (zaten var)"
     return
   fi
-  result=$(post "/api/vehicles" "{\"plateNumber\":\"$plate\",\"brand\":\"$brand\",\"model\":\"$model\",\"year\":$year,\"vehicleType\":\"$type\",\"seatCount\":$seat,\"dailyRate\":$rate,\"location\":\"$loc\",\"color\":\"$color\",\"mileage\":$mileage}" "$brand $model ($plate)")
+  result=$(post "/api/vehicles" "{\"plateNumber\":\"$plate\",\"brand\":\"$brand\",\"model\":\"$model\",\"year\":$year,\"vehicleType\":\"$type\",\"seatCount\":$seat,\"dailyRate\":$rate,\"currency\":\"TRY\",\"location\":\"$loc\",\"color\":\"$color\",\"mileage\":$mileage}" "$brand $model ($plate)")
   echo "$result" | head -1
 }
 
@@ -368,9 +369,23 @@ create_customer() {
   local fn="$1" ln="$2" email="$3" phone="$4" passport="$5"
   # CRM phone/passport updates are not authenticated endpoints, so these fields are intentionally not posted.
   local body response code id
+  # already registered? (admin lookup, no register call -> no rate-limit cost on re-runs)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -G "$BASE/api/admin/users" --data-urlencode "email=$email" -H "Authorization: Bearer $TOKEN")
+  if [ "$code" = "200" ]; then
+    echo "  [SKIP] $fn $ln (zaten kayitli)"
+    return
+  fi
   body=$(FN="$fn" LN="$ln" EMAIL="$email" PASSWORD="$SEED_CUSTOMER_PASSWORD" python3 -c 'import json,os; print(json.dumps({"firstName":os.environ["FN"],"lastName":os.environ["LN"],"email":os.environ["EMAIL"],"password":os.environ["PASSWORD"]}))')
-  response=$(curl -s -w '\n%{http_code}' -X POST "$BASE/api/auth/register" -H "$H" -d "$body")
+  response=$(curl -s -D "$SEED_HDRS" -w '\n%{http_code}' -X POST "$BASE/api/auth/register" -H "$H" -d "$body")
   code=$(echo "$response" | tail -1)
+  if [ "$code" = "429" ]; then
+    # gateway limits register per IP (5/min): wait for the window the gateway tells us, then retry once
+    wait_s=$(grep -i '^retry-after:' "$SEED_HDRS" | tr -dc '0-9'); wait_s=${wait_s:-60}
+    echo "  [WAIT] register limiti, ${wait_s}s bekleniyor"
+    sleep "$wait_s"
+    response=$(curl -s -D "$SEED_HDRS" -w '\n%{http_code}' -X POST "$BASE/api/auth/register" -H "$H" -d "$body")
+    code=$(echo "$response" | tail -1)
+  fi
   response=$(echo "$response" | sed '$d')
   if [ "$code" = "201" ] || [ "$code" = "200" ]; then
     id=$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["userId"])' 2>/dev/null || echo "")
@@ -379,6 +394,7 @@ create_customer() {
     echo "  [SKIP] $fn $ln (zaten kayitli)"
     id=""
   else
+    printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
     echo "  [FAIL:$code] $fn $ln"
     echo "$response" | head -1
     id=""

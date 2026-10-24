@@ -9,6 +9,7 @@ import com.waylo.carrentalservice.dto.VehicleResponse;
 import com.waylo.carrentalservice.exception.DuplicateResourceException;
 import com.waylo.carrentalservice.exception.ResourceNotFoundException;
 import com.waylo.carrentalservice.repository.VehicleRepository;
+import com.waylo.carrentalservice.repository.RentalRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +25,12 @@ public class VehicleServiceImpl implements VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final VehicleMapper vehicleMapper;
+    private final RentalRepository rentalRepository;
 
-    public VehicleServiceImpl(VehicleRepository vehicleRepository, VehicleMapper vehicleMapper) {
+    public VehicleServiceImpl(VehicleRepository vehicleRepository, VehicleMapper vehicleMapper, RentalRepository rentalRepository) {
         this.vehicleRepository = vehicleRepository;
         this.vehicleMapper = vehicleMapper;
+        this.rentalRepository = rentalRepository;
     }
 
     @Override
@@ -92,6 +95,8 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = findOrThrow(id);
         VehicleRequest normalized = normalize(request);
         validateYear(normalized.year());
+        if (!normalized.currency().equals(vehicle.getCurrency()) && rentalRepository.existsFutureReserved(vehicle.getId(), java.time.LocalDate.now()))
+            throw new com.waylo.carrentalservice.exception.BusinessRuleException("VEHICLE_HAS_BOOKINGS", "Vehicle has future bookings");
         if (vehicleRepository.existsByPlateNumberAndIdNot(normalized.plateNumber(), id))
             throw new DuplicateResourceException("Vehicle", "plateNumber", normalized.plateNumber());
         vehicleMapper.updateEntity(normalized, vehicle);
@@ -140,7 +145,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     private VehicleRequest normalize(VehicleRequest r) {
         return new VehicleRequest(normalizePlate(r.plateNumber()), r.brand().trim(), r.model().trim(), r.year(), r.vehicleType(),
-                r.color() == null ? null : r.color().trim(), r.seatCount(), r.dailyRate(), r.location().trim(), r.mileage());
+                r.color() == null ? null : r.color().trim(), r.seatCount(), r.dailyRate(), r.currency().trim().toUpperCase(), r.location().trim(), r.mileage());
     }
     private String normalizePlate(String plate) { return plate.trim().replaceAll("\\s+", "").toUpperCase(); }
     private void validateYear(Integer year) { if (year < 1990 || year > Year.now().getValue() + 1) throw new IllegalArgumentException("Year must be between 1990 and next year"); }

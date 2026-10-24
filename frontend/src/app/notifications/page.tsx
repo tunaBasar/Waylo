@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Notification } from '@/lib/types';
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -12,16 +13,31 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 };
 const typeIcons: Record<string, string> = { EMAIL: 'mail', SMS: 'sms', PUSH: 'notifications_active' };
 
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
+
 export default function NotificationsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAdmin) return;
     api.get<Notification[]>('/api/notifications').then(r => { setNotifs(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
 
   const filtered = notifs.filter(n => !typeFilter || n.type === typeFilter);
+
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">

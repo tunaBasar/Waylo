@@ -5,18 +5,19 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
-const nav = [
+const nav: Array<{ href: string; label: string; icon: string; adminOnly?: boolean }> = [
   { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
   { href: '/partner', label: 'Partner Paneli', icon: 'storefront' },
   { href: '/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/hotels', label: 'Oteller', icon: 'hotel' },
   { href: '/vehicles', label: 'Araclar', icon: 'directions_car' },
   { href: '/rentals', label: 'Kiralama', icon: 'car_rental' },
-  { href: '/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
-  { href: '/customers', label: 'Musteriler', icon: 'group' },
-  { href: '/payments', label: 'Odemeler', icon: 'payments' },
-  { href: '/notifications', label: 'Bildirimler', icon: 'notifications' },
-  { href: '/checkins', label: 'Check-in', icon: 'check_circle' },
+  { href: '/orders', label: 'Siparislerim', icon: 'receipt_long' },
+  { href: '/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number', adminOnly: true },
+  { href: '/customers', label: 'Musteriler', icon: 'group', adminOnly: true },
+  { href: '/payments', label: 'Odemeler', icon: 'payments', adminOnly: true },
+  { href: '/notifications', label: 'Bildirimler', icon: 'notifications', adminOnly: true },
+  { href: '/checkins', label: 'Check-in', icon: 'check_circle', adminOnly: true },
   { href: '/profile', label: 'Profil', icon: 'person' },
   { href: '/settings', label: 'Ayarlar', icon: 'settings' },
 ];
@@ -26,7 +27,7 @@ const bottomTabs = [
   { href: '/', label: 'Ana Sayfa', icon: 'dashboard' },
   { href: '/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/hotels', label: 'Oteller', icon: 'hotel' },
-  { href: '/bookings', label: 'Rezervasyon', icon: 'confirmation_number' },
+  { href: '/orders', label: 'Siparisler', icon: 'receipt_long' },
   { href: '/settings', label: 'Menu', icon: 'menu' },
 ];
 
@@ -49,7 +50,7 @@ export default function Sidebar() {
 
         {/* Nav */}
         <nav className="mt-2 px-3 space-y-0.5 flex-1 overflow-y-auto">
-          {nav.map(({ href, label, icon }) => {
+          {nav.filter(n => !n.adminOnly || user?.role === 'ADMIN').map(({ href, label, icon }) => {
             const active = pathname === href || (href !== '/' && pathname.startsWith(href));
             return (
               <Link key={href} href={href}
@@ -99,13 +100,6 @@ export default function Sidebar() {
           <span className="text-base font-bold text-on-surface">WAYLO</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="p-2 hover:bg-surface-container rounded-full transition-colors">
-            <span className="material-symbols-outlined text-on-surface-variant text-xl">search</span>
-          </button>
-          <button className="p-2 hover:bg-surface-container rounded-full transition-colors relative">
-            <span className="material-symbols-outlined text-on-surface-variant text-xl">notifications</span>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error" />
-          </button>
           <Link href="/profile" className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
             <span className="text-xs font-bold text-on-primary">
               {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}

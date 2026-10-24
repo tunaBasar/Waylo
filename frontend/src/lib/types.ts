@@ -81,6 +81,7 @@ export interface Vehicle {
   color: string | null;
   seatCount: number;
   dailyRate: number;
+  currency: string;
   location: string;
   mileage: number | null;
   active: boolean;
@@ -97,6 +98,7 @@ export interface AvailableVehicle {
   vehicleType: 'ECONOMY' | 'COMPACT' | 'MIDSIZE' | 'FULLSIZE' | 'SUV' | 'LUXURY' | 'VAN';
   seatCount: number;
   dailyRate: number;
+  currency: string;
   location: string;
 }
 
@@ -110,6 +112,7 @@ export interface Rental {
   returnDate: string;
   dailyRate: number;
   totalPrice: number;
+  currency: string;
   status: RentalStatus;
   createdAt: string;
 }

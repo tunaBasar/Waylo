@@ -24,6 +24,9 @@ public interface RentalRepository extends JpaRepository<Rental, UUID> {
                               @Param("pickupDate") LocalDate pickupDate,
                               @Param("returnDate") LocalDate returnDate);
 
+    @Query("select count(r) > 0 from Rental r where r.vehicleId = :vehicleId and r.status = com.waylo.carrentalservice.domain.RentalStatus.RESERVED and r.pickupDate >= :today")
+    boolean existsFutureReserved(@Param("vehicleId") UUID vehicleId, @Param("today") LocalDate today);
+
     List<Rental> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
 
     List<Rental> findByVehicleIdOrderByPickupDateDesc(UUID vehicleId);

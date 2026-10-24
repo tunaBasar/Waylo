@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Payment } from '@/lib/types';
 
 const statusConfig: Record<string, { label: string; class: string; icon: string }> = {
@@ -12,18 +13,35 @@ const statusConfig: Record<string, { label: string; class: string; icon: string 
 };
 const methodIcons: Record<string, string> = { CREDIT_CARD: 'credit_card', DEBIT_CARD: 'credit_card', BANK_TRANSFER: 'account_balance', MOCK: 'science' };
 
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
+
 export default function PaymentsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    if (!isAdmin) return;
     api.get<Payment[]>('/api/payments').then(r => { setPayments(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
 
   const filtered = payments.filter(p => !search || p.transactionRef?.toLowerCase().includes(search.toLowerCase()) || p.bookingId?.toLowerCase().includes(search.toLowerCase()));
 
-  const totalRevenue = payments.filter(p => p.status === 'COMPLETED').reduce((s, p) => s + p.amount, 0);
+  const completed = payments.filter(p => p.status === 'COMPLETED');
+  const currencies = Array.from(new Set(completed.map(p => p.currency)));
+  const totalRevenue = completed.reduce((s, p) => s + p.amount, 0);
+
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">
@@ -37,8 +55,8 @@ export default function PaymentsPage() {
       {/* Revenue card */}
       <div className="bg-gradient-to-br from-primary to-primary-container rounded-xl p-4 shadow-md">
         <p className="text-primary-fixed text-xs font-medium mb-1">Toplam Gelir</p>
-        <p className="text-2xl font-bold text-on-primary">₺{totalRevenue.toLocaleString('tr-TR')}</p>
-        <p className="text-primary-fixed text-[10px] mt-1">{payments.filter(p => p.status === 'COMPLETED').length} basarili odeme</p>
+        <p className="text-2xl font-bold text-on-primary">{totalRevenue.toLocaleString('tr-TR')} {currencies.length === 1 ? currencies[0] : ''}</p>
+        <p className="text-primary-fixed text-[10px] mt-1">{completed.length} basarili odeme</p>
       </div>
 
       <div className="relative shadow-sm rounded-xl bg-surface-container-lowest">
@@ -64,7 +82,7 @@ export default function PaymentsPage() {
                       <span className="material-symbols-outlined text-secondary text-lg">{methodIcons[p.paymentMethod] || 'payments'}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-on-surface">₺{p.amount.toLocaleString('tr-TR')}</p>
+                      <p className="text-sm font-bold text-on-surface">{p.amount.toLocaleString('tr-TR')} {p.currency}</p>
                       <p className="text-[10px] text-on-surface-variant">{p.transactionRef}</p>
                     </div>
                   </div>

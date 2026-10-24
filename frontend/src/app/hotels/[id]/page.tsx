@@ -377,7 +377,7 @@ function HotelsDetailContent() {
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-warning">{stars}</span>
               <span className="text-xs text-on-surface-variant">
-                {hotel.city}, {hotel.country || 'Turkiye'}
+                {[hotel.city, hotel.country].filter(Boolean).join(', ')}
               </span>
             </div>
           </div>

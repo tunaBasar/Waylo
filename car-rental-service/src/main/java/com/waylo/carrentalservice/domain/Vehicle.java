@@ -54,6 +54,9 @@ public class Vehicle {
     @Column(name = "daily_rate", nullable = false, precision = 10, scale = 2)
     private BigDecimal dailyRate;
 
+    @Column(name = "currency", nullable = false, length = 3, columnDefinition = "bpchar(3)")
+    private String currency;
+
     @Column(name = "location", nullable = false)
     private String location;
 
@@ -108,6 +111,8 @@ public class Vehicle {
 
     public BigDecimal getDailyRate() { return dailyRate; }
     public void setDailyRate(BigDecimal dailyRate) { this.dailyRate = dailyRate; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }

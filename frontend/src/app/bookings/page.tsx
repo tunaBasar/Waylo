@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { PackageBooking } from '@/lib/types';
 
 const statusConfig: Record<string, { label: string; class: string; icon: string }> = {
@@ -12,15 +13,28 @@ const statusConfig: Record<string, { label: string; class: string; icon: string 
   PARTIALLY_CONFIRMED: { label: 'Kismi Onay', class: 'bg-tertiary-fixed text-on-tertiary-fixed-variant', icon: 'pending' },
 };
 
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
+
 export default function BookingsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [bookings, setBookings] = useState<PackageBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAdmin) return;
     api.get<PackageBooking[]>('/api/bookings').then(r => { setBookings(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
 
   const filtered = bookings.filter(b => {
     const matchSearch = !search || b.id.toLowerCase().includes(search.toLowerCase()) || b.customerId?.toLowerCase().includes(search.toLowerCase());
@@ -34,6 +48,8 @@ export default function BookingsPage() {
     pending: bookings.filter(b => b.status === 'PENDING').length,
     cancelled: bookings.filter(b => b.status === 'CANCELLED').length,
   };
+
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">
@@ -111,8 +127,7 @@ export default function BookingsPage() {
                   ))}
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-lg font-bold text-primary">₺{(b.totalPrice || 0).toLocaleString('tr-TR')}</p>
-                  <button className="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-medium shadow-sm active:scale-95 transition-all">Detay</button>
+                  <p className="text-lg font-bold text-primary">{b.totalPrice != null ? b.totalPrice.toLocaleString('tr-TR') : '-'}</p>
                 </div>
               </div>
             );

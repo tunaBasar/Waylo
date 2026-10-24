@@ -32,13 +32,15 @@ class VehicleServiceImplTest {
     private VehicleRepository vehicleRepository;
     @Mock
     private VehicleMapper vehicleMapper;
+    @Mock
+    private com.waylo.carrentalservice.repository.RentalRepository rentalRepository;
 
     private VehicleServiceImpl service;
 
     private final UUID vehicleId = UUID.randomUUID();
 
     private VehicleServiceImpl newService() {
-        return new VehicleServiceImpl(vehicleRepository, vehicleMapper);
+        return new VehicleServiceImpl(vehicleRepository, vehicleMapper, rentalRepository);
     }
 
     private Vehicle buildVehicle(UUID id, VehicleStatus status) {

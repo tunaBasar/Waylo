@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Checkin } from '@/lib/types';
 
 const statusConfig: Record<string, { label: string; class: string; icon: string }> = {
@@ -12,13 +13,28 @@ const statusConfig: Record<string, { label: string; class: string; icon: string 
   CANCELLED: { label: 'Iptal', class: 'bg-error-container text-on-error-container', icon: 'cancel' },
 };
 
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
+
 export default function CheckinsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAdmin) return;
     api.get<Checkin[]>('/api/checkins').then(r => { setCheckins(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
+
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">

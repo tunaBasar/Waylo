@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Customer } from '@/lib/types';
 
 const tierConfig: Record<string, { color: string; bg: string }> = {
@@ -11,21 +12,36 @@ const tierConfig: Record<string, { color: string; bg: string }> = {
   PLATINUM: { color: 'text-indigo-700', bg: 'bg-indigo-100' },
 };
 
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
+
 export default function CustomersPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAdmin) return;
     api.get<Customer[]>('/api/customers').then(r => { setCustomers(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
 
   const filtered = customers.filter(c => {
     const matchSearch = !search || `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase());
     const matchTier = !tierFilter || c.tier === tierFilter;
     return matchSearch && matchTier;
   });
+
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">
@@ -34,9 +50,6 @@ export default function CustomersPage() {
           <h2 className="text-xl font-semibold text-on-surface tracking-tight">Musteriler</h2>
           <span className="bg-secondary-container text-on-secondary-container text-xs font-semibold px-2.5 py-0.5 rounded-full">{customers.length}</span>
         </div>
-        <button className="bg-secondary hover:bg-secondary-container text-on-secondary text-sm font-medium px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-md active:scale-95 transition-all">
-          <span className="material-symbols-outlined text-[18px]">person_add</span> Yeni Musteri
-        </button>
       </div>
 
       <div className="relative shadow-sm rounded-xl bg-surface-container-lowest">
@@ -80,9 +93,6 @@ export default function CustomersPage() {
                       <span className="flex items-center gap-0.5"><span className="material-symbols-outlined text-[12px]">star</span> {c.loyaltyPoints.toLocaleString()} puan</span>
                     </div>
                   </div>
-                  <button className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors">
-                    <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
-                  </button>
                 </div>
               </div>
             );
