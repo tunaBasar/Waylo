@@ -8,5 +8,6 @@ public record SeatReservationResponse(
         String seatNumber,
         String reservationId,
         BigDecimal price,
-        Instant reservedAt
+        Instant reservedAt,
+        Instant holdExpiresAt
 ) {}

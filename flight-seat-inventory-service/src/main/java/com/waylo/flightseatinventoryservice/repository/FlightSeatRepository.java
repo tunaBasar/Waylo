@@ -2,8 +2,12 @@ package com.waylo.flightseatinventoryservice.repository;
 
 import com.waylo.flightseatinventoryservice.domain.FlightSeat;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,7 +15,13 @@ import java.util.UUID;
 @Repository
 public interface FlightSeatRepository extends JpaRepository<FlightSeat, UUID> {
 
-    List<FlightSeat> findByFlightNumberAndAvailableTrue(String flightNumber);
+    @Query("select s from FlightSeat s where s.flightNumber = :flightNumber "
+            + "and (s.available = true or s.holdExpiresAt < :now)")
+    List<FlightSeat> findAvailable(@Param("flightNumber") String flightNumber, @Param("now") Instant now);
+
+    @Query("select count(s) from FlightSeat s where s.flightNumber = :flightNumber "
+            + "and (s.available = true or s.holdExpiresAt < :now)")
+    long countAvailable(@Param("flightNumber") String flightNumber, @Param("now") Instant now);
 
     Optional<FlightSeat> findByFlightNumberAndSeatNumber(String flightNumber, String seatNumber);
 
@@ -19,7 +29,11 @@ public interface FlightSeatRepository extends JpaRepository<FlightSeat, UUID> {
 
     List<FlightSeat> findByFlightNumberAndSeatType(String flightNumber, String seatType);
 
-    long countByFlightNumberAndAvailableTrue(String flightNumber);
-
     boolean existsByFlightNumberAndSeatNumber(String flightNumber, String seatNumber);
+
+    @Modifying
+    @Query("update FlightSeat s set s.available = true, s.reservedBy = null, s.reservationId = null, "
+            + "s.holdExpiresAt = null, s.version = s.version + 1 "
+            + "where s.holdExpiresAt < :now")
+    int releaseExpiredHolds(@Param("now") Instant now);
 }

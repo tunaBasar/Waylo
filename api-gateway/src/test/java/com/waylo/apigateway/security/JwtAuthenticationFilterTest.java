@@ -1108,4 +1108,88 @@ class JwtAuthenticationFilterTest {
         assertThat(forwarded.getHeaders().getFirst("X-User-Email")).isEqualTo("user@example.com");
         assertThat(forwarded.getHeaders().getFirst("X-User-Role")).isEqualTo("USER");
     }
+
+    @Test
+    void publicSeatInventoryGet_anon_passesWithoutIdentity() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/seat-inventory/seats/ZZ1234/count").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isNull();
+    }
+
+    @Test
+    void publicSeatInventoryGet_withValidToken_forwardIdentityHeaders() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/seat-inventory/seats/ZZ1234/count")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                .build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        ServerHttpRequest forwarded = capturedRequest.get();
+        assertThat(forwarded).isNotNull();
+        assertThat(forwarded.getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
+    }
+
+    @Test
+    void anonPOST_toSeatInventory_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.post("/api/seat-inventory/seats/ZZ1234/reserve").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void seatInventoryX_notPublic_returns401() {
+        AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            capturedRequest.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/seat-inventoryX/seats/ZZ1234/count").build();
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        JwtVerifier verifier = new JwtVerifier(SECRET);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(verifier, new ObjectMapper());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(capturedRequest.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }

@@ -11,7 +11,6 @@ public record FlightSeatResponse(
         String seatType,
         BigDecimal price,
         boolean available,
-        String reservationId,
         Instant createdAt,
         Instant updatedAt
 ) {}

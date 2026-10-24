@@ -47,3 +47,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+waylo:
+  seat-hold:
+    minutes: 15

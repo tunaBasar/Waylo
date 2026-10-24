@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -43,6 +44,16 @@ public class FlightSeat {
     @Column(name = "reservation_id", length = 64)
     private String reservationId;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
+    @Column(name = "reserved_by")
+    private UUID reservedBy;
+
+    @Column(name = "hold_expires_at")
+    private Instant holdExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -75,6 +86,14 @@ public class FlightSeat {
 
     public String getReservationId() { return reservationId; }
     public void setReservationId(String reservationId) { this.reservationId = reservationId; }
+
+    public long getVersion() { return version; }
+
+    public UUID getReservedBy() { return reservedBy; }
+    public void setReservedBy(UUID reservedBy) { this.reservedBy = reservedBy; }
+
+    public Instant getHoldExpiresAt() { return holdExpiresAt; }
+    public void setHoldExpiresAt(Instant holdExpiresAt) { this.holdExpiresAt = holdExpiresAt; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

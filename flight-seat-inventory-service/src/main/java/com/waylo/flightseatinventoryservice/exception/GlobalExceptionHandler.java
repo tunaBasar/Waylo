@@ -4,6 +4,7 @@ import com.waylo.flightseatinventoryservice.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,6 +17,39 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message,
+                                                HttpServletRequest request) {
+        return ResponseEntity.status(status)
+                .body(new ErrorResponse(status.value(), error, message, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
+        log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
+        return build(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(OptimisticLockingFailureException ex,
+                                                              HttpServletRequest request) {
+        log.warn("Optimistic lock failure: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION",
+                "Seat was modified concurrently, please retry", request);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        log.warn("Forbidden: {}", ex.getMessage());
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleUnavailable(ServiceUnavailableException ex,
+                                                           HttpServletRequest request) {
+        log.error("Dependency unavailable: {}", ex.getMessage());
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", ex.getMessage(), request);
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex,
