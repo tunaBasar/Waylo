@@ -1,5 +1,21 @@
 # Waylo
 
+## Proje hakkında
+
+Waylo, otel öncelikli kurulan bir seyahat pazaryeridir. Oteller doğrudan katılır ve tesislerini B2B partner web panelinden yönetir. Son kullanıcılar yayınlanmış otelleri arar, rezerve eder, öder ve değerlendirir (tüketici mobil uygulaması otel web + backend'den sonra gelecek). Uçuş ve araç kiralama gelecekteki dikeylerdir. Ortak çekirdek (kimlik, kuruluş/üyelik, sipariş, ödeme, bildirim, audit) dikeyden bağımsız kalır.
+
+**Kullanıcılar**
+- Otel işletmeleri: ORGANIZATION_OWNER, HOTEL_OWNER, HOTEL_MANAGER, HOTEL_STAFF (kuruluş/otel kapsamlı)
+- Platform ekibi: PLATFORM_ADMIN, PLATFORM_SUPPORT
+- Son kullanıcı (CUSTOMER). Aynı kimlik hem müşteri hem partner üyesi olabilir.
+
+**Ana akışlar**
+1. Partner: kuruluş başvurusu → admin onayı → otel taslağı → içerik → oda tipleri/rate planlar → günlük stok/fiyat → yayın talebi → admin yayını
+2. Müşteri: yayınlanmış otel arama → müsaitlik → teklif (quote) → çok gecelik atomik hold → sipariş → ödeme → onay → konaklama → doğrulanmış yorum
+3. İptal/iade: politika snapshot'ı ve stok iadesi
+
+**Dokümanlar:** [ARCHITECTURE.md](ARCHITECTURE.md) (mevcut teknik yapı, servisler ve portlar), [PRODUCT-ARCHITECTURE.md](PRODUCT-ARCHITECTURE.md) (hedef tasarım), [WAYLO-MVP-ROADMAP.md](WAYLO-MVP-ROADMAP.md) (fazlı yol haritası), [API-DOCS.md](API-DOCS.md), [auth-service/ORGANIZATION-DOMAIN.md](auth-service/ORGANIZATION-DOMAIN.md).
+
 ## Tek komutla başlatma
 
 Gereksinimler: Docker Engine ve Docker Compose v2 veya üstü. Yerel Java, Gradle veya Node.js kurulumu gerekmez.

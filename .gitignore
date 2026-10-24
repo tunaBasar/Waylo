@@ -57,10 +57,7 @@ docker-compose.override.yml
 graphify-out/
 CLAUDE.md
 AGENTS.md
-manager_prompt.md
-PROGRESS.md
-TASK_QUEUE.md
-ISSUES.md
+STATUS.md
 PRODUCT-DISCUSSION-NOTES.md
 .claude/
 .cursor/

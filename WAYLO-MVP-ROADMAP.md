@@ -4,7 +4,7 @@ Tarih: 14 Ekim 2026. **Durum: planlama dokümanıdır. Bu doküman tek başına 
 
 Kaynaklar resmi/birincil sayfalardan salt okuma ile derlendi (web.run/webfetch). Kurulum, hesap açma, form gönderme, ödeme veya kodlama bu doküman üretilirken yapılmadı. Sayısal eşikler (yüzde, süre, sayı) burada **önerilen hipotez eşiğidir**, sektör kanıtlanmış standart değildir; her biri ilgili görevde yeniden değerlendirilir.
 
-İlişkili dokümanlar: `PRODUCT-ARCHITECTURE.md` (hedef mimari), `ARCHITECTURE.md` (mevcut teknik yapı), `PRODUCT-DISCUSSION-NOTES.md` (görüşme notları), Superpro Waylo projesi (83 mevcut uygulama alt görevi).
+İlişkili dokümanlar: `PRODUCT-ARCHITECTURE.md` (hedef mimari), `ARCHITECTURE.md` (mevcut teknik yapı), `PRODUCT-DISCUSSION-NOTES.md` (görüşme notları, yerel dosya), Superpro Waylo projesi (83 mevcut uygulama alt görevi).
 
 ## 1. Yönetici özeti
 

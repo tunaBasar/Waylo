@@ -40,7 +40,9 @@ Uçuş + otel + araç kiralama paket rezervasyon platformu. Mikroservis mimarisi
 | checkin-service | 8089 | Uçuş check-in |
 | notification-service | 8090 | Email/SMS (mock) |
 | package-booking-saga-orchestrator | 8091 | Saga koordinatörü |
+| auth-service | 8092 | Kimlik, JWT, kuruluş/üyelik/rol |
 | traffic-simulator | 8095 | Yük testi |
+| frontend (Next.js) | 3000 | Müşteri + partner web arayüzü |
 
 ## Mimari Kararlar
 
