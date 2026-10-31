@@ -80,6 +80,15 @@ function VoucherList({ orderId, testMode }: { orderId: string; testMode: boolean
             {v.redeemedAt && ` · Kullanim: ${fmt(v.redeemedAt)}`}
           </p>
           {v.payload && <QrImage payload={v.payload} />}
+          {v.payload && (
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="break-all rounded-lg bg-surface-container-lowest px-2 py-1 text-xs text-on-surface">{v.payload}</code>
+              <button type="button" onClick={() => void navigator.clipboard?.writeText(v.payload ?? '')}
+                className="rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
+                Kodu kopyala
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
