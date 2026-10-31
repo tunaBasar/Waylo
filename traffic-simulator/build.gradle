@@ -3,4 +3,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webclient'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

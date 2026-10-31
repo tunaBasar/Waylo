@@ -105,11 +105,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: authData.role,
       emailVerified: authData.emailVerified,
     };
-    setUser(userData);
-    setToken(authData.token);
+    // Persist first: setUser triggers effects (e.g. the customer layout's membership fetch) that read
+    // the token from localStorage. Writing it afterwards made that first request go out unauthenticated.
     localStorage.setItem('waylo_user', JSON.stringify(userData));
     localStorage.setItem('waylo_token', authData.token);
     localStorage.setItem('waylo_refresh', authData.refreshToken);
+    setUser(userData);
+    setToken(authData.token);
   }, []);
 
   const login = useCallback(async (email: string, password: string, next?: string | null) => {

@@ -14,6 +14,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
+
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -115,6 +119,35 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ErrorResponse> handleBadParam(Exception ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Invalid or missing request parameter", request);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                  HttpServletRequest request) {
+        log.warn("Message not readable: {}", ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Request body is not readable", request);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+        log.warn("Method not allowed: {}", ex.getMethod());
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.warn("No resource found: {}", ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "CONFLICT", "A constraint violation occurred. The request could not be processed.", request);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String code, String message,

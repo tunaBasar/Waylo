@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.stream.Collectors;
 
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -117,6 +122,42 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                   HttpServletRequest request) {
+        log.warn("Message not readable: {}", ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Request body is not readable", request);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+        log.warn("Method not allowed: {}", ex.getMethod());
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.warn("No resource found: {}", ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "CONFLICT", "A constraint violation occurred. The request could not be processed.", request);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
+                                                             HttpServletRequest request) {
+        log.warn("Missing header: {}", ex.getHeaderName());
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Missing header: " + ex.getHeaderName(), request);
     }
 
     @ExceptionHandler(Exception.class)

@@ -12,6 +12,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.stream.Collectors;
 
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -83,6 +90,85 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex,
+                                                                HttpServletRequest request) {
+        log.warn("Missing parameter: {}", ex.getParameterName());
+        var response = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                "Missing required parameter: " + ex.getParameterName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                                                            HttpServletRequest request) {
+        log.warn("Type mismatch: {}", ex.getName());
+        var response = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                "Invalid value for parameter: " + ex.getName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                   HttpServletRequest request) {
+        log.warn("Message not readable: {}", ex.getMessage());
+        var response = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                "Request body is not readable",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+        log.warn("Method not allowed: {}", ex.getMethod());
+        var response = new ErrorResponse(
+                HttpStatus.METHOD_NOT_ALLOWED.value(),
+                "METHOD_NOT_ALLOWED",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.warn("No resource found: {}", ex.getMessage());
+        var response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "NOT_FOUND",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
+                                                             HttpServletRequest request) {
+        log.warn("Missing header: {}", ex.getHeaderName());
+        var response = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "UNAUTHORIZED",
+                "Missing header: " + ex.getHeaderName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @ExceptionHandler(Exception.class)

@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.stream.Collectors;
 
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -197,6 +201,32 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.warn("No resource found: {}", ex.getMessage());
+        var response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "NOT_FOUND",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
+                                                             HttpServletRequest request) {
+        log.warn("Missing header: {}", ex.getHeaderName());
+        var response = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "UNAUTHORIZED",
+                "Missing header: " + ex.getHeaderName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @ExceptionHandler(Exception.class)
