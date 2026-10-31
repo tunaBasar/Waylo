@@ -101,6 +101,19 @@ class AccessServiceTest {
         }
 
         @Test
+        @DisplayName("RESERVATION_REDEEM allowed for every business role, denied for no grants")
+        void reservationRedeem_allRoles() {
+            for (Role role : Role.values()) {
+                var grant = makeGrant(role, ScopeType.ORGANIZATION, ORG_ID);
+                when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+                assertTrue(accessService.check(USER_ID, ORG_ID, null, Permission.RESERVATION_REDEEM).allowed(), role.name());
+            }
+            UUID other = UUID.randomUUID();
+            when(accessQueryRepository.findActiveGrants(USER_ID, other)).thenReturn(List.of());
+            assertFalse(accessService.check(USER_ID, other, null, Permission.RESERVATION_REDEEM).allowed());
+        }
+
+        @Test
         @DisplayName("null permission -> denied")
         void nullPermission_denied() {
             AccessDecision decision = accessService.check(USER_ID, ORG_ID, HOTEL_ID, null);

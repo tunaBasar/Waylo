@@ -15,5 +15,11 @@ public interface PaymentEscrowClient {
     @PostMapping("/{orderItemId}/refund")
     Envelope<Object> refund(@PathVariable("orderItemId") UUID orderItemId);
 
+    /** HELD -> RELEASED (idempotent). Pays the supplier share. */
+    @PostMapping("/{orderItemId}/release")
+    Envelope<EscrowDto> release(@PathVariable("orderItemId") UUID orderItemId);
+
+    record EscrowDto(UUID orderItemId, java.math.BigDecimal supplierAmount, String currency, String status) {}
+
     record Envelope<T>(boolean success, T data, String message) {}
 }

@@ -4,6 +4,7 @@ import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderResponse;
+import com.waylo.packagebookingservice.dto.VoucherResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +16,9 @@ public interface OrderService {
     OrderResponse createHotelOrder(UUID actorUserId, HotelOrderCreateRequest request);
 
     OrderResponse getById(UUID actorUserId, UUID orderId);
+
+    /** Owner only. QR payloads of the order's items. */
+    List<VoucherResponse> getVouchers(UUID actorUserId, UUID orderId);
 
     List<OrderResponse> listOwn(UUID actorUserId);
 

@@ -21,6 +21,7 @@ from decimal import Decimal
 BASE = 'http://localhost:8080'
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 P = F = 0
+other_orgs = []
 
 
 def ok(cond, label):
@@ -92,6 +93,8 @@ def register(prefix):
 
 def main():
     emails, order_ids, hotel_id, org_id = [], [], None, None
+    global other_orgs
+    other_orgs = []
     try:
         admin = must('POST', '/api/auth/login', {'email': env_value('WAYLO_BOOTSTRAP_ADMIN_EMAIL'),
                                                  'password': env_value('WAYLO_BOOTSTRAP_ADMIN_PASSWORD')})['token']
@@ -209,6 +212,45 @@ def main():
         ledger = must('GET', f"/api/admin/ledger?orderId={order3['id']}", None, admin)
         ok(len(ledger.get('entries', [])) >= 4 and Decimal(str(ledger.get('balance'))) == 0,
            'admin ledger lookup returns balanced entries')
+        ok(psql('package_booking_db', f"SELECT string_agg(status, ',') FROM vouchers v JOIN order_items i "
+                                      f"ON i.id = v.order_item_id WHERE i.order_id = '{order3['id']}'") == 'VOID',
+           'cancelled order voucher is VOID')
+
+        # --- QR voucher: issued on payment, owner-only, partner redemption releases escrow ---
+        order4 = new_order(cust)
+        i4 = must('POST', f"/api/payments/orders/{order4['id']}/intent", None, cust)
+        must('POST', f"/api/payments/intents/{i4['id']}/confirm", {'paymentToken': 'TEST_OK'}, cust)
+        vouchers = must('GET', f"/api/orders/{order4['id']}/vouchers", None, cust)
+        ok(len(vouchers) == 1 and vouchers[0]['status'] == 'ACTIVE' and vouchers[0]['payload'].startswith('WAYLO1:'),
+           'one ACTIVE voucher with WAYLO1 payload after payment')
+        payload = vouchers[0]['payload']
+        vid = vouchers[0]['voucherId']
+        ok(req('GET', f"/api/orders/{order4['id']}/vouchers", None, other)[0] in (403, 404), 'stranger cannot read vouchers')
+        stored = psql('package_booking_db', f"SELECT code_hash FROM vouchers WHERE id='{vid}'")
+        ok(payload.split(':')[2] not in stored and len(stored) == 64, 'only the SHA-256 of the code is stored')
+        redeem = f'/api/partner/organizations/{org_id}/vouchers/redeem'
+        s, d = req('POST', redeem, {'payload': payload}, owner)
+        ok(s == 422 and 'NOT_YET_VALID' in json.dumps(d), f'redeem before check-in -> NOT_YET_VALID (got {s})')
+        ok(req('POST', redeem, {'payload': payload}, cust)[0] == 403, 'non-member cannot redeem 403')
+        ok(req('POST', redeem, {'payload': 'WAYLO1:' + vid + ':forged'}, owner)[0] == 422, 'forged code rejected 422')
+        e, owner2 = register('pay-owner2'); emails.append(e)
+        org2 = must('POST', '/api/organizations', {'name': f'pay-test2-{uuid.uuid4().hex[:6]}'}, owner2)['id']
+        other_orgs.append(org2)
+        s, d = req('POST', f'/api/partner/organizations/{org2}/vouchers/redeem', {'payload': payload}, owner2)
+        ok(s in (403, 422) and ('WRONG_SUPPLIER' in json.dumps(d) or s == 403), f'other org cannot redeem ({s})')
+        # move only this test voucher's window to "now" (check-in is 40 days ahead in the fixture)
+        psql('package_booking_db', f"UPDATE vouchers SET valid_from = now() - interval '1 hour' WHERE id='{vid}'")
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(6) as pool:
+            results = list(pool.map(lambda _: req('POST', redeem, {'payload': payload}, owner), range(6)))
+        codes = sorted(r[0] for r in results)
+        ok(codes.count(200) == 1 and all(c == 409 for c in codes if c != 200),
+           f'6 concurrent scans -> exactly one 200, rest 409 ({codes})')
+        win = next(r[1]['data'] for r in results if r[0] == 200)
+        ok(Decimal(str(win['amountReleased'])) == Decimal('2187.50'), f"redeem releases supplier share 2187.50 ({win['amountReleased']})")
+        ok(psql('payment_db', f"SELECT status FROM escrow_items WHERE order_id='{order4['id']}'") == 'RELEASED',
+           'escrow RELEASED by QR redemption')
+        ok(psql('package_booking_db', f"SELECT status FROM vouchers WHERE id='{vid}'") == 'REDEEMED', 'voucher REDEEMED')
     except AssertionError as exc:
         ok(False, str(exc))
     finally:
@@ -226,6 +268,8 @@ def cleanup(hotel_id, org_id, order_ids, emails):
         psql('payment_db', 'ALTER TABLE ledger_entries ENABLE TRIGGER trg_ledger_entries_no_update_delete')
         psql('payment_db', f'DELETE FROM escrow_items WHERE order_id IN ({ids})')
         psql('payment_db', f'DELETE FROM payment_intents WHERE order_id IN ({ids})')
+        psql('package_booking_db', f'DELETE FROM vouchers WHERE order_item_id IN '
+                                   f'(SELECT id FROM order_items WHERE order_id IN ({ids}))')
         psql('package_booking_db', f'DELETE FROM orders WHERE id IN ({ids})')
     if org_id:
         psql('payment_db', f"DELETE FROM commission_rates WHERE supplier_organization_id='{org_id}'")
@@ -240,6 +284,10 @@ def cleanup(hotel_id, org_id, order_ids, emails):
         psql('auth_db', f'DELETE FROM role_assignments WHERE organization_id IN ({o})')
         psql('auth_db', f'DELETE FROM organization_memberships WHERE organization_id IN ({o})')
         psql('auth_db', f'DELETE FROM organizations WHERE id IN ({o})')
+    for o2 in other_orgs:
+        psql('auth_db', f"DELETE FROM role_assignments WHERE organization_id = '{o2}'")
+        psql('auth_db', f"DELETE FROM organization_memberships WHERE organization_id = '{o2}'")
+        psql('auth_db', f"DELETE FROM organizations WHERE id = '{o2}'")
     if emails:
         q = ','.join(f"'{e}'" for e in emails)
         psql('crm_db', f'DELETE FROM customers WHERE email IN ({q})')

@@ -111,6 +111,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
     }
 
+    @ExceptionHandler(VoucherException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handleVoucher(VoucherException ex, HttpServletRequest request) {
+        log.warn("Voucher redemption refused [{}]", ex.getCode());
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("status", ex.getStatus().value());
+        body.put("error", ex.getCode());
+        body.put("message", ex.getCode());
+        body.put("path", request.getRequestURI());
+        body.put("timestamp", java.time.Instant.now());
+        if (ex.getRedeemedAt() != null) body.put("redeemedAt", ex.getRedeemedAt());
+        return ResponseEntity.status(ex.getStatus()).body(body);
+    }
+
     @ExceptionHandler(PaymentUnavailableException.class)
     public ResponseEntity<ErrorResponse> handlePaymentUnavailable(PaymentUnavailableException ex, HttpServletRequest request) {
         log.error("Payment service unavailable: {}", ex.getMessage());

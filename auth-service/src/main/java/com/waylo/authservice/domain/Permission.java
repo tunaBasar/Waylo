@@ -8,5 +8,7 @@ public enum Permission {
     /** Read non-public hotels of the organization: any active member. */
     HOTEL_READ,
     /** See reservations/order items of the organization: ORGANIZATION_OWNER, HOTEL_OWNER, HOTEL_MANAGER, HOTEL_STAFF. */
-    RESERVATION_READ
+    RESERVATION_READ,
+    /** Redeem a customer voucher (releases escrow): same roles as RESERVATION_READ. */
+    RESERVATION_REDEEM
 }

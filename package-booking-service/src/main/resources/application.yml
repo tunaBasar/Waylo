@@ -37,6 +37,10 @@ spring:
 waylo:
   internal:
     token: ${INTERNAL_API_TOKEN}
+  voucher:
+    # HMAC key for deriving voucher codes. Its own secret: anyone holding it could mint valid vouchers,
+    # so it must not be shared with the service-to-service token. Required, min 32 chars.
+    secret: ${VOUCHER_SECRET}
 
 eureka:
   client:

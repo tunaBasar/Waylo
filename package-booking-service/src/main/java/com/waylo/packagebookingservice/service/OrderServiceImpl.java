@@ -12,6 +12,7 @@ import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemResponse;
 import com.waylo.packagebookingservice.dto.OrderResponse;
+import com.waylo.packagebookingservice.dto.VoucherResponse;
 import com.waylo.packagebookingservice.event.OrderCancelledEvent;
 import com.waylo.packagebookingservice.event.OrderCreatedEvent;
 import com.waylo.packagebookingservice.event.OrderEventPublisher;
@@ -45,12 +46,15 @@ public class OrderServiceImpl implements OrderService {
     private final OrderEventPublisher eventPublisher;
     private final HotelHoldClient hotelHoldClient;
     private final PaymentEscrowClient paymentEscrowClient;
+    private final VoucherService voucherService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                              OrderItemRepository orderItemRepository,
                              OrderEventPublisher eventPublisher,
                              HotelHoldClient hotelHoldClient,
-                             PaymentEscrowClient paymentEscrowClient) {
+                             PaymentEscrowClient paymentEscrowClient,
+                             VoucherService voucherService) {
+        this.voucherService = voucherService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.eventPublisher = eventPublisher;
@@ -105,6 +109,8 @@ public class OrderServiceImpl implements OrderService {
             item.setFulfillmentRef(hold.holdId());
             item.setDescription(hold.checkIn() + "-" + hold.checkOut() + ", " + hold.nights() + " gece, "
                     + hold.rooms() + " oda");
+            item.setCheckIn(hold.checkIn());
+            item.setCheckOut(hold.checkOut());
             item.setUnitAmount(hold.totalAmount());
             item.setQuantity(1);
             item.setCurrency(hold.currency());
@@ -189,6 +195,15 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VoucherResponse> getVouchers(UUID actorUserId, UUID orderId) {
+        requireIdentity(actorUserId);
+        Order order = findOrThrow(orderId);
+        requireOwner(actorUserId, order);
+        return voucherService.listForOrder(orderId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> listOwn(UUID actorUserId) {
         requireIdentity(actorUserId);
         return orderRepository.findByCustomerId(actorUserId).stream()
@@ -237,6 +252,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.saveAndFlush(order);
+        voucherService.voidForOrder(order.getId());
 
         eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId()));
 
@@ -255,6 +271,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = findOrThrow(orderId);
         List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
         if (order.getStatus() == OrderStatus.CONFIRMED) {
+            voucherService.createForItems(items); // idempotent
             return toInternal(order, items);
         }
         if (order.getStatus() != OrderStatus.PENDING) {
@@ -269,6 +286,7 @@ public class OrderServiceImpl implements OrderService {
         }
         order.setStatus(OrderStatus.CONFIRMED);
         order = orderRepository.saveAndFlush(order);
+        voucherService.createForItems(items);
         return toInternal(order, items);
     }
 

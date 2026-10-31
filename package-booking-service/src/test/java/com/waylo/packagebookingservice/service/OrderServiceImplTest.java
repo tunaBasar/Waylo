@@ -55,13 +55,16 @@ class OrderServiceImplTest {
     @Mock
     private com.waylo.packagebookingservice.client.PaymentEscrowClient paymentEscrowClient;
 
+    @Mock
+    private VoucherService voucherService;
+
     private OrderServiceImpl service;
 
     private final UUID customerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, paymentEscrowClient);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, paymentEscrowClient, voucherService);
     }
 
     private OrderItemCreateRequest validItem(String currency) {
@@ -501,5 +504,28 @@ class OrderServiceImplTest {
         assertThatThrownBy(() -> service.cancel(customerId, orderId, null)).isInstanceOf(HotelUnavailableException.class);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
         verify(orderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void markPaid_createsVouchers() {
+        UUID orderId = UUID.randomUUID();
+        Order o = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0);
+        when(orderRepository.findById(orderId)).thenReturn(java.util.Optional.of(o));
+        when(orderRepository.saveAndFlush(o)).thenReturn(o);
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
+        service.markPaid(orderId);
+        verify(voucherService).createForItems(List.of());
+    }
+
+    @Test
+    void getVouchers_ownerOnly() {
+        UUID orderId = UUID.randomUUID();
+        Order o = persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0);
+        when(orderRepository.findById(orderId)).thenReturn(java.util.Optional.of(o));
+        assertThatThrownBy(() -> service.getVouchers(UUID.randomUUID(), orderId))
+                .isInstanceOf(com.waylo.packagebookingservice.exception.AccessDeniedException.class);
+        verifyNoInteractions(voucherService);
+        service.getVouchers(customerId, orderId);
+        verify(voucherService).listForOrder(orderId);
     }
 }

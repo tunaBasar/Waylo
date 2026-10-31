@@ -15,6 +15,7 @@ const nav: NavItem[] = [
   { href: '/partner/room-types', label: 'Oda tipleri', icon: 'bed' },
   { href: '/partner/rate-plans', label: 'Fiyat planlari', icon: 'sell' },
   { href: '/partner/calendar', label: 'Takvim', icon: 'calendar_month' },
+  { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
 function WorkspaceBar() {

@@ -93,7 +93,7 @@ public class AccessService {
             return true; // any active grant on the organization
         }
 
-        if (permission == Permission.RESERVATION_READ) {
+        if (permission == Permission.RESERVATION_READ || permission == Permission.RESERVATION_REDEEM) {
             return role == Role.ORGANIZATION_OWNER || role == Role.HOTEL_OWNER
                     || role == Role.HOTEL_MANAGER || role == Role.HOTEL_STAFF;
         }

@@ -12,6 +12,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -61,6 +62,12 @@ public class OrderItem {
     @Column(name = "currency", nullable = false, length = 3, columnDefinition = "bpchar(3)")
     private String currency;
 
+    @Column(name = "check_in")
+    private LocalDate checkIn;
+
+    @Column(name = "check_out")
+    private LocalDate checkOut;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -100,6 +107,12 @@ public class OrderItem {
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+
+    public LocalDate getCheckIn() { return checkIn; }
+    public void setCheckIn(LocalDate checkIn) { this.checkIn = checkIn; }
+
+    public LocalDate getCheckOut() { return checkOut; }
+    public void setCheckOut(LocalDate checkOut) { this.checkOut = checkOut; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

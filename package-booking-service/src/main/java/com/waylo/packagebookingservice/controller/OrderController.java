@@ -4,6 +4,7 @@ import com.waylo.packagebookingservice.dto.ApiResponse;
 import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
 import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.dto.OrderResponse;
+import com.waylo.packagebookingservice.dto.VoucherResponse;
 import com.waylo.packagebookingservice.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,13 @@ public class OrderController {
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.of(orderService.getById(userId, id)));
+    }
+
+    @GetMapping("/{id}/vouchers")
+    public ResponseEntity<ApiResponse<List<VoucherResponse>>> vouchers(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.of(orderService.getVouchers(userId, id)));
     }
 
     @GetMapping
