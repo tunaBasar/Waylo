@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -71,6 +71,8 @@ export default function PaymentsPage() {
   const [formValidFrom, setFormValidFrom] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [formSaving, setFormSaving] = useState(false);
+  const savingRef = useRef(false);
 
   // Ledger state
   const [ledgerOrderId, setLedgerOrderId] = useState('');
@@ -87,11 +89,17 @@ export default function PaymentsPage() {
 
   const handleCreateRate = async (e: React.FormEvent) => {
     e.preventDefault();
+    // A ref, not state: several clicks in the same render all see formSaving === false.
+    if (savingRef.current) return;
+    savingRef.current = true;
     setFormError('');
     setFormSuccess('');
+    setFormSaving(true);
     const rateNum = parseFloat(formRate);
     if (isNaN(rateNum) || rateNum < 0 || rateNum > 100) {
       setFormError('Komisyon oran 0-100 arasinda olmalidir.');
+      setFormSaving(false);
+      savingRef.current = false;
       return;
     }
     try {
@@ -99,7 +107,8 @@ export default function PaymentsPage() {
         vertical: formVertical,
         supplierOrganizationId: formOrgId || null,
         rate: parseFloat((rateNum / 100).toFixed(4)),
-        validFrom: formValidFrom || new Date().toISOString(),
+        // empty = server time ("now"); the client clock is not the source of truth
+        validFrom: formValidFrom ? new Date(formValidFrom).toISOString() : null,
       };
       await api.post<CommissionRate>('/api/admin/commission-rates', body);
       setFormSuccess('Komisyon oran kaydedildi');
@@ -116,11 +125,14 @@ export default function PaymentsPage() {
       } else {
         setFormError('Komisyon oran kaydedilemedi');
       }
+    } finally {
+      setFormSaving(false);
+      savingRef.current = false;
     }
   };
 
   const handleLookupLedger = async () => {
-    if (!ledgerOrderId.trim()) return;
+    if (!ledgerOrderId.trim() || ledgerLoading) return;
     setLedgerLoading(true);
     setLedgerError('');
     setLedgerData(null);
@@ -249,9 +261,10 @@ export default function PaymentsPage() {
             {formSuccess && <p className="text-xs text-on-primary">{formSuccess}</p>}
             <button
               type="submit"
-              className="w-full py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container hover:text-on-primary-container transition-colors"
+              disabled={formSaving}
+              className="w-full py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary-container hover:text-on-primary-container transition-colors disabled:opacity-50"
             >
-              Oran kaydet
+              {formSaving ? 'Kaydediliyor...' : 'Oran kaydet'}
             </button>
           </div>
         </form>

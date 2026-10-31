@@ -3,7 +3,9 @@ package com.waylo.paymentservice.service;
 import com.waylo.paymentservice.domain.CommissionRate;
 import com.waylo.paymentservice.domain.Vertical;
 import com.waylo.paymentservice.exception.BusinessRuleException;
+import com.waylo.paymentservice.exception.CommissionRateConflictException;
 import com.waylo.paymentservice.repository.CommissionRateRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class CommissionService {
 
     public static final String RATE_MISSING = "COMMISSION_RATE_MISSING";
+    public static final String RATE_EXISTS = "COMMISSION_RATE_EXISTS";
 
     private final CommissionRateRepository repository;
 
@@ -73,6 +76,14 @@ public class CommissionService {
         row.setRate(rate.setScale(4, RoundingMode.UNNECESSARY));
         row.setValidFrom(validFrom != null ? validFrom : Instant.now());
         row.setCreatedBy(adminId);
-        return repository.save(row);
+        try {
+            // flush here: with plain save() the unique-index violation surfaces at commit, outside this catch
+            return repository.saveAndFlush(row);
+        } catch (DataIntegrityViolationException ex) {
+            throw new CommissionRateConflictException(
+                    "A commission rate for " + vertical
+                    + (supplierOrganizationId != null ? " and org " + supplierOrganizationId : " (default)")
+                    + " on " + validFrom + " already exists");
+        }
     }
 }

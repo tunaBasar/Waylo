@@ -96,6 +96,19 @@ class GlobalExceptionHandlerHttpErrorsTest {
     }
 
     @Test
+    void commissionRateConflict_handler_returns409CommissionRateExists() {
+        var ex = new com.waylo.paymentservice.exception.CommissionRateConflictException(
+                "A commission rate for HOTEL (default) on 2024-01-01T00:00:00Z already exists");
+        var req = new MockHttpServletRequest("POST", "/api/admin/commission-rates");
+
+        ResponseEntity<ErrorResponse> response = handler.handleCommissionRateConflict(ex, req);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().status()).isEqualTo(409);
+        assertThat(response.getBody().error()).isEqualTo("COMMISSION_RATE_EXISTS");
+    }
+
+    @Test
     void optimisticLock_handler_returnsConflict() {
         var ex = new ObjectOptimisticLockingFailureException(
                 com.waylo.paymentservice.domain.LedgerAccount.class, UUID.randomUUID());

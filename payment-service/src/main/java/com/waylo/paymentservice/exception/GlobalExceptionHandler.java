@@ -72,6 +72,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
+    @ExceptionHandler(CommissionRateConflictException.class)
+    public ResponseEntity<ErrorResponse> handleCommissionRateConflict(CommissionRateConflictException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Duplicate commission rate: {}", ex.getMessage());
+        var response = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                "COMMISSION_RATE_EXISTS",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex,
                                                              HttpServletRequest request) {

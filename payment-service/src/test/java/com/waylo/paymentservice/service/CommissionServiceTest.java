@@ -3,11 +3,13 @@ package com.waylo.paymentservice.service;
 import com.waylo.paymentservice.domain.CommissionRate;
 import com.waylo.paymentservice.domain.Vertical;
 import com.waylo.paymentservice.exception.BusinessRuleException;
+import com.waylo.paymentservice.exception.CommissionRateConflictException;
 import com.waylo.paymentservice.repository.CommissionRateRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CommissionServiceTest {
@@ -89,5 +92,15 @@ class CommissionServiceTest {
         assertThatThrownBy(() -> s.create(Vertical.BUS, null, new BigDecimal("1.0001"), null, null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> s.create(Vertical.BUS, null, new BigDecimal("-0.01"), null, null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> s.create(Vertical.BUS, null, new BigDecimal("0.12345"), null, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void create_conflict_wrapsDataIntegrityViolation() {
+        CommissionService s = new CommissionService(repository);
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Duplicate entry"));
+
+        assertThatThrownBy(() -> s.create(Vertical.HOTEL, org, new BigDecimal("0.1500"), Instant.now(), null))
+                .isInstanceOfSatisfying(CommissionRateConflictException.class,
+                        e -> assertThat(e.getMessage()).contains("already exists"));
     }
 }
