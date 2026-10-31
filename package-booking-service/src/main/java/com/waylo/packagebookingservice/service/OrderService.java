@@ -1,6 +1,7 @@
 package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
+import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderResponse;
 
@@ -18,4 +19,10 @@ public interface OrderService {
     List<OrderResponse> listOwn(UUID actorUserId);
 
     OrderResponse cancel(UUID actorUserId, UUID orderId, Long expectedVersion);
+
+    /** Internal (payment-service): authoritative order with item amounts. */
+    InternalOrderResponse getInternal(UUID orderId);
+
+    /** Internal (payment-service): money is in escrow. Confirms hotel holds and sets CONFIRMED. Idempotent. */
+    InternalOrderResponse markPaid(UUID orderId);
 }

@@ -18,6 +18,9 @@ public interface HotelHoldClient {
     @PostMapping
     Envelope<HoldDto> hold(@RequestBody HoldRequest request);
 
+    @PostMapping("/{holdId}/confirm")
+    Envelope<HoldDto> confirm(@PathVariable("holdId") UUID holdId);
+
     @PostMapping("/{holdId}/release")
     Envelope<HoldDto> release(@PathVariable("holdId") UUID holdId);
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { adminApi } from '@/lib/admin';
-import type { Payment } from '@/lib/types';
 import { Card, LoadingRows } from '@/components/partner/ui';
 import { Notice } from '@/components/Notice';
 import { Suspense } from 'react';
@@ -20,8 +19,6 @@ const stats: Stat[] = [
   { key: 'vehicles', label: 'Araclar', icon: 'directions_car', href: '/admin/vehicles', load: () => len(adminApi.vehicles()) },
   { key: 'bookings', label: 'Rezervasyonlar', icon: 'confirmation_number', href: '/admin/bookings', load: () => len(api.get<unknown[]>('/api/bookings')) },
   { key: 'customers', label: 'Musteriler', icon: 'group', href: '/admin/customers', load: () => len(api.get<unknown[]>('/api/customers')) },
-  { key: 'payments', label: 'Tamamlanan odemeler', icon: 'payments', href: '/admin/payments',
-    load: () => api.get<Payment[]>('/api/payments').then(r => r.data.filter(p => p.status === 'COMPLETED').length) },
 ];
 
 export default function AdminOverview() {

@@ -52,13 +52,16 @@ class OrderServiceImplTest {
     @Mock
     private com.waylo.packagebookingservice.client.HotelHoldClient hotelHoldClient;
 
+    @Mock
+    private com.waylo.packagebookingservice.client.PaymentEscrowClient paymentEscrowClient;
+
     private OrderServiceImpl service;
 
     private final UUID customerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, paymentEscrowClient);
     }
 
     private OrderItemCreateRequest validItem(String currency) {
@@ -371,6 +374,95 @@ class OrderServiceImplTest {
         item.setUnitAmount(BigDecimal.TEN);
         item.setQuantity(1);
         return item;
+    }
+
+    @Test
+    void cancel_paidOrder_refundsEveryItemBeforeCancelling() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setId(UUID.randomUUID());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0L)));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(hotelHoldClient.release(any())).thenThrow(new HotelRejectedException(422, "HOLD_INVALID_STATE", "confirmed"));
+
+        assertThat(service.cancel(customerId, orderId, null).status()).isEqualTo(OrderStatus.CANCELLED);
+        verify(paymentEscrowClient).refund(item.getId());
+    }
+
+    @Test
+    void cancel_paidOrder_alreadyReleased_rejectedAndOrderUnchanged() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setId(UUID.randomUUID());
+        Order order = persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0L);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(paymentEscrowClient.refund(item.getId())).thenThrow(new BusinessRuleException("ESCROW_ALREADY_RELEASED", "released"));
+
+        assertThatThrownBy(() -> service.cancel(customerId, orderId, null)).isInstanceOf(BusinessRuleException.class);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(hotelHoldClient, never()).release(any());
+    }
+
+    @Test
+    void cancel_pendingOrder_doesNotCallPayment() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L)));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
+        service.cancel(customerId, orderId, null);
+        verifyNoInteractions(paymentEscrowClient);
+    }
+
+    @Test
+    void markPaid_confirmsHoldAndSetsConfirmed_andIsIdempotent() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, holdId);
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+
+        assertThat(service.markPaid(orderId).status()).isEqualTo("CONFIRMED");
+        verify(hotelHoldClient).confirm(holdId);
+        service.markPaid(orderId);
+        verify(hotelHoldClient, times(1)).confirm(holdId);
+    }
+
+    @Test
+    void markPaid_holdRejected_orderStaysPending() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(hotelItem(orderId, holdId)));
+        when(hotelHoldClient.confirm(holdId)).thenThrow(new HotelRejectedException(422, "HOLD_EXPIRED", "expired"));
+
+        assertThatThrownBy(() -> service.markPaid(orderId)).isInstanceOf(HotelRejectedException.class);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void markPaid_cancelledOrder_422() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.CANCELLED, 0L)));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
+        assertThatThrownBy(() -> service.markPaid(orderId)).isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void getInternal_exposesAuthoritativeItemAmounts() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setCurrency("USD");
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L)));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        var r = service.getInternal(orderId);
+        assertThat(r.items()).hasSize(1);
+        assertThat(r.items().get(0).vertical()).isEqualTo("HOTEL");
+        assertThat(r.items().get(0).amount()).isEqualByComparingTo("10");
     }
 
     @Test

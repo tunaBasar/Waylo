@@ -1,51 +1,56 @@
 package com.waylo.paymentservice.controller;
 
-import com.waylo.paymentservice.domain.PaymentStatus;
 import com.waylo.paymentservice.dto.ApiResponse;
-import com.waylo.paymentservice.dto.PaymentRequest;
-import com.waylo.paymentservice.dto.PaymentResponse;
-import com.waylo.paymentservice.service.PaymentService;
+import com.waylo.paymentservice.dto.ConfirmIntentRequest;
+import com.waylo.paymentservice.dto.IntentResponse;
+import com.waylo.paymentservice.dto.OrderPaymentResponse;
+import com.waylo.paymentservice.service.PaymentIntentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
+/** Customer payment API. X-User-Id / X-User-Role are set by the api-gateway after JWT verification. */
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
-    private final PaymentService paymentService;
-    public PaymentController(PaymentService paymentService) { this.paymentService = paymentService; }
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<PaymentResponse>> create(@Valid @RequestBody PaymentRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(paymentService.create(request), "Payment created"));
+    private final PaymentIntentService intentService;
+
+    public PaymentController(PaymentIntentService intentService) {
+        this.intentService = intentService;
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PaymentResponse>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.of(paymentService.getById(id)));
+    @PostMapping("/orders/{orderId}/intent")
+    public ResponseEntity<ApiResponse<IntentResponse>> createIntent(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable UUID orderId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.of(intentService.createIntent(userId, role, orderId), "Payment intent ready"));
     }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.of(paymentService.getAll()));
+    @PostMapping("/intents/{id}/confirm")
+    public ResponseEntity<ApiResponse<IntentResponse>> confirm(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable UUID id,
+            @Valid @RequestBody ConfirmIntentRequest request) {
+        return ResponseEntity.ok(ApiResponse.of(intentService.confirm(userId, role, id, request.paymentToken())));
     }
 
-    @GetMapping("/booking/{bookingId}")
-    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByBookingId(@PathVariable UUID bookingId) {
-        return ResponseEntity.ok(ApiResponse.of(paymentService.getByBookingId(bookingId)));
-    }
-
-    @GetMapping("/customer/{customerId}")
-    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByCustomerId(@PathVariable UUID customerId) {
-        return ResponseEntity.ok(ApiResponse.of(paymentService.getByCustomerId(customerId)));
-    }
-
-    @PostMapping("/{id}/refund")
-    public ResponseEntity<ApiResponse<PaymentResponse>> refund(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.of(paymentService.refund(id), "Payment refunded"));
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<ApiResponse<OrderPaymentResponse>> getForOrder(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @PathVariable UUID orderId) {
+        return ResponseEntity.ok(ApiResponse.of(intentService.getForOrder(userId, orderId)));
     }
 }

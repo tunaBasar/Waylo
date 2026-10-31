@@ -28,5 +28,21 @@ for path in ROOT.glob('*/src/main/java/**/*.java'):
 
 for f in findings:
     print(f)
+
+# Same exception type mapped twice in one @ControllerAdvice -> Spring refuses to start
+# ("Ambiguous @ExceptionHandler method mapped for ..."). Unit tests with a standalone
+# MockMvc usually do not load the advice and never see it.
+HANDLER = re.compile(r'@ExceptionHandler\(\s*(\{[^}]*\}|[^)]*)\)')
+for path in ROOT.glob('*/src/main/java/**/*.java'):
+    src = path.read_text(encoding='utf-8')
+    if 'ControllerAdvice' not in src:
+        continue
+    types = [t.split('.')[-1] for m in HANDLER.finditer(src) for t in re.findall(r'([\w.]+)\.class', m.group(1))]
+    dups = sorted({t for t in types if types.count(t) > 1})
+    if dups:
+        msg = f'{path.relative_to(ROOT)}: duplicate @ExceptionHandler for {dups}'
+        findings.append(msg)
+        print(msg)
+
 print(f'{len(findings)} problem(s)')
 sys.exit(1 if findings else 0)

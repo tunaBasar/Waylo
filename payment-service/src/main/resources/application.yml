@@ -34,6 +34,13 @@ spring:
       host: localhost
       port: 6379
 
+waylo:
+  internal:
+    token: ${INTERNAL_API_TOKEN}
+  payments:
+    # TEST is refused at startup under the prod profile. A real provider (iyzico) is a later task.
+    provider: ${WAYLO_PAYMENTS_PROVIDER:TEST}
+
 eureka:
   client:
     service-url:

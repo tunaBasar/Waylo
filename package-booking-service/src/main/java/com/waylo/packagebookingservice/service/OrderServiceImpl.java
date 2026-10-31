@@ -1,6 +1,8 @@
 package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.client.HotelHoldClient;
+import com.waylo.packagebookingservice.client.PaymentEscrowClient;
+import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.domain.Order;
 import com.waylo.packagebookingservice.domain.OrderItemVertical;
 import com.waylo.packagebookingservice.domain.OrderItem;
@@ -42,15 +44,18 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderEventPublisher eventPublisher;
     private final HotelHoldClient hotelHoldClient;
+    private final PaymentEscrowClient paymentEscrowClient;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                              OrderItemRepository orderItemRepository,
                              OrderEventPublisher eventPublisher,
-                             HotelHoldClient hotelHoldClient) {
+                             HotelHoldClient hotelHoldClient,
+                             PaymentEscrowClient paymentEscrowClient) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.eventPublisher = eventPublisher;
         this.hotelHoldClient = hotelHoldClient;
+        this.paymentEscrowClient = paymentEscrowClient;
     }
 
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
@@ -208,7 +213,17 @@ public class OrderServiceImpl implements OrderService {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Order.class, order.getId().toString());
         }
 
-        // Release hotel holds first: if hotel-service is down this throws 503 and the order stays unchanged.
+        // Paid order (CONFIRMED): refund every HELD escrow item first. If payment-service is down this throws 503 and the
+        // order stays unchanged. TODO(cancellation policy task): for now this is a FULL refund of all HELD items regardless of
+        // the cancel policy snapshot. Items already RELEASED to the supplier make payment-service answer 422
+        // ESCROW_ALREADY_RELEASED and the cancel is rejected.
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
+                paymentEscrowClient.refund(item.getId());
+            }
+        }
+
+        // Release hotel holds: if hotel-service is down this throws 503 and the order stays unchanged.
         for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
             if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
                 try {
@@ -226,6 +241,42 @@ public class OrderServiceImpl implements OrderService {
         eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId()));
 
         return toResponse(order, orderItemRepository.findByOrderId(order.getId()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InternalOrderResponse getInternal(UUID orderId) {
+        Order order = findOrThrow(orderId);
+        return toInternal(order, orderItemRepository.findByOrderId(orderId));
+    }
+
+    @Override
+    public InternalOrderResponse markPaid(UUID orderId) {
+        Order order = findOrThrow(orderId);
+        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            return toInternal(order, items);
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessRuleException("ORDER_NOT_PAYABLE", "Order is " + order.getStatus() + ", it cannot be marked paid");
+        }
+        // Hold confirm is idempotent in hotel-service. A rejection (expired/released hold) propagates as 422 and
+        // payment-service then cancels the provider payment and rolls back its escrow.
+        for (OrderItem item : items) {
+            if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
+                hotelHoldClient.confirm(item.getFulfillmentRef());
+            }
+        }
+        order.setStatus(OrderStatus.CONFIRMED);
+        order = orderRepository.saveAndFlush(order);
+        return toInternal(order, items);
+    }
+
+    private InternalOrderResponse toInternal(Order order, List<OrderItem> items) {
+        return new InternalOrderResponse(order.getId(), order.getCustomerId(), order.getStatus().name(), order.getCurrency(),
+                order.getTotalAmount(),
+                items.stream().map(i -> new InternalOrderResponse.Item(i.getId(), i.getVertical().name(),
+                        i.getSupplierOrganizationId(), i.getSubtotal(), i.getCurrency())).toList());
     }
 
     private void requireIdentity(UUID actorUserId) {
