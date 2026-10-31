@@ -25,6 +25,10 @@ public class AuthService {
 
     public static final String LOCKED_MESSAGE = "Cok fazla hatali giris. Lutfen daha sonra tekrar deneyin.";
 
+    public static final String EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
+    public static final String EMAIL_NOT_VERIFIED_MESSAGE =
+            "E-posta adresiniz dogrulanmamis. Lutfen e-postanizdaki linke tiklayin.";
+
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
@@ -73,7 +77,7 @@ public class AuthService {
     // ------------------------------------------------------------------
 
     @Transactional
-    public ApiResponse<AuthResponse> register(RegisterRequest request) {
+    public ApiResponse<RegisterResponse> register(RegisterRequest request) {
         String normalized = normalizeEmail(request.email());
         if (userRepository.existsByEmailIgnoreCase(normalized)) {
             throw new DuplicateRegistrationException("Bu e-posta adresi zaten kullaniliyor");
@@ -93,17 +97,9 @@ public class AuthService {
         // Send verification email via Kafka
         publishAuthEvent("VERIFICATION", user, user.getVerificationToken());
 
-        // Generate tokens (user can login but will see "verify email" prompt)
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        String refreshToken = refreshTokenService.issue(user.getId(), null);
-
-        AuthResponse response = new AuthResponse(
-                token, refreshToken, user.getId(), user.getEmail(),
-                user.getFirstName(), user.getLastName(),
-                user.getRole().name(), user.isEmailVerified()
-        );
-
-        return ApiResponse.success("Kayit basarili! Lutfen e-postanizi dogrulayin.", response);
+        // No tokens until the email is verified
+        return ApiResponse.success("Kayit basarili! Lutfen e-postanizi dogrulayin.",
+                new RegisterResponse(user.getEmail(), user.isEmailVerified()));
     }
 
     // ------------------------------------------------------------------
@@ -143,6 +139,10 @@ public class AuthService {
             user.setFailedLoginAttempts(0);
             user.setLockedUntil(null);
             userRepository.save(user);
+        }
+
+        if (!user.isEmailVerified()) {
+            return ApiResponse.error(EMAIL_NOT_VERIFIED_MESSAGE, EMAIL_NOT_VERIFIED_CODE);
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
@@ -282,6 +282,11 @@ public class AuthService {
 
         if (user == null || user.getDeletedAt() != null) {
             return ApiResponse.error("Kullanici bulunamadi");
+        }
+
+        if (!user.isEmailVerified()) {
+            refreshTokenService.revokeAll(user.getId());
+            return ApiResponse.error(EMAIL_NOT_VERIFIED_MESSAGE, EMAIL_NOT_VERIFIED_CODE);
         }
 
         String newToken = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());

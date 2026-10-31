@@ -5,7 +5,7 @@ Registers real users and organizations, creates hotels/room-types/rate-plans,
 then exercises inventory PUT, rate PUT, status PATCH, and concurrency guards.
 Uses standard library only; parse_float=Decimal for monetary comparisons.
 """
-import argparse, json, secrets, sys, threading, uuid
+import argparse, json, secrets, subprocess, sys, threading, time, uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from decimal import Decimal
@@ -64,6 +64,11 @@ def reg(n):
         "firstName": "Test", "lastName": "User", "email": email, "password": password
     })
     ok(s == 200 and d.get("success"), f"Reg{n}: 200+success got {s} {d.get('success')}")
+    subprocess.run(["docker", "exec", "waylo-postgres", "psql", "-U", "waylo", "-d", "auth_db", "-tAc",
+                    f"UPDATE users SET email_verified = true WHERE email = '{email}'"], check=True, capture_output=True)
+    time.sleep(13)  # gateway register limit 5/min
+    s, d = req("POST", "/api/auth/login", {"email": email, "password": password})
+    ok(s == 200 and d.get("success"), f"Reg{n}: login after verify got {s}")
     return d["data"]["userId"], d["data"]["token"]
 
 def ln(email, password):

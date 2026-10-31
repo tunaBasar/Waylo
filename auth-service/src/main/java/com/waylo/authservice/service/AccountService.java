@@ -119,6 +119,10 @@ public class AccountService {
         // Revoke all sessions
         refreshTokenService.revokeAll(userId);
 
+        if (!user.isEmailVerified()) {
+            throw new ResponseStatusException(FORBIDDEN, AuthService.EMAIL_NOT_VERIFIED_MESSAGE);
+        }
+
         // Issue fresh tokens
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
         String refreshToken = refreshTokenService.issue(user.getId(), null);

@@ -1,13 +1,15 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { verifiedLoginPath } from '@/lib/email-verification';
 import VideoBackground from '@/components/VideoBackground';
 
 function VerifyContent() {
   const { verifyEmail } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -24,6 +26,12 @@ function VerifyContent() {
       setMessage('Dogrulama sirasinda bir hata olustu');
     });
   }, [token, verifyEmail]);
+
+  useEffect(() => {
+    if (status !== 'success') return;
+    const timer = setTimeout(() => router.replace(verifiedLoginPath()), 1500);
+    return () => clearTimeout(timer);
+  }, [status, router]);
 
   const displayStatus = token ? status : 'error';
   const displayMessage = token ? message : 'Dogrulama tokeni bulunamadi';

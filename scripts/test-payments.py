@@ -86,6 +86,7 @@ def register(prefix):
     email = f'{prefix}-{uuid.uuid4().hex[:10]}@example.test'
     pw = 'Pay1' + secrets.token_urlsafe(16)
     must('POST', '/api/auth/register', {'firstName': 'Pay', 'lastName': 'Test', 'email': email, 'password': pw})
+    psql('auth_db', f"UPDATE users SET email_verified = true WHERE email = '{email}'")
     time.sleep(13)  # gateway register limit 5/min
     tok = must('POST', '/api/auth/login', {'email': email, 'password': pw})['token']
     return email, tok

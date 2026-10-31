@@ -8,7 +8,7 @@ Registers a user through the gateway (no manual CRM call), then asserts:
 order-events have no CRM or notification consumer, so no booking/loyalty assertions here.)
 Standard library only.
 """
-import argparse, json, secrets, sys, time, uuid
+import argparse, json, secrets, subprocess, sys, time, uuid
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -59,9 +59,15 @@ def main():
     BASE_URL = ap.parse_args().base_url
 
     email = f"crmlink{uuid.uuid4().hex[:10]}@example.test"
+    pw = secrets.token_urlsafe(16)
     s, d = req("POST", "/api/auth/register",
-               {"firstName": "Plain", "lastName": "User", "email": email, "password": secrets.token_urlsafe(16)})
+               {"firstName": "Plain", "lastName": "User", "email": email, "password": pw})
     ok(s == 200 and d and d.get("success"), f"register 200 (got {s})")
+    ok("token" not in d["data"], "register issues no token")
+    subprocess.run(["docker", "exec", "waylo-postgres", "psql", "-U", "waylo", "-d", "auth_db", "-tAc",
+                    f"UPDATE users SET email_verified = true WHERE email = '{email}'"], check=True, capture_output=True)
+    s, d = req("POST", "/api/auth/login", {"email": email, "password": pw})
+    ok(s == 200 and d and d.get("success"), f"login after verify 200 (got {s})")
     uid, tok = d["data"]["userId"], d["data"]["token"]
 
     def customer():

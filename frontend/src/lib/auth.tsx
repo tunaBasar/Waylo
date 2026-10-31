@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { homeFor, postLoginTarget } from './surface';
+import { postLoginTarget } from './surface';
+import { AuthError, verifyEmailSentPath } from './email-verification';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -41,6 +42,7 @@ interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T | null;
+  code?: string;
 }
 
 interface AuthData {
@@ -56,7 +58,7 @@ interface AuthData {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify'];
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify', '/verify-email-sent'];
 
 async function authFetch<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
   try {
@@ -121,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (!res.success || !res.data) {
-      throw new Error(res.message || 'Giris basarisiz');
+      throw new AuthError(res.message || 'Giris basarisiz', res.code);
     }
 
     persistAuth(res.data);
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router, persistAuth]);
 
   const register = useCallback(async (data: RegisterData) => {
-    const res = await authFetch<AuthData>('/api/auth/register', {
+    const res = await authFetch<{ email: string; emailVerified: boolean }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -138,9 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(res.message || 'Kayit basarisiz');
     }
 
-    persistAuth(res.data);
-    router.push(homeFor(res.data.role));
-  }, [router, persistAuth]);
+    router.push(verifyEmailSentPath(res.data.email));
+  }, [router]);
 
   const logout = useCallback((redirectTo = '/login') => {
     const refreshToken = localStorage.getItem('waylo_refresh');

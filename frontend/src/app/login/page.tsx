@@ -3,27 +3,43 @@
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { isEmailNotVerified } from '@/lib/email-verification';
 import VideoBackground from '@/components/VideoBackground';
 import LoginMessage from './LoginMessage';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, resendVerification } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resendInfo, setResendInfo] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setUnverified(false);
+    setResendInfo('');
     setLoading(true);
     try {
       await login(email, password, new URLSearchParams(window.location.search).get('next'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Giris basarisiz');
+      setUnverified(isEmailNotVerified(err));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    setResendInfo('');
+    try {
+      await resendVerification(email);
+      setResendInfo('Dogrulama linki tekrar gonderildi.');
+    } catch (err) {
+      setResendInfo(err instanceof Error ? err.message : 'Gonderilemedi');
     }
   }
 
@@ -56,6 +72,16 @@ export default function LoginPage() {
             <div className="mb-4 p-3 bg-error-container rounded-lg text-on-error-container text-sm flex items-center gap-2">
               <span className="material-symbols-outlined text-base">error</span>
               {error}
+            </div>
+          )}
+
+          {unverified && (
+            <div className="mb-4 flex flex-col items-start gap-1 text-sm">
+              <button type="button" onClick={handleResend}
+                className="text-primary font-semibold hover:text-primary-container transition-colors">
+                Dogrulama mailini tekrar gonder
+              </button>
+              {resendInfo && <span role="status" className="text-on-surface-variant">{resendInfo}</span>}
             </div>
           )}
 

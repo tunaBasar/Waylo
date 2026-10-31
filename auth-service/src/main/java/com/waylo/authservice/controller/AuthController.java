@@ -21,9 +21,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            ApiResponse<AuthResponse> response = authService.register(request);
+            ApiResponse<RegisterResponse> response = authService.register(request);
             return response.success()
                     ? ResponseEntity.ok(response)
                     : ResponseEntity.badRequest().body(response);
@@ -41,6 +41,9 @@ public class AuthController {
         // Task A: distinguish 429 (locked) from 401 (wrong creds)
         if (com.waylo.authservice.service.AuthService.LOCKED_MESSAGE.equals(response.message())) {
             return ResponseEntity.status(429).body(response);
+        }
+        if (AuthService.EMAIL_NOT_VERIFIED_CODE.equals(response.code())) {
+            return ResponseEntity.status(403).body(response);
         }
         return ResponseEntity.status(401).body(response);
     }
@@ -83,7 +86,8 @@ public class AuthController {
         ApiResponse<AuthResponse> response = authService.refreshToken(refreshTokenStr);
         return response.success()
                 ? ResponseEntity.ok(response)
-                : ResponseEntity.status(401).body(response);
+                : ResponseEntity.status(AuthService.EMAIL_NOT_VERIFIED_CODE.equals(response.code()) ? 403 : 401)
+                        .body(response);
     }
 
     @PostMapping("/logout")

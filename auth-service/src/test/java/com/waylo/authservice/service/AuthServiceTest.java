@@ -180,12 +180,31 @@ class AuthServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(saved);
 
             RegisterRequest req = new RegisterRequest("John", "Doe", "  TEST@EXAMPLE.COM  ", "pass123");
-            ApiResponse<AuthResponse> result = authService.register(req);
+            ApiResponse<RegisterResponse> result = authService.register(req);
 
             assertTrue(result.success());
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(captor.capture());
             assertEquals("test@example.com", captor.getValue().getEmail());
+        }
+
+        @Test
+        @DisplayName("Register returns no tokens and emailVerified=false")
+        void register_noTokens() {
+            when(userRepository.existsByEmailIgnoreCase("test@example.com")).thenReturn(false);
+            when(passwordEncoder.encode("pass123")).thenReturn("hashed");
+            User saved = createUser(USER_ID, "test@example.com", "hashed", null, 0);
+            saved.setEmailVerified(false);
+            when(userRepository.save(any(User.class))).thenReturn(saved);
+
+            ApiResponse<RegisterResponse> result = authService.register(
+                    new RegisterRequest("John", "Doe", "test@example.com", "pass123"));
+
+            assertTrue(result.success());
+            assertEquals("test@example.com", result.data().email());
+            assertFalse(result.data().emailVerified());
+            verify(jwtUtil, never()).generateToken(any(), any(), any());
+            verify(refreshTokenService, never()).issue(any(), any());
         }
 
         @Test
@@ -299,6 +318,55 @@ class AuthServiceTest {
         verify(jwtUtil, never()).generateToken(any(), any(), any());
     }
 
+    @Test
+    void login_unverified_correctPassword_emailNotVerified() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        user.setEmailVerified(false);
+        when(userRepository.findByEmailIgnoreCase("x@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("pw", "hashed")).thenReturn(true);
+        ApiResponse<AuthResponse> resp = authService.login(new LoginRequest("x@example.com", "pw"));
+        assertFalse(resp.success());
+        assertEquals(AuthService.EMAIL_NOT_VERIFIED_CODE, resp.code());
+        assertEquals(AuthService.EMAIL_NOT_VERIFIED_MESSAGE, resp.message());
+        verify(jwtUtil, never()).generateToken(any(), any(), any());
+        verifyNoInteractions(refreshTokenService);
+    }
+
+    @Test
+    void login_unverified_wrongPassword_genericError() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        user.setEmailVerified(false);
+        when(userRepository.findByEmailIgnoreCase("x@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("bad", "hashed")).thenReturn(false);
+        ApiResponse<AuthResponse> resp = authService.login(new LoginRequest("x@example.com", "bad"));
+        assertFalse(resp.success());
+        assertEquals("E-posta veya sifre hatali", resp.message());
+        assertNull(resp.code());
+    }
+
+    @Test
+    void login_verified_ok() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        when(userRepository.findByEmailIgnoreCase("x@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("pw", "hashed")).thenReturn(true);
+        ApiResponse<AuthResponse> resp = authService.login(new LoginRequest("x@example.com", "pw"));
+        assertTrue(resp.success());
+        assertEquals("fake.jwt.token", resp.data().token());
+    }
+
+    @Test
+    void refreshToken_unverified_refusedAndRevoked() {
+        User user = createUser(USER_ID, "x@example.com", "hashed", null, 0);
+        user.setEmailVerified(false);
+        when(refreshTokenService.rotate("rt")).thenReturn(new RotationResult(USER_ID, "new"));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        ApiResponse<AuthResponse> resp = authService.refreshToken("rt");
+        assertFalse(resp.success());
+        assertEquals(AuthService.EMAIL_NOT_VERIFIED_CODE, resp.code());
+        verify(refreshTokenService).revokeAll(USER_ID);
+        verify(jwtUtil, never()).generateToken(any(), any(), any());
+    }
+
     // ==================== Helpers ====================
 
     private User createUser(UUID id, String email, String password, LocalDateTime lockedUntil, int failedAttempts) {
@@ -308,6 +376,7 @@ class AuthServiceTest {
         user.setPassword(password);
         user.setLockedUntil(lockedUntil);
         user.setFailedLoginAttempts(failedAttempts);
+        user.setEmailVerified(true);
         return user;
     }
 
@@ -318,6 +387,7 @@ class AuthServiceTest {
         user.setPassword("hashed");
         user.setLockedUntil(lockedUntil);
         user.setFailedLoginAttempts(failedAttempts);
+        user.setEmailVerified(true);
         return user;
     }
 }

@@ -13,7 +13,7 @@ creates a hotel under it, and asserts the hotel is absent from public listing
 while PENDING, then (if an admin exists) approving flow is out of scope here
 since admin bootstrap requires direct DB access.
 """
-import argparse, json, secrets, sys, uuid
+import argparse, json, secrets, subprocess, sys, time, uuid
 from decimal import Decimal
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -57,6 +57,11 @@ def reg():
         "firstName": "Test", "lastName": "User", "email": email, "password": password
     })
     ok(s == 200 and d.get("success"), f"Register: 200+success got {s}")
+    subprocess.run(["docker", "exec", "waylo-postgres", "psql", "-U", "waylo", "-d", "auth_db", "-tAc",
+                    f"UPDATE users SET email_verified = true WHERE email = '{email}'"], check=True, capture_output=True)
+    time.sleep(13)  # gateway register limit 5/min
+    s, d = req("POST", "/api/auth/login", {"email": email, "password": password})
+    ok(s == 200 and d.get("success"), f"Login after verify: 200+success got {s}")
     return d["data"]["userId"], d["data"]["token"]
 
 

@@ -84,8 +84,10 @@ def lit(*ids):
 def register(prefix):
     email = f'{prefix}-{uuid.uuid4().hex[:12]}@example.test'
     pw = secrets.token_urlsafe(20)
-    d = must('POST', '/api/auth/register', {'firstName': 'Ord', 'lastName': 'Test', 'email': email, 'password': pw})
+    must('POST', '/api/auth/register', {'firstName': 'Ord', 'lastName': 'Test', 'email': email, 'password': pw})
+    psql('auth_db', f"UPDATE users SET email_verified = true WHERE email = '{email}'")
     time.sleep(13)  # gateway register limit 5/min
+    d = must('POST', '/api/auth/login', {'email': email, 'password': pw})
     return email, d
 
 

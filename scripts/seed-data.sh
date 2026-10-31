@@ -388,7 +388,8 @@ create_customer() {
   fi
   response=$(echo "$response" | sed '$d')
   if [ "$code" = "201" ] || [ "$code" = "200" ]; then
-    id=$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["userId"])' 2>/dev/null || echo "")
+    docker exec waylo-postgres psql -U waylo -d auth_db -tAc "UPDATE users SET email_verified = true WHERE email = '$email'" >/dev/null 2>&1 || echo "  [WARN] $email dogrulanmis olarak isaretlenemedi"
+    id=$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["email"])' 2>/dev/null || echo "")
     echo "  [OK] $fn $ln -> $id"
   elif [ "$code" = "409" ]; then
     echo "  [SKIP] $fn $ln (zaten kayitli)"

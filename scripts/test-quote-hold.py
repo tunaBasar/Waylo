@@ -10,6 +10,8 @@ import argparse
 import json
 import os
 import secrets
+import subprocess
+import time
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -57,11 +59,17 @@ def request(method, path, body=None, token=None, internal_token=None, direct=Fal
 
 
 def register():
+    email, password = f'qh{uuid.uuid4().hex}@example.test', secrets.token_urlsafe(20)
     status, result = request('POST', '/api/auth/register', {
-        'firstName': 'QuoteHold', 'lastName': 'Acceptance',
-        'email': f'qh{uuid.uuid4().hex}@example.test', 'password': secrets.token_urlsafe(20),
+        'firstName': 'QuoteHold', 'lastName': 'Acceptance', 'email': email, 'password': password,
     })
     check(status == 200 and result['success'], 'register dedicated test user')
+    subprocess.run(['docker', 'exec', 'waylo-postgres', 'psql', '-U', 'waylo', '-d', 'auth_db', '-tAc',
+                    f"UPDATE users SET email_verified = true WHERE email = '{email}'"],
+                   check=True, capture_output=True)
+    time.sleep(13)  # gateway register limit 5/min
+    status, result = request('POST', '/api/auth/login', {'email': email, 'password': password})
+    check(status == 200 and result['success'], 'login dedicated test user after email verification')
     return result['data']['userId'], result['data']['token']
 
 
