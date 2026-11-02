@@ -74,7 +74,7 @@ spring:
             - id: checkin-service
               uri: lb://checkin-service
               predicates:
-                - Path=/api/checkins/**
+                - Path=/api/checkins/**,/api/admin/checkins
             - id: notification-service
               uri: lb://notification-service
               predicates:

@@ -34,6 +34,10 @@ spring:
       host: localhost
       port: 6379
 
+waylo:
+  internal:
+    token: ${INTERNAL_API_TOKEN}
+
 eureka:
   client:
     service-url:

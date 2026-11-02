@@ -176,6 +176,22 @@ export interface Notification {
 }
 
 // Checkin types
+export interface OrderCheckin {
+  id: string;
+  orderItemId: string;
+  orderId: string;
+  customerId: string;
+  pnr: string | null;
+  passengerName: string | null;
+  flightNumber: string | null;
+  departureAt: string | null;
+  seatNumber: string | null;
+  status: 'NOT_CHECKED_IN' | 'CHECKED_IN' | 'BOARDING_PASS_ISSUED' | 'BOARDED' | 'CANCELLED';
+  checkedInAt: string | null;
+}
+
+export interface OrderCheckinPage { items: OrderCheckin[]; page: number; size: number; total: number }
+
 export interface Checkin {
   id: string;
   bookingId: string;

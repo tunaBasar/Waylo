@@ -39,6 +39,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(CheckinException.class)
+    public ResponseEntity<ErrorResponse> handleCheckin(CheckinException ex, HttpServletRequest request) {
+        log.warn("Check-in rejected [{}]: {}", ex.getCode(), ex.getMessage());
+        return ResponseEntity.status(ex.getStatus())
+                .body(new ErrorResponse(ex.getStatus(), ex.getCode(), ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateResource(DuplicateResourceException ex,
                                                                   HttpServletRequest request) {

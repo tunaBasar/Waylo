@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import type { Checkin } from '@/lib/types';
+import type { OrderCheckin, OrderCheckinPage } from '@/lib/types';
 
 const statusConfig: Record<string, { label: string; class: string; icon: string }> = {
   CHECKED_IN: { label: 'Check-in', class: 'bg-secondary-container text-on-secondary-container', icon: 'check_circle' },
@@ -26,13 +26,17 @@ function AdminOnly() {
 export default function CheckinsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const [checkins, setCheckins] = useState<Checkin[]>([]);
+  const [checkins, setCheckins] = useState<OrderCheckin[]>([])
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAdmin) return;
-    api.get<Checkin[]>('/api/checkins').then(r => { setCheckins(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, [isAdmin]);
+    api.get<OrderCheckinPage>(`/api/admin/checkins?page=${page}&size=20`)
+      .then(r => { setCheckins(r.data.items); setTotal(r.data.total); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [isAdmin, page]);
 
   if (!isAdmin) return <AdminOnly />;
 
@@ -41,7 +45,7 @@ export default function CheckinsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-space-xs">
           <h2 className="text-xl font-semibold text-on-surface tracking-tight">Check-in Islemleri</h2>
-          <span className="bg-secondary-container text-on-secondary-container text-xs font-semibold px-2.5 py-0.5 rounded-full">{checkins.length}</span>
+          <span className="bg-secondary-container text-on-secondary-container text-xs font-semibold px-2.5 py-0.5 rounded-full">{total}</span>
         </div>
       </div>
 
@@ -76,8 +80,8 @@ export default function CheckinsPage() {
                       <span className="material-symbols-outlined text-secondary text-lg">{sc.icon}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-on-surface">Ucus: #{c.flightId.slice(0, 8)}</p>
-                      <p className="text-[10px] text-on-surface-variant">Booking: #{c.bookingId.slice(0, 8)}</p>
+                      <p className="text-sm font-bold text-on-surface">Ucus: {c.flightNumber ?? '-'} · {c.passengerName ?? '-'}</p>
+                      <p className="text-[10px] text-on-surface-variant">PNR: {c.pnr ?? '-'}</p>
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${sc.class}`}>{sc.label}</span>
@@ -93,6 +97,11 @@ export default function CheckinsPage() {
               </div>
             );
           })}
+          <div className="flex items-center justify-between text-xs text-on-surface-variant">
+            <button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="disabled:opacity-40">Onceki</button>
+            <span>Sayfa {page + 1}</span>
+            <button type="button" disabled={(page + 1) * 20 >= total} onClick={() => setPage(p => p + 1)} className="disabled:opacity-40">Sonraki</button>
+          </div>
         </div>
       )}
     </div>

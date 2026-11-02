@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 import { policyText, refundText } from '@/lib/cancellation';
+import { checkinWindow, checkinDoneText } from '@/lib/checkin';
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ interface OrderItem {
   refundAmount?: number | null;
   pickupAt: string | null;
   returnAt: string | null;
-  flight?: { flightNumber: string; passengerFirstName: string; passengerLastName: string; seatNumber: string; pnr: string | null; ticketNumber: string | null } | null;
+  flight?: { departureAt?: string | null; supplier?: string | null; flightNumber: string; passengerFirstName: string; passengerLastName: string; seatNumber: string; pnr: string | null; ticketNumber: string | null } | null;
 }
 
 interface Order {
@@ -264,8 +265,50 @@ function CancelPanel({ order, onChanged }: { order: Order; onChanged: () => void
   );
 }
 
+interface FlightCheckin { orderItemId: string; seatNumber: string | null; status: string }
+
+function FlightCheckinPanel({ item, checkin, onDone }: { item: OrderItem; checkin: FlightCheckin | undefined; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
+  if (!item.flight) return null;
+  if (checkin) {
+    return <p className="font-semibold text-secondary" data-testid="checkin-done">{checkinDoneText(checkin.seatNumber ?? item.flight.seatNumber)}</p>;
+  }
+  const win = checkinWindow(item.flight.departureAt ?? '', now, item.flight.supplier, !!item.cancelOutcome);
+  const run = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api.post(`/api/checkins/order-items/${encodeURIComponent(item.id)}`, {});
+      onDone();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Check-in yapilamadi');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-1 space-y-1">
+      <button type="button" disabled={!win.open || busy} onClick={() => void run()} data-testid="checkin-button"
+        className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">Online check-in</button>
+      {!win.open && win.reason && <p className="text-xs text-on-surface-variant" data-testid="checkin-reason">{win.reason}</p>}
+      {msg && <p className="text-xs text-error">{msg}</p>}
+    </div>
+  );
+}
+
 function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }) {
   const [testMode, setTestMode] = useState(false);
+  const [checkins, setCheckins] = useState<FlightCheckin[]>([]);
+  const loadCheckins = useCallback(() => {
+    api.get<FlightCheckin[]>('/api/checkins/me').then(r => setCheckins(r.data)).catch(() => setCheckins([]));
+  }, []);
+
+  useEffect(() => {
+    if (order.status !== 'CONFIRMED' || !order.items?.some(i => i.vertical === 'FLIGHT')) return;
+    loadCheckins();
+  }, [order.status, order.items, loadCheckins]);
 
   useEffect(() => {
     if (order.status !== 'CONFIRMED') return;
@@ -300,6 +343,9 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
             <>
               <p>Yolcu: {item.flight.passengerFirstName} {item.flight.passengerLastName}</p>
               {item.flight.pnr && item.flight.ticketNumber && <p>PNR: {item.flight.pnr} · E-bilet: {item.flight.ticketNumber}</p>}
+              {order.status === 'CONFIRMED' && (
+                <FlightCheckinPanel item={item} checkin={checkins.find(c => c.orderItemId === item.id)} onDone={loadCheckins} />
+              )}
             </>
           )}
           {item.vertical === 'CAR' && item.pickupAt && item.returnAt && (

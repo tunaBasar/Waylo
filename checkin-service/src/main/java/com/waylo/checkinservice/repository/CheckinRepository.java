@@ -3,6 +3,8 @@ package com.waylo.checkinservice.repository;
 import com.waylo.checkinservice.domain.Checkin;
 import com.waylo.checkinservice.domain.CheckinStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -16,4 +18,7 @@ public interface CheckinRepository extends JpaRepository<Checkin, UUID> {
     List<Checkin> findByFlightId(UUID flightId);
     Optional<Checkin> findByBookingIdAndFlightId(UUID bookingId, UUID flightId);
     List<Checkin> findByStatus(CheckinStatus status);
+    Optional<Checkin> findByOrderItemId(UUID orderItemId);
+    List<Checkin> findByCustomerIdAndOrderItemIdIsNotNullOrderByDepartureAtDesc(UUID customerId);
+    Page<Checkin> findByOrderItemIdIsNotNull(Pageable pageable);
 }

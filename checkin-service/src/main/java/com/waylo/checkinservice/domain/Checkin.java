@@ -23,13 +23,13 @@ public class Checkin {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "booking_id", nullable = false)
+    @Column(name = "booking_id")
     private UUID bookingId;
 
     @Column(name = "customer_id", nullable = false)
     private UUID customerId;
 
-    @Column(name = "flight_id", nullable = false)
+    @Column(name = "flight_id")
     private UUID flightId;
 
     @Column(name = "seat_number", length = 10)
@@ -53,7 +53,27 @@ public class Checkin {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "order_item_id") private UUID orderItemId;
+    @Column(name = "order_id") private UUID orderId;
+    @Column(name = "pnr", length = 8) private String pnr;
+    @Column(name = "passenger_name", length = 170) private String passengerName;
+    @Column(name = "flight_number", length = 10) private String flightNumber;
+    @Column(name = "departure_at") private Instant departureAt;
+
     public Checkin() {}
+
+    public UUID getOrderItemId() { return orderItemId; }
+    public void setOrderItemId(UUID v) { this.orderItemId = v; }
+    public UUID getOrderId() { return orderId; }
+    public void setOrderId(UUID v) { this.orderId = v; }
+    public String getPnr() { return pnr; }
+    public void setPnr(String v) { this.pnr = v; }
+    public String getPassengerName() { return passengerName; }
+    public void setPassengerName(String v) { this.passengerName = v; }
+    public String getFlightNumber() { return flightNumber; }
+    public void setFlightNumber(String v) { this.flightNumber = v; }
+    public Instant getDepartureAt() { return departureAt; }
+    public void setDepartureAt(Instant v) { this.departureAt = v; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
