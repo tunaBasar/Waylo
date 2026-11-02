@@ -685,6 +685,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<com.waylo.packagebookingservice.dto.FlightAffectedItem> findAffectedFlightItems(String flightNumber, java.time.LocalDate departureDate) {
+        java.time.Instant from = departureDate == null ? java.time.Instant.EPOCH
+                : departureDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        java.time.Instant to = departureDate == null ? java.time.Instant.parse("9999-01-01T00:00:00Z")
+                : departureDate.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        return orderItemRepository.findConfirmedFlightItems(flightNumber, from, to);
+    }
+
+    @Override
     public InternalOrderResponse markPaid(UUID orderId) {
         Order order = findOrThrow(orderId);
         List<OrderItem> items = orderItemRepository.findByOrderId(orderId);

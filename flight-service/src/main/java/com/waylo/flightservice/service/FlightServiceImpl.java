@@ -268,7 +268,7 @@ public class FlightServiceImpl implements FlightService {
         flight.setStatus(FlightStatus.CANCELLED);
         flight = flightRepository.saveAndFlush(flight);
         eventPublisher.publishFlightCancelled(new FlightCancelledEvent(
-                flight.getId(), flight.getFlightNumber()));
+                flight.getId(), flight.getFlightNumber(), flight.getDepartureTime()));
         return flightMapper.toResponse(flight);
     }
 

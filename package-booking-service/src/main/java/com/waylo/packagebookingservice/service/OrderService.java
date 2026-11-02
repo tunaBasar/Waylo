@@ -40,6 +40,9 @@ public interface OrderService {
     /** Internal (payment-service): authoritative order with item amounts. */
     InternalOrderResponse getInternal(UUID orderId);
 
+    /** CONFIRMED, not-cancelled FLIGHT items of a flight number, optionally limited to a UTC departure date. */
+    java.util.List<com.waylo.packagebookingservice.dto.FlightAffectedItem> findAffectedFlightItems(String flightNumber, java.time.LocalDate departureDate);
+
     /** Internal (payment-service): money is in escrow. Confirms hotel holds and sets CONFIRMED. Idempotent. */
     InternalOrderResponse markPaid(UUID orderId);
 }

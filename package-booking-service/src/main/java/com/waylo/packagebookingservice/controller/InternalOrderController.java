@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.waylo.packagebookingservice.dto.FlightAffectedItem;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -21,6 +23,14 @@ public class InternalOrderController {
 
     public InternalOrderController(OrderService orderService) {
         this.orderService = orderService;
+    }
+
+    /** Used by notification-service: CONFIRMED, not-cancelled FLIGHT items of a flight (departureDate = UTC yyyy-MM-dd, optional). */
+    @GetMapping("/flight-items")
+    public ResponseEntity<ApiResponse<java.util.List<FlightAffectedItem>>> flightItems(
+            @RequestParam String flightNumber,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate departureDate) {
+        return ResponseEntity.ok(ApiResponse.of(orderService.findAffectedFlightItems(flightNumber, departureDate)));
     }
 
     @GetMapping("/{id}")

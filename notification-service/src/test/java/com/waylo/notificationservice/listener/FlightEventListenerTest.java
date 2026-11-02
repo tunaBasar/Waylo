@@ -55,6 +55,7 @@ class FlightEventListenerTest {
         FlightCancelledEvent e = new FlightCancelledEvent();
         e.setFlightId(flightId);
         e.setFlightNumber("WY123");
+        e.setDepartureTime(java.time.Instant.parse("2026-11-05T09:30:00Z"));
         return e;
     }
 
@@ -66,10 +67,10 @@ class FlightEventListenerTest {
     @Test
     void handleFlightCancelled_notifiesEveryAffectedCustomer() {
         when(processedEventRepository.existsByEventIdAndConsumerGroup(any(), any())).thenReturn(false);
-        when(packageBookingServiceClient.getByFlightId(flightId)).thenReturn(
-                new PackageBookingServiceClient.BookingListResponse(true, List.of(
-                        new PackageBookingServiceClient.BookingDto(bookingId1, customerId1, flightId),
-                        new PackageBookingServiceClient.BookingDto(bookingId2, customerId2, flightId))));
+        when(packageBookingServiceClient.getFlightItems("WY123", "2026-11-05")).thenReturn(
+                new PackageBookingServiceClient.FlightItemListResponse(true, List.of(
+                        new PackageBookingServiceClient.FlightItemDto(bookingId1, UUID.randomUUID(), customerId1),
+                        new PackageBookingServiceClient.FlightItemDto(bookingId2, UUID.randomUUID(), customerId2))));
         when(crmServiceClient.getById(customerId1)).thenReturn(lookupWithEmail(customerId1, "a@waylo.com"));
         when(crmServiceClient.getById(customerId2)).thenReturn(lookupWithEmail(customerId2, "b@waylo.com"));
 
@@ -89,10 +90,10 @@ class FlightEventListenerTest {
     @Test
     void handleFlightCancelled_oneCustomerLookupFails_stillNotifiesTheOther() {
         when(processedEventRepository.existsByEventIdAndConsumerGroup(any(), any())).thenReturn(false);
-        when(packageBookingServiceClient.getByFlightId(flightId)).thenReturn(
-                new PackageBookingServiceClient.BookingListResponse(true, List.of(
-                        new PackageBookingServiceClient.BookingDto(bookingId1, customerId1, flightId),
-                        new PackageBookingServiceClient.BookingDto(bookingId2, customerId2, flightId))));
+        when(packageBookingServiceClient.getFlightItems("WY123", "2026-11-05")).thenReturn(
+                new PackageBookingServiceClient.FlightItemListResponse(true, List.of(
+                        new PackageBookingServiceClient.FlightItemDto(bookingId1, UUID.randomUUID(), customerId1),
+                        new PackageBookingServiceClient.FlightItemDto(bookingId2, UUID.randomUUID(), customerId2))));
         when(crmServiceClient.getById(customerId1)).thenThrow(new RuntimeException("crm down"));
         when(crmServiceClient.getById(customerId2)).thenReturn(lookupWithEmail(customerId2, "b@waylo.com"));
 
@@ -107,7 +108,7 @@ class FlightEventListenerTest {
     @Test
     void handleFlightCancelled_bookingLookupFails_sendsNothingButStillMarksProcessed() {
         when(processedEventRepository.existsByEventIdAndConsumerGroup(any(), any())).thenReturn(false);
-        when(packageBookingServiceClient.getByFlightId(flightId)).thenThrow(new RuntimeException("package-booking-service down"));
+        when(packageBookingServiceClient.getFlightItems("WY123", "2026-11-05")).thenThrow(new RuntimeException("package-booking-service down"));
 
         newListener().handleFlightEvent(rec(cancelledEvent()), ack);
 
@@ -120,8 +121,8 @@ class FlightEventListenerTest {
     @Test
     void handleFlightCancelled_noAffectedBookings_sendsNothing() {
         when(processedEventRepository.existsByEventIdAndConsumerGroup(any(), any())).thenReturn(false);
-        when(packageBookingServiceClient.getByFlightId(flightId)).thenReturn(
-                new PackageBookingServiceClient.BookingListResponse(true, List.of()));
+        when(packageBookingServiceClient.getFlightItems("WY123", "2026-11-05")).thenReturn(
+                new PackageBookingServiceClient.FlightItemListResponse(true, List.of()));
 
         newListener().handleFlightEvent(rec(cancelledEvent()), ack);
 

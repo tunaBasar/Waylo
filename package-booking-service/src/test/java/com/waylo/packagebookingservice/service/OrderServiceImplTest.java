@@ -785,4 +785,20 @@ class OrderServiceImplTest {
         service.getVouchers(customerId, orderId);
         verify(voucherService).listForOrder(orderId);
     }
+
+    @Test
+    void findAffectedFlightItems_usesUtcDayWindow() {
+        service.findAffectedFlightItems("WY123", java.time.LocalDate.of(2026, 11, 5));
+
+        verify(orderItemRepository).findConfirmedFlightItems("WY123",
+                java.time.Instant.parse("2026-11-05T00:00:00Z"), java.time.Instant.parse("2026-11-06T00:00:00Z"));
+    }
+
+    @Test
+    void findAffectedFlightItems_noDate_unbounded() {
+        service.findAffectedFlightItems("WY123", null);
+
+        verify(orderItemRepository).findConfirmedFlightItems("WY123", java.time.Instant.EPOCH,
+                java.time.Instant.parse("9999-01-01T00:00:00Z"));
+    }
 }

@@ -60,21 +60,23 @@ public class FlightEventListener {
         if (isDuplicate(event.getEventId())) return;
         log.info("[NOTIFICATION] Ucus iptal edildi - flightId={}, flightNumber={}",
                 event.getFlightId(), event.getFlightNumber());
-        notifyAffectedCustomers(event.getFlightId(), event.getFlightNumber());
+        String departureDate = event.getDepartureTime() == null ? null
+                : event.getDepartureTime().atZone(java.time.ZoneOffset.UTC).toLocalDate().toString();
+        notifyAffectedCustomers(event.getFlightId(), event.getFlightNumber(), departureDate);
         markProcessed(event.getEventId());
     }
 
     /**
-     * Looks up every booking for the cancelled flight via package-booking-service, then
+     * Looks up every confirmed flight order item for the cancelled flight via package-booking-service internal Order endpoint, then
      * notifies each affected customer via crm-service email lookup. Fails soft per customer:
      * one missing/unreachable lookup does not block notifying the other affected customers,
      * and a failure of the booking lookup itself just logs and skips (matches the fail-soft
      * pattern used elsewhere for cross-service lookups, e.g. RoleGrantService).
      */
-    private void notifyAffectedCustomers(UUID flightId, String flightNumber) {
-        List<PackageBookingServiceClient.BookingDto> bookings;
+    private void notifyAffectedCustomers(UUID flightId, String flightNumber, String departureDate) {
+        List<PackageBookingServiceClient.FlightItemDto> bookings;
         try {
-            PackageBookingServiceClient.BookingListResponse response = packageBookingServiceClient.getByFlightId(flightId);
+            PackageBookingServiceClient.FlightItemListResponse response = packageBookingServiceClient.getFlightItems(flightNumber, departureDate);
             if (response == null || !response.success() || response.data() == null) {
                 log.warn("Booking lookup returned no data for flightId={}, skipping notifications", flightId);
                 return;
@@ -85,8 +87,8 @@ public class FlightEventListener {
             return;
         }
 
-        for (PackageBookingServiceClient.BookingDto booking : bookings) {
-            sendCancellationEmail(booking.customerId(), booking.id(), flightNumber);
+        for (PackageBookingServiceClient.FlightItemDto booking : bookings) {
+            sendCancellationEmail(booking.customerId(), booking.orderItemId(), flightNumber);
         }
     }
 
@@ -109,7 +111,7 @@ public class FlightEventListener {
                 customerId, bookingId, NotificationType.EMAIL, recipient,
                 "Ucusunuz iptal edildi",
                 "Sayin musterimiz, " + flightNumber + " numarali ucusunuz iptal edilmistir. "
-                        + bookingId + " numarali rezervasyonunuz etkilenmistir."));
+                        + bookingId + " numarali siparis kaleminiz etkilenmistir."));
     }
 
     private boolean isDuplicate(String eventId) {

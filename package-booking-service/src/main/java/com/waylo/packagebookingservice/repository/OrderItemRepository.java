@@ -21,6 +21,19 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     List<OrderItem> findByOrderId(UUID orderId);
 
+    @Query("""
+            select new com.waylo.packagebookingservice.dto.FlightAffectedItem(i.id, o.id, o.customerId)
+            from OrderItem i join Order o on o.id = i.orderId
+            where i.vertical = com.waylo.packagebookingservice.domain.OrderItemVertical.FLIGHT
+              and i.flightNumber = :flightNumber
+              and i.departureAt >= :fromTs
+              and i.departureAt < :toTs
+              and o.status = com.waylo.packagebookingservice.domain.OrderStatus.CONFIRMED
+              and i.cancelOutcome is null
+            """)
+    List<com.waylo.packagebookingservice.dto.FlightAffectedItem> findConfirmedFlightItems(
+            @Param("flightNumber") String flightNumber, @Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs);
+
     List<OrderItem> findByOrderIdIn(java.util.Collection<UUID> orderIds);
 
     @Query(value = """
