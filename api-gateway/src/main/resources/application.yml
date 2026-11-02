@@ -100,7 +100,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info
   endpoint:
     health:
       show-details: when-authorized
@@ -118,5 +118,7 @@ waylo:
     forgot-password-per-minute: 3
     resend-verification-per-minute: 3
     refresh-per-minute: 30
+    order-create-per-minute: 30
+    voucher-redeem-per-minute: 30
   jwt:
     secret: ${JWT_SECRET}

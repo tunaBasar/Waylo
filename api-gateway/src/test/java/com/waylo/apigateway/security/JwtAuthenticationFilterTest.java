@@ -1320,4 +1320,20 @@ class JwtAuthenticationFilterTest {
         assertThat(capturedRequest.get()).isNull();
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    void pathTraversal_nullByte_returns400() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/hotels%00/x").build());
+        new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper())
+                .filter(exchange, ex -> ex.getResponse().setComplete()).block();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void internalPathWithoutToken_returns401() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/internal/orders/1/paid").build());
+        new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper())
+                .filter(exchange, ex -> ex.getResponse().setComplete()).block();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }

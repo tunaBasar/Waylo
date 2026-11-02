@@ -186,7 +186,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             decodedLower = decodedPath.toLowerCase();
         }
 
-        String[] traversalPatterns = {"..", "//", ";", "%2e", "%2f", "%5c", "\\"};
+        String[] traversalPatterns = {"..", "//", ";", "%2e", "%2f", "%5c", "\\", "%00"};
         for (String pattern : traversalPatterns) {
             if (checkLower != null && checkLower.contains(pattern)) {
                 return true;

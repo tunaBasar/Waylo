@@ -136,4 +136,27 @@ class AuthRateLimitFilterTest {
         }
         assertThat(chainCalls.get()).isEqualTo(20);
     }
+
+    @Test
+    void orderCreationIsLimitedPerIp() {
+        AuthRateLimitFilter f = filter(new RateLimitProperties(), false);
+        for (int i = 0; i < 30; i++) {
+            assertThat(run(f, post("/api/orders/car", "1.1.1.1", null))).isEqualTo(HttpStatus.OK);
+        }
+        assertThat(run(f, post("/api/orders/car", "1.1.1.1", null))).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(run(f, post("/api/orders/car", "2.2.2.2", null))).isEqualTo(HttpStatus.OK);
+        // cancel is not creation
+        assertThat(run(f, post("/api/orders/5/cancel", "1.1.1.1", null))).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void voucherRedeemSharesOneBucketAcrossOrganizations() {
+        AuthRateLimitFilter f = filter(new RateLimitProperties(), false);
+        for (int i = 0; i < 30; i++) {
+            assertThat(run(f, post("/api/partner/organizations/" + i + "/vouchers/redeem", "1.1.1.1", null)))
+                    .isEqualTo(HttpStatus.OK);
+        }
+        assertThat(run(f, post("/api/partner/organizations/99/vouchers/redeem", "1.1.1.1", null)))
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    }
 }

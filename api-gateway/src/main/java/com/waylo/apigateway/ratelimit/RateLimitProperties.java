@@ -12,6 +12,8 @@ public class RateLimitProperties {
     private int forgotPasswordPerMinute = 3;
     private int resendVerificationPerMinute = 3;
     private int refreshPerMinute = 30;
+    private int orderCreatePerMinute = 30;
+    private int voucherRedeemPerMinute = 30;
 
     public boolean isTrustForwardedFor() { return trustForwardedFor; }
     public void setTrustForwardedFor(boolean v) { this.trustForwardedFor = v; }
@@ -25,4 +27,8 @@ public class RateLimitProperties {
     public void setResendVerificationPerMinute(int v) { this.resendVerificationPerMinute = v; }
     public int getRefreshPerMinute() { return refreshPerMinute; }
     public void setRefreshPerMinute(int v) { this.refreshPerMinute = v; }
+    public int getOrderCreatePerMinute() { return orderCreatePerMinute; }
+    public void setOrderCreatePerMinute(int v) { this.orderCreatePerMinute = v; }
+    public int getVoucherRedeemPerMinute() { return voucherRedeemPerMinute; }
+    public void setVoucherRedeemPerMinute(int v) { this.voucherRedeemPerMinute = v; }
 }

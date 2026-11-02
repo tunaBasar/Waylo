@@ -17,7 +17,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     command: postgres -c max_connections=200
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U waylo"]
@@ -63,7 +63,7 @@ services:
     image: redis:7-alpine
     container_name: waylo-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -83,7 +83,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set in .env}"
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     depends_on:
       - postgres
     deploy:
@@ -103,7 +103,7 @@ services:
         SERVICE: config-service
     container_name: waylo-config-service
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
     healthcheck:
@@ -124,7 +124,7 @@ services:
         SERVICE: discovery-service
     container_name: waylo-discovery-service
     ports:
-      - "8761:8761"
+      - "127.0.0.1:8761:8761"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
@@ -576,7 +576,7 @@ services:
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      SPRING_MAIL_USERNAME: "${MAIL_USERNAME:-waylo353241@gmail.com}"
+      SPRING_MAIL_USERNAME: "${MAIL_USERNAME:-}"
       SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
     depends_on:
       discovery-service:

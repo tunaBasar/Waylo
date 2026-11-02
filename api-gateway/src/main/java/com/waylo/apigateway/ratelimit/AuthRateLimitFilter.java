@@ -71,7 +71,7 @@ public class AuthRateLimitFilter implements GlobalFilter, Ordered {
         if (limit <= 0) {
             return chain.filter(exchange);
         }
-        String key = "waylo:rl:" + path + ":" + clientIp(exchange);
+        String key = "waylo:rl:" + bucket(path) + ":" + clientIp(exchange);
         return redis.execute(SCRIPT, List.of(key), List.of(String.valueOf(limit), String.valueOf(WINDOW_SECONDS)))
                 .next()
                 .defaultIfEmpty(0L)
@@ -84,8 +84,23 @@ public class AuthRateLimitFilter implements GlobalFilter, Ordered {
                         : chain.filter(exchange));
     }
 
+    /** Collapses per-organization voucher paths into one bucket so the org id cannot be rotated to dodge the limit. */
+    private static String bucket(String path) {
+        return isVoucherRedeem(path) ? "/api/partner/vouchers/redeem" : path;
+    }
+
+    private static boolean isVoucherRedeem(String path) {
+        return path.startsWith("/api/partner/organizations/") && path.endsWith("/vouchers/redeem")
+                && path.indexOf('/', "/api/partner/organizations/".length()) == path.length() - "/vouchers/redeem".length();
+    }
+
     private int limitFor(String path) {
+        if (isVoucherRedeem(path)) {
+            return props.getVoucherRedeemPerMinute();
+        }
         return switch (path) {
+            case "/api/orders/hotel", "/api/orders/car", "/api/orders/bus", "/api/orders/flight",
+                 "/api/orders/package" -> props.getOrderCreatePerMinute();
             case "/api/auth/login" -> props.getLoginPerMinute();
             case "/api/auth/register" -> props.getRegisterPerMinute();
             case "/api/auth/forgot-password" -> props.getForgotPasswordPerMinute();
