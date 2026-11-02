@@ -103,7 +103,7 @@ def main():
         e, cust = register('pay-cust'); emails.append(e)
         e, other = register('pay-other'); emails.append(e)
 
-        org_id = must('POST', '/api/organizations', {'name': f'pay-test-{uuid.uuid4().hex[:6]}'}, owner)['id']
+        org_id = must('POST', '/api/organizations', {'name': f'pay-test-{uuid.uuid4().hex[:6]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, owner)['id']
         hotel_id = must('POST', '/api/hotels', {'name': 'Pay test hotel', 'city': f'PT{uuid.uuid4().hex[:6]}',
                                                 'country': 'TR', 'address': 'Test only', 'starRating': 3,
                                                 'organizationId': org_id}, owner)['id']
@@ -235,7 +235,7 @@ def main():
         ok(req('POST', redeem, {'payload': payload}, cust)[0] == 403, 'non-member cannot redeem 403')
         ok(req('POST', redeem, {'payload': 'WAYLO1:' + vid + ':forged'}, owner)[0] == 422, 'forged code rejected 422')
         e, owner2 = register('pay-owner2'); emails.append(e)
-        org2 = must('POST', '/api/organizations', {'name': f'pay-test2-{uuid.uuid4().hex[:6]}'}, owner2)['id']
+        org2 = must('POST', '/api/organizations', {'name': f'pay-test2-{uuid.uuid4().hex[:6]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, owner2)['id']
         other_orgs.append(org2)
         s, d = req('POST', f'/api/partner/organizations/{org2}/vouchers/redeem', {'payload': payload}, owner2)
         ok(s in (403, 422) and ('WRONG_SUPPLIER' in json.dumps(d) or s == 403), f'other org cannot redeem ({s})')

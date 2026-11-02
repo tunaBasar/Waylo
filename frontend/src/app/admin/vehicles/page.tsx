@@ -1,136 +1,164 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@/components/Toast';
-import { adminApi, type VehicleRequest } from '@/lib/admin';
-import type { Vehicle } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
-import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
+import { useEffect, useState } from 'react';
+import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { CATEGORY_LABEL, TRANSMISSION_LABEL, FUEL_LABEL } from '@/lib/car';
 
-const TYPES: Vehicle['vehicleType'][] = ['ECONOMY', 'COMPACT', 'MIDSIZE', 'FULLSIZE', 'SUV', 'LUXURY', 'VAN'];
-const EMPTY = { plateNumber: '', brand: '', model: '', year: String(new Date().getFullYear()), vehicleType: 'ECONOMY' as Vehicle['vehicleType'],
-  color: '', seatCount: '5', dailyRate: '', currency: 'TRY', location: '', mileage: '' };
-type Form = typeof EMPTY;
+type VehicleCategory = 'ECONOMY' | 'COMPACT' | 'MIDSIZE' | 'FULLSIZE' | 'SUV' | 'MINIVAN' | 'LUXURY' | 'VAN';
+type TransmissionType = 'AUTOMATIC' | 'MANUAL';
+type FuelType = 'PETROL' | 'DIESEL' | 'LPG' | 'HYBRID' | 'ELECTRIC';
+
+type AdminVehicle = {
+  id: string;
+  organizationId: string;
+  organizationName?: string | null;
+  homeBranchId: string;
+  homeBranchName?: string | null;
+  plateNumber: string;
+  brand: string;
+  model: string;
+  year: number;
+  category: VehicleCategory;
+  transmission: TransmissionType;
+  fuelType: FuelType;
+  seatCount: number;
+  active: boolean;
+  sellable: boolean;
+  missingDocuments: string[];
+};
+
+function AdminOnly() {
+  return (
+    <div className="text-center py-12">
+      <span className="material-symbols-outlined text-outline text-5xl mb-3 block">lock</span>
+      <p className="text-on-surface-variant text-sm">Bu sayfa yalnizca yoneticiler icindir</p>
+    </div>
+  );
+}
 
 export default function AdminVehiclesPage() {
-  const toast = useToast();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const [vehicles, setVehicles] = useState<AdminVehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | 'new' | null>(null);
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    try { setVehicles((await adminApi.vehicles()).data ?? []); setError(null); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Araclar yuklenemedi'); }
-    finally { setLoading(false); }
-  }, []);
   useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve().then(() => { if (!cancelled) return load(); });
-    return () => { cancelled = true; };
-  }, [load]);
+    if (!isAdmin) return;
+    api.get<AdminVehicle[]>('/api/admin/car-vehicles')
+      .then(res => setVehicles(res.data))
+      .catch((cause) => {
+        const apiError = cause as ApiError;
+        setError(apiError.message || 'Araclar yuklenemedi.');
+      })
+      .finally(() => setLoading(false));
+  }, [isAdmin]);
 
-  const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
-  const valid = !!form.plateNumber.trim() && !!form.brand.trim() && !!form.model.trim() && !!form.location.trim()
-    && Number(form.year) >= 1990 && Number(form.seatCount) >= 1 && Number(form.seatCount) <= 60
-    && Number(form.dailyRate) >= 0.01 && /^[A-Z]{3}$/.test(form.currency.trim().toUpperCase());
-
-  function edit(v: Vehicle) {
-    setEditing(v.id);
-    setForm({ plateNumber: v.plateNumber, brand: v.brand, model: v.model, year: String(v.year), vehicleType: v.vehicleType, color: v.color ?? '',
-      seatCount: String(v.seatCount), dailyRate: String(v.dailyRate), currency: v.currency, location: v.location, mileage: v.mileage?.toString() ?? '' });
-  }
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (!valid || saving || !editing) return;
-    setSaving(true);
-    const body: VehicleRequest = {
-      plateNumber: form.plateNumber.trim(), brand: form.brand.trim(), model: form.model.trim(), year: Number(form.year),
-      vehicleType: form.vehicleType, color: form.color.trim() || null, seatCount: Number(form.seatCount),
-      dailyRate: Number(form.dailyRate), currency: form.currency.trim().toUpperCase(), location: form.location.trim(),
-      mileage: form.mileage.trim() === '' ? null : Number(form.mileage),
-    };
-    try {
-      if (editing === 'new') await adminApi.createVehicle(body);
-      else await adminApi.updateVehicle(editing, body);
-      toast.success('Arac kaydedildi');
-      setEditing(null);
-      await load();
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Kaydedilemedi'); }
-    finally { setSaving(false); }
-  }
-
-  async function act(action: () => Promise<unknown>, done: string, fail: string) {
-    try { await action(); toast.success(done); await load(); }
-    catch (err) { toast.error(err instanceof Error ? err.message : fail); }
-  }
+  if (!isAdmin) return <AdminOnly />;
 
   return (
     <div className="space-y-space-md">
-      <PageHeader title="Araclar" subtitle={`${vehicles.length} kayit`}
-        actions={<Button icon="add" onClick={() => { setEditing('new'); setForm(EMPTY); }}>Yeni arac</Button>} />
-      {editing && (
-        <Card className="p-4">
-          <form onSubmit={save} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Plaka"><input className={inputClass} maxLength={20} value={form.plateNumber} onChange={set('plateNumber')} /></Field>
-            <Field label="Marka"><input className={inputClass} value={form.brand} onChange={set('brand')} /></Field>
-            <Field label="Model"><input className={inputClass} value={form.model} onChange={set('model')} /></Field>
-            <Field label="Yil"><input type="number" min={1990} className={inputClass} value={form.year} onChange={set('year')} /></Field>
-            <Field label="Tip">
-              <select className={inputClass} value={form.vehicleType} onChange={set('vehicleType')}>{TYPES.map(t => <option key={t}>{t}</option>)}</select>
-            </Field>
-            <Field label="Renk"><input className={inputClass} value={form.color} onChange={set('color')} /></Field>
-            <Field label="Koltuk"><input type="number" min={1} max={60} className={inputClass} value={form.seatCount} onChange={set('seatCount')} /></Field>
-            <Field label="Gunluk ucret"><input type="number" min={0.01} step="0.01" className={inputClass} value={form.dailyRate} onChange={set('dailyRate')} /></Field>
-            <Field label="Para birimi"><input className={inputClass} maxLength={3} value={form.currency} onChange={set('currency')} /></Field>
-            <Field label="Lokasyon"><input className={inputClass} value={form.location} onChange={set('location')} /></Field>
-            <Field label="Kilometre"><input type="number" min={0} className={inputClass} value={form.mileage} onChange={set('mileage')} /></Field>
-            <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
-              <Button type="submit" icon="check" disabled={!valid || saving}>{saving ? 'Kaydediliyor' : 'Kaydet'}</Button>
-              <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Vazgec</Button>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-space-xs">
+          <h2 className="text-xl font-semibold text-on-surface tracking-tight">Arac Yonetimi</h2>
+          <span className="bg-tertiary-container text-on-tertiary-container text-xs font-semibold px-2.5 py-0.5 rounded-full">{vehicles.length}</span>
+        </div>
+      </div>
+
+      {/* Summary row */}
+      <div className="grid grid-cols-3 gap-space-xs">
+        <div className="bg-surface-container-lowest rounded-xl p-3 shadow-sm text-center">
+          <p className="text-lg font-bold text-on-surface">{vehicles.length}</p>
+          <p className="text-[10px] text-on-surface-variant">Toplam Arac</p>
+        </div>
+        <div className="bg-surface-container-lowest rounded-xl p-3 shadow-sm text-center">
+          <p className="text-lg font-bold text-on-surface">{vehicles.filter(v => v.sellable).length}</p>
+          <p className="text-[10px] text-on-surface-variant">Kiralanabilir</p>
+        </div>
+        <div className="bg-surface-container-lowest rounded-xl p-3 shadow-sm text-center">
+          <p className="text-lg font-bold text-error">{vehicles.filter(v => !v.sellable).length}</p>
+          <p className="text-[10px] text-on-surface-variant">Kiralanamaz</p>
+        </div>
+      </div>
+
+      {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
+
+      {loading ? (
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-surface-container-lowest rounded-xl shadow-sm p-4 animate-pulse"><div className="h-5 bg-surface-container rounded w-1/3 mb-2"/><div className="h-4 bg-surface-container rounded w-1/2"/></div>)}</div>
+      ) : vehicles.length === 0 ? (
+        <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">directions_car</span><p className="text-on-surface-variant text-sm">Arac bulunamadi</p></div>
+      ) : (
+        <div className="space-y-space-sm">
+          {vehicles.map(vehicle => (
+            <div key={vehicle.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-sm font-bold text-on-surface">
+                    {vehicle.brand} {vehicle.model}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">Plaka: {vehicle.plateNumber}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {vehicle.sellable && (
+                    <span className="text-[10px] font-bold text-on-secondary-container bg-secondary-container px-2 py-0.5 rounded-full">
+                      Kiralanabilir
+                    </span>
+                  )}
+                  {!vehicle.sellable && vehicle.missingDocuments?.length > 0 && (
+                    <span className="text-[10px] font-bold text-on-error-container bg-error-container px-2 py-0.5 rounded-full">
+                      Eksi: {vehicle.missingDocuments.length}
+                    </span>
+                  )}
+                  <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
+                    vehicle.active
+                      ? 'bg-secondary-container text-on-secondary-container'
+                      : 'bg-surface-container text-on-surface-variant'
+                  }`}>
+                    {vehicle.active ? 'Aktif' : 'Pasif'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Org and branch context */}
+              <div className="flex items-center gap-3 mb-3">
+                {vehicle.organizationName && (
+                  <span className="text-[10px] text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+                    {vehicle.organizationName}
+                  </span>
+                )}
+                {vehicle.homeBranchName && (
+                  <span className="text-[10px] text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+                    {vehicle.homeBranchName}
+                  </span>
+                )}
+              </div>
+
+              {/* Missing documents */}
+              {vehicle.missingDocuments && vehicle.missingDocuments.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] text-error mb-1">Eksik belgeler:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {vehicle.missingDocuments.map(dt => (
+                      <span key={dt} className="text-[10px] text-on-error-container bg-error-container-lowest px-1.5 py-0.5 rounded">
+                        {dt}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-on-surface-variant">
+                <p>Tip: <span className="text-on-surface">{CATEGORY_LABEL[vehicle.category] || vehicle.category}</span></p>
+                <p>Vites: <span className="text-on-surface">{TRANSMISSION_LABEL[vehicle.transmission] || vehicle.transmission}</span></p>
+                <p>Yakit: <span className="text-on-surface">{FUEL_LABEL[vehicle.fuelType] || vehicle.fuelType}</span></p>
+                <p>Koltuk: <span className="text-on-surface">{vehicle.seatCount}</span></p>
+                <p>Yil: <span className="text-on-surface">{vehicle.year}</span></p>
+              </div>
             </div>
-          </form>
-        </Card>
+          ))}
+        </div>
       )}
-      {loading ? <LoadingRows /> : error ? <EmptyState icon="error" title="Yuklenemedi" description={error} />
-        : vehicles.length === 0 ? <EmptyState icon="directions_car" title="Arac yok" />
-        : (
-          <div className="space-y-2">
-            {vehicles.map(v => (
-              <Card key={v.id} className="p-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-on-surface">
-                    {v.brand} {v.model} <span className="font-normal text-on-surface-variant">{v.plateNumber}</span>{' '}
-                    <StatusPill tone={v.status === 'AVAILABLE' ? 'success' : 'warning'}>{v.status === 'AVAILABLE' ? 'Musait' : 'Bakimda'}</StatusPill>{' '}
-                    {!v.active && <StatusPill tone="neutral">Pasif</StatusPill>}
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    {v.vehicleType} · {v.seatCount} koltuk · {v.location} · {formatCurrency(v.dailyRate, v.currency)}/gun
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="ghost" icon="edit" onClick={() => edit(v)}>Duzenle</Button>
-                  <Button variant="ghost" icon="build" onClick={() => void act(
-                    () => adminApi.setVehicleStatus(v.id, v.status === 'AVAILABLE' ? 'MAINTENANCE' : 'AVAILABLE'),
-                    'Durum guncellendi', 'Durum guncellenemedi')}>
-                    {v.status === 'AVAILABLE' ? 'Bakima al' : 'Musait yap'}
-                  </Button>
-                  <Button variant="ghost" icon={v.active ? 'visibility_off' : 'visibility'} onClick={() => void act(
-                    () => v.active ? adminApi.deactivateVehicle(v.id) : adminApi.activateVehicle(v.id),
-                    v.active ? 'Arac pasife alindi' : 'Arac aktif edildi', 'Islem basarisiz')}>
-                    {v.active ? 'Pasife al' : 'Aktif et'}
-                  </Button>
-                  <Button variant="danger" icon="delete" onClick={() => {
-                    if (window.confirm(`${v.plateNumber} silinsin mi?`)) void act(() => adminApi.deleteVehicle(v.id), 'Arac silindi', 'Silinemedi');
-                  }}>Sil</Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
     </div>
   );
 }

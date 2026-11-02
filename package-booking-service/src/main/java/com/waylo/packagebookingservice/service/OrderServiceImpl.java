@@ -1,6 +1,7 @@
 package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.client.HotelHoldClient;
+import com.waylo.packagebookingservice.client.CarHoldClient;
 import com.waylo.packagebookingservice.client.PaymentEscrowClient;
 import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.domain.Order;
@@ -8,6 +9,7 @@ import com.waylo.packagebookingservice.domain.OrderItemVertical;
 import com.waylo.packagebookingservice.domain.OrderItem;
 import com.waylo.packagebookingservice.domain.OrderStatus;
 import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
+import com.waylo.packagebookingservice.dto.CarOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderItemResponse;
@@ -45,6 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderEventPublisher eventPublisher;
     private final HotelHoldClient hotelHoldClient;
+    private final CarHoldClient carHoldClient;
     private final PaymentEscrowClient paymentEscrowClient;
     private final VoucherService voucherService;
 
@@ -52,6 +55,7 @@ public class OrderServiceImpl implements OrderService {
                              OrderItemRepository orderItemRepository,
                              OrderEventPublisher eventPublisher,
                              HotelHoldClient hotelHoldClient,
+                             CarHoldClient carHoldClient,
                              PaymentEscrowClient paymentEscrowClient,
                              VoucherService voucherService) {
         this.voucherService = voucherService;
@@ -59,6 +63,7 @@ public class OrderServiceImpl implements OrderService {
         this.orderItemRepository = orderItemRepository;
         this.eventPublisher = eventPublisher;
         this.hotelHoldClient = hotelHoldClient;
+        this.carHoldClient = carHoldClient;
         this.paymentEscrowClient = paymentEscrowClient;
     }
 
@@ -128,6 +133,24 @@ public class OrderServiceImpl implements OrderService {
             }
             throw e;
         }
+    }
+
+    @Override
+    public OrderResponse createCarOrder(UUID actorUserId, CarOrderCreateRequest request) {
+        requireIdentity(actorUserId);
+        UUID orderId = UUID.randomUUID();
+        String key = "co-" + UUID.nameUUIDFromBytes((actorUserId + ":" + request.pickupBranchId() + ":" + request.returnBranchId() + ":" + request.pickupAt() + ":" + request.returnAt()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        CarHoldClient.HoldDto hold = carHoldClient.hold(new CarHoldClient.HoldRequest(request.pickupBranchId(), request.returnBranchId(), request.category(), request.transmission(), request.pickupAt(), request.returnAt(), request.driverAge(), actorUserId, key, orderId)).data();
+        try {
+            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); order.setTotalAmount(hold.totalAmount()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
+            order = orderRepository.saveAndFlush(order);
+            OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.CAR); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.pickupBranchId()); item.setFulfillmentRef(hold.holdId());
+            String transmission = "AUTOMATIC".equalsIgnoreCase(hold.transmission()) ? "Otomatik" : "Manuel";
+            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission + "), " + hold.chargeableDays() + " gun"); item.setUnitAmount(hold.totalAmount()); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.pickupAt()); item.setReturnAt(hold.returnAt());
+            OrderItem saved = orderItemRepository.saveAndFlush(item);
+            eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+            return toResponse(order, List.of(saved));
+        } catch (RuntimeException e) { try { carHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release car hold {}", hold.holdId(), releaseFailure); } throw e; }
     }
 
     @Override
@@ -247,6 +270,8 @@ public class OrderServiceImpl implements OrderService {
                     log.info("Hold {} not releasable ({}), continuing cancel", item.getFulfillmentRef(),
                             alreadyGone.getCode());
                 }
+            } else if (item.getVertical() == OrderItemVertical.CAR && item.getFulfillmentRef() != null) {
+                carHoldClient.release(item.getFulfillmentRef());
             }
         }
 
@@ -282,6 +307,8 @@ public class OrderServiceImpl implements OrderService {
         for (OrderItem item : items) {
             if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
                 hotelHoldClient.confirm(item.getFulfillmentRef());
+            } else if (item.getVertical() == OrderItemVertical.CAR && item.getFulfillmentRef() != null) {
+                carHoldClient.confirm(item.getFulfillmentRef());
             }
         }
         order.setStatus(OrderStatus.CONFIRMED);
@@ -307,6 +334,22 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getCustomerId().equals(actorUserId)) {
             throw new AccessDeniedException("Order does not belong to the authenticated customer");
         }
+    }
+
+    /** Turkish label for a car-rental-service CarCategory name (shown to customers on orders and vouchers). */
+    static String carCategoryLabel(String category) {
+        if (category == null) return "";
+        return switch (category) {
+            case "ECONOMY" -> "Ekonomi";
+            case "COMPACT" -> "Kompakt";
+            case "MIDSIZE" -> "Orta";
+            case "FULLSIZE" -> "Buyuk";
+            case "SUV" -> "SUV";
+            case "MINIVAN" -> "Minivan";
+            case "VAN" -> "Van";
+            case "LUXURY" -> "Luks";
+            default -> category;
+        };
     }
 
     private Order findOrThrow(UUID orderId) {
@@ -347,7 +390,9 @@ public class OrderServiceImpl implements OrderService {
                 item.getQuantity(),
                 item.getSubtotal(),
                 item.getCurrency(),
-                item.getCreatedAt()
+                item.getCreatedAt(),
+                item.getPickupAt(),
+                item.getReturnAt()
         );
     }
 }

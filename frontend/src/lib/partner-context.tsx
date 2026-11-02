@@ -7,6 +7,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { partnerApi, type Membership, type PartnerHotel } from './partner';
+import { type BusinessType } from './partner-car';
 
 const ORG_KEY = 'waylo_partner_org';
 const HOTEL_KEY = 'waylo_partner_hotel';
@@ -20,6 +21,8 @@ interface PartnerContextValue {
   hotels: PartnerHotel[];
   hotelId: string | null;
   hotel: PartnerHotel | null;
+  /** The selected membership's business type (HOTEL | CAR_RENTAL). */
+  businessType: BusinessType | null;
   selectOrganization: (organizationId: string) => void;
   selectHotel: (hotelId: string) => void;
   /** Re-fetch memberships and hotels, e.g. after creating an organization or hotel. */
@@ -27,6 +30,8 @@ interface PartnerContextValue {
   /** A page with unsaved edits sets this; the workspace selector is locked while it is true. */
   hasUnsavedChanges: boolean;
   setHasUnsavedChanges: (dirty: boolean) => void;
+  /** True when the currently selected org is CAR_RENTAL. */
+  isCarRentalOrg: boolean;
 }
 
 const PartnerContext = createContext<PartnerContextValue | null>(null);
@@ -114,21 +119,25 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
     setHotelId(id);
   }, [hasUnsavedChanges, hotels]);
 
+  const membership = memberships.find(m => m.organizationId === organizationId) ?? null;
+
   const value = useMemo<PartnerContextValue>(() => ({
     loading,
     error,
     memberships,
     organizationId,
-    membership: memberships.find(m => m.organizationId === organizationId) ?? null,
+    membership,
     hotels,
     hotelId,
     hotel: hotels.find(h => h.id === hotelId) ?? null,
+    businessType: membership?.organizationBusinessType ?? null,
     selectOrganization,
     selectHotel,
     reload,
     hasUnsavedChanges,
     setHasUnsavedChanges,
-  }), [loading, error, memberships, organizationId, hotels, hotelId, selectOrganization, selectHotel, reload, hasUnsavedChanges]);
+    isCarRentalOrg: membership?.organizationBusinessType === 'CAR_RENTAL',
+  }), [loading, error, memberships, organizationId, hotels, hotelId, membership, selectOrganization, selectHotel, reload, hasUnsavedChanges]);
 
   return <PartnerContext.Provider value={value}>{children}</PartnerContext.Provider>;
 }

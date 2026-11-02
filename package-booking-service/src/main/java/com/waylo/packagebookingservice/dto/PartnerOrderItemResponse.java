@@ -2,6 +2,7 @@ package com.waylo.packagebookingservice.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /** Supplier-facing view of an order item. Deliberately carries no customer, payment or other-item data. */
@@ -13,5 +14,7 @@ public record PartnerOrderItemResponse(
         String description,
         BigDecimal amount,
         String currency,
-        UUID fulfillmentRef
+        UUID fulfillmentRef,
+        LocalDateTime pickupAt,
+        LocalDateTime returnAt
 ) {}

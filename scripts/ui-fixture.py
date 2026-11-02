@@ -81,7 +81,7 @@ def create():
     STATE.chmod(0o600)
     owner_tok = must('POST', '/api/auth/login', state['accounts']['owner'])['token']
     admin_tok = must('POST', '/api/auth/login', state['accounts']['admin'])['token']
-    org = must('POST', '/api/organizations', {'name': f'UI Test Oteli {uuid.uuid4().hex[:4]}'}, owner_tok)
+    org = must('POST', '/api/organizations', {'name': f'UI Test Oteli {uuid.uuid4().hex[:4]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, owner_tok)
     state['orgId'] = org['id']
     STATE.write_text(json.dumps(state))
     hotel = must('POST', '/api/hotels', {'name': 'UI Test Hotel', 'city': 'Antalya', 'country': 'TR',

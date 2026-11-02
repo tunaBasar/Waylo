@@ -10,7 +10,8 @@ RUN --mount=type=cache,id=waylo-gradle,target=/root/.gradle,sharing=locked \
 FROM eclipse-temurin:21-jre-alpine AS runtime
 ARG SERVICE
 WORKDIR /app
-RUN addgroup -S waylo && adduser -S waylo -G waylo
+RUN addgroup -S waylo && adduser -S waylo -G waylo \
+    && mkdir -p /data/car-documents && chown waylo:waylo /data/car-documents
 COPY --from=build --chown=waylo:waylo /workspace/${SERVICE}/build/libs/*-SNAPSHOT.jar app.jar
 USER waylo
 ENTRYPOINT ["java", "-jar", "app.jar"]

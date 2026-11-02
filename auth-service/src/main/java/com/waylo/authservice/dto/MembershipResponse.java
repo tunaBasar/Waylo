@@ -1,5 +1,7 @@
 package com.waylo.authservice.dto;
 
+import com.waylo.authservice.domain.BusinessType;
+import com.waylo.authservice.domain.LegalType;
 import com.waylo.authservice.domain.MembershipStatus;
 import com.waylo.authservice.domain.OrganizationStatus;
 
@@ -11,6 +13,8 @@ public record MembershipResponse(
         UUID organizationId,
         String organizationName,
         OrganizationStatus organizationStatus,
+        BusinessType organizationBusinessType,
+        LegalType organizationLegalType,
         MembershipStatus status,
         List<RoleGrantResponse> roles
 ) {

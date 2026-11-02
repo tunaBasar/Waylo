@@ -19,7 +19,7 @@ class GlobalExceptionHandlerHttpErrorsTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
-    private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/vehicles");
+    private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/rentals");
 
     @Test
     void methodNotAllowed_handler_returns405() {

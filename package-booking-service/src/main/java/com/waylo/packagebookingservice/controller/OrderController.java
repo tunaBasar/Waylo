@@ -2,6 +2,7 @@ package com.waylo.packagebookingservice.controller;
 
 import com.waylo.packagebookingservice.dto.ApiResponse;
 import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
+import com.waylo.packagebookingservice.dto.CarOrderCreateRequest;
 import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.dto.OrderResponse;
 import com.waylo.packagebookingservice.dto.VoucherResponse;
@@ -49,6 +50,13 @@ public class OrderController {
         }
         OrderResponse response = orderService.createHotelOrder(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(response, "Order created"));
+    }
+
+    @PostMapping("/car")
+    public ResponseEntity<ApiResponse<OrderResponse>> createCar(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role, @Valid @RequestBody CarOrderCreateRequest request) {
+        if ("ADMIN".equals(role)) throw new AccessDeniedException("Platform administrators cannot place orders, use a customer account", AccessDeniedException.ADMIN_CANNOT_PURCHASE);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(orderService.createCarOrder(userId, request), "Order created"));
     }
 
     @GetMapping("/{id}")

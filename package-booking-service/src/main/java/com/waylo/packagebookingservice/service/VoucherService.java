@@ -77,6 +77,9 @@ public class VoucherService {
     }
 
     static Instant[] window(OrderItem item) {
+        if (item.getVertical() == OrderItemVertical.CAR && item.getPickupAt() != null && item.getReturnAt() != null) {
+            return new Instant[] { item.getPickupAt().minusHours(2).atZone(DEFAULT_ZONE).toInstant(), item.getReturnAt().atZone(DEFAULT_ZONE).toInstant() };
+        }
         if (item.getVertical() == OrderItemVertical.HOTEL && item.getCheckIn() != null && item.getCheckOut() != null) {
             return new Instant[] {
                     item.getCheckIn().atStartOfDay(DEFAULT_ZONE).toInstant(),

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,6 +50,44 @@ class InternalOrganizationControllerTest {
         List<UUID> result = controller.activeIds();
 
         assertEquals(List.of(), result);
+    }
+
+    @Test
+    void getOrganization_returnsDetailWithTypes() throws Exception {
+        // Use the 3-arg constructor to set businessType and legalType
+        Constructor<Organization> ctor = Organization.class.getDeclaredConstructor(
+                String.class, com.waylo.authservice.domain.BusinessType.class,
+                com.waylo.authservice.domain.LegalType.class);
+        ctor.setAccessible(true);
+        Organization org = ctor.newInstance("Test Org",
+                com.waylo.authservice.domain.BusinessType.CAR_RENTAL,
+                com.waylo.authservice.domain.LegalType.INDIVIDUAL);
+        Field idField = Organization.class.getDeclaredField("id");
+        idField.setAccessible(true);
+        UUID orgId = UUID.randomUUID();
+        idField.set(org, orgId);
+
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        InternalOrganizationController.InternalOrganizationDetail detail =
+                controller.getOrganization(orgId);
+
+        assertEquals(orgId, detail.id());
+        assertEquals("Test Org", detail.name());
+        assertEquals(com.waylo.authservice.domain.OrganizationStatus.PENDING, detail.status());
+        assertEquals(com.waylo.authservice.domain.BusinessType.CAR_RENTAL, detail.businessType());
+        assertEquals(com.waylo.authservice.domain.LegalType.INDIVIDUAL, detail.legalType());
+        verify(organizationRepository).findById(orgId);
+    }
+
+    @Test
+    void getOrganization_returns404ForMissing() {
+        UUID missing = UUID.randomUUID();
+        when(organizationRepository.findById(missing)).thenReturn(Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.getOrganization(missing));
     }
 
     /** Organization's constructor and ID are package-private/generated; set the id via reflection for this test double. */

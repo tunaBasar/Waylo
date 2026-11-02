@@ -314,40 +314,12 @@ done
 echo ""
 
 # =============================================
-# 5. VEHICLES
+# 5. ARAC KIRALAMA (CAR_RENTAL partner akisi)
 # =============================================
-echo "--- 5. ARACLAR ---"
-login
-
-create_vehicle() {
-  local plate="$1" brand="$2" model="$3" year="$4" type="$5" seat="$6" rate="$7" loc="$8" color="$9" mileage="${10}"
-  local existing
-  existing=$(curl -s "$BASE/api/vehicles/plate/$plate" | python3 -c 'import sys,json;
-try: print(json.load(sys.stdin)["data"]["id"])
-except Exception: pass' 2>/dev/null || true)
-  if [ -n "$existing" ]; then
-    echo "  [SKIP] $brand $model ($plate) (zaten var)"
-    return
-  fi
-  result=$(post "/api/vehicles" "{\"plateNumber\":\"$plate\",\"brand\":\"$brand\",\"model\":\"$model\",\"year\":$year,\"vehicleType\":\"$type\",\"seatCount\":$seat,\"dailyRate\":$rate,\"currency\":\"TRY\",\"location\":\"$loc\",\"color\":\"$color\",\"mileage\":$mileage}" "$brand $model ($plate)")
-  echo "$result" | head -1
-}
-
-create_vehicle "34 WYL 10" "Toyota"     "Corolla"     2024 "ECONOMY"  5  250  "Istanbul Havalimani"  "Beyaz"   15000
-create_vehicle "34 WYL 11" "Renault"    "Clio"        2024 "ECONOMY"  5  200  "Istanbul Havalimani"  "Gri"     12000
-create_vehicle "34 WYL 12" "Fiat"       "Egea"        2023 "COMPACT"  5  220  "Sabiha Gokcen"        "Mavi"    28000
-create_vehicle "34 WYL 13" "Volkswagen" "Golf"        2024 "COMPACT"  5  280  "Sabiha Gokcen"        "Siyah"   8000
-create_vehicle "07 WYL 20" "Toyota"     "Camry"       2024 "MIDSIZE"  5  350  "Antalya Havalimani"   "Beyaz"   5000
-create_vehicle "07 WYL 21" "Honda"      "Civic"       2023 "MIDSIZE"  5  320  "Antalya Havalimani"   "Kirmizi" 22000
-create_vehicle "06 WYL 30" "Ford"       "Mondeo"      2024 "FULLSIZE" 5  400  "Ankara Esenboga"      "Lacivert" 10000
-create_vehicle "35 WYL 40" "BMW"        "X3"          2024 "SUV"      5  650  "Izmir Adnan Menderes" "Siyah"   7000
-create_vehicle "48 WYL 50" "Mercedes"   "GLE"         2024 "SUV"      5  750  "Bodrum Havalimani"    "Beyaz"   4000
-create_vehicle "34 WYL 60" "Mercedes"   "E-Class"     2024 "LUXURY"   5  900  "Istanbul Havalimani"  "Siyah"   3000
-create_vehicle "34 WYL 61" "BMW"        "7 Serisi"    2024 "LUXURY"   5  1100 "Istanbul Havalimani"  "Lacivert" 2000
-create_vehicle "07 WYL 70" "Ford"       "Tourneo"     2023 "VAN"      9  500  "Antalya Havalimani"   "Beyaz"   35000
-create_vehicle "34 WYL 71" "Mercedes"   "Vito"        2024 "VAN"      8  600  "Sabiha Gokcen"        "Gri"     15000
-create_vehicle "34 WYL 80" "Hyundai"    "i20"         2023 "ECONOMY"  5  180  "Istanbul Havalimani"  "Yesil"   40000
-create_vehicle "61 WYL 90" "Dacia"      "Duster"      2024 "SUV"      5  450  "Trabzon Havalimani"   "Turuncu" 6000
+echo "--- 5. ARAC KIRALAMA PARTNERI ---"
+if ! SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" python3 "$ROOT_DIR/scripts/seed-car-partner.py"; then
+  printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
+fi
 
 echo ""
 
@@ -513,7 +485,7 @@ echo "Flights:        $(count_endpoint "/api/flights" "len(data)")"
 echo "Seats:          $SEAT_TOTAL"
 echo "Hotels:         $(count_endpoint "/api/hotels" "len(data)")"
 echo "Rooms:          $ROOM_TOTAL"
-echo "Vehicles:       $(count_endpoint "/api/vehicles" "len(data)")"
+echo "Car branches:   $(count_endpoint "/api/car-branches" "len(data)")"
 echo "Customers:      $(count_endpoint "/api/customers" "len(data)")"
 echo "Pricing Rules:  $(count_endpoint "/api/pricing-rules" "len(data)")"
 

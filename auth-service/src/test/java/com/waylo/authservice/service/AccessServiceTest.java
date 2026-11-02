@@ -32,6 +32,8 @@ class AccessServiceTest {
     private static final UUID ORG_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID HOTEL_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID OTHER_HOTEL_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final UUID CAR_ORG_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID HOTEL_ORG_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     // ---- Null-input tests ----
 
@@ -365,19 +367,97 @@ class AccessServiceTest {
         }
     }
 
+    // ---- FLEET_MANAGE matrix tests ----
+
+    @Nested
+    @DisplayName("FLEET_MANAGE")
+    class FleetManageTests {
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER of CAR_RENTAL org is allowed")
+        void fleetManage_carOrgOwner_allowed() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    CAR_ORG_ID, BusinessType.CAR_RENTAL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, CAR_ORG_ID)).thenReturn(List.of(grant));
+
+            assertTrue(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.FLEET_MANAGE).allowed());
+        }
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER of HOTEL org is denied")
+        void fleetManage_hotelOrgOwner_denied() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    HOTEL_ORG_ID, BusinessType.HOTEL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, HOTEL_ORG_ID)).thenReturn(List.of(grant));
+
+            assertFalse(accessService.check(USER_ID, HOTEL_ORG_ID, null, Permission.FLEET_MANAGE).allowed());
+        }
+
+        @Test
+        @DisplayName("Non-owner role denied even on CAR_RENTAL org")
+        void fleetManage_nonOwner_denied() {
+            var grant = makeGrantWithBusinessType(Role.HOTEL_MANAGER, ScopeType.HOTEL, HOTEL_ID,
+                    BusinessType.CAR_RENTAL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+
+            assertFalse(accessService.check(USER_ID, ORG_ID, null, Permission.FLEET_MANAGE).allowed());
+        }
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER without org scope denied on CAR_RENTAL org")
+        void fleetManage_orgOwnerHotelScope_denied() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.HOTEL, HOTEL_ID,
+                    BusinessType.CAR_RENTAL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+
+            assertFalse(accessService.check(USER_ID, ORG_ID, null, Permission.FLEET_MANAGE).allowed());
+        }
+    }
+
+    // ---- HOTEL_CREATE on CAR_RENTAL org tests ----
+
+    @Nested
+    @DisplayName("HOTEL_CREATE on CAR_RENTAL org")
+    class HotelCreateOnCarRentalTests {
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER of CAR_RENTAL org denied for HOTEL_CREATE")
+        void hotelCreate_carOrg_denied() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    CAR_ORG_ID, BusinessType.CAR_RENTAL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, CAR_ORG_ID)).thenReturn(List.of(grant));
+
+            assertFalse(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.HOTEL_CREATE).allowed());
+        }
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER of HOTEL org allowed for HOTEL_CREATE")
+        void hotelCreate_hotelOrg_allowed() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    HOTEL_ORG_ID, BusinessType.HOTEL);
+            when(accessQueryRepository.findActiveGrants(USER_ID, HOTEL_ORG_ID)).thenReturn(List.of(grant));
+
+            assertTrue(accessService.check(USER_ID, HOTEL_ORG_ID, null, Permission.HOTEL_CREATE).allowed());
+        }
+    }
+
     // ---- Helper: create a mocked RoleAssignment ----
 
     private RoleAssignment makeGrant(Role role, ScopeType scopeType, UUID scopeId) {
+        return makeGrantWithBusinessType(role, scopeType, scopeId, BusinessType.HOTEL);
+    }
+
+    private RoleAssignment makeGrantWithBusinessType(Role role, ScopeType scopeType,
+                                                      UUID scopeId, BusinessType businessType) {
         RoleAssignment grant = org.mockito.Mockito.mock(RoleAssignment.class);
         org.mockito.Mockito.when(grant.getRole()).thenReturn(role);
         org.mockito.Mockito.when(grant.getScopeType()).thenReturn(scopeType);
         org.mockito.Mockito.when(grant.getScopeId()).thenReturn(scopeId);
 
-        // membership and organization mocks are lenient — only needed to avoid constructor
-        // exceptions if real entities were used; tests use pure mocks.
         var membership = org.mockito.Mockito.mock(com.waylo.authservice.domain.OrganizationMembership.class);
         var organization = org.mockito.Mockito.mock(com.waylo.authservice.domain.Organization.class);
-        org.mockito.Mockito.lenient().when(organization.getId()).thenReturn(ORG_ID);
+        org.mockito.Mockito.lenient().when(organization.getId()).thenReturn(scopeId);
+        org.mockito.Mockito.lenient().when(organization.getBusinessType()).thenReturn(businessType);
         org.mockito.Mockito.lenient().when(membership.getOrganization()).thenReturn(organization);
         org.mockito.Mockito.lenient().when(grant.getMembership()).thenReturn(membership);
 

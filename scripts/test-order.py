@@ -112,7 +112,7 @@ def main():
         tok_o, tok_a, tok_b, tok_admin = owner['token'], cust_a['token'], cust_b['token'], admin['token']
 
         # --- fixture ---
-        org = must('POST', '/api/organizations', {'name': f'ord-test-{uuid.uuid4().hex[:8]}'}, tok_o)
+        org = must('POST', '/api/organizations', {'name': f'ord-test-{uuid.uuid4().hex[:8]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, tok_o)
         org_id = org['id']
         hotel = must('POST', '/api/hotels', {'name': 'Order test hotel', 'city': f'OT{uuid.uuid4().hex[:8]}',
                                               'country': 'TR', 'address': 'Test only', 'starRating': 3,

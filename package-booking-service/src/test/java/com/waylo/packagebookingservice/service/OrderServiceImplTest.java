@@ -53,6 +53,9 @@ class OrderServiceImplTest {
     private com.waylo.packagebookingservice.client.HotelHoldClient hotelHoldClient;
 
     @Mock
+    private com.waylo.packagebookingservice.client.CarHoldClient carHoldClient;
+
+    @Mock
     private com.waylo.packagebookingservice.client.PaymentEscrowClient paymentEscrowClient;
 
     @Mock
@@ -64,7 +67,7 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, paymentEscrowClient, voucherService);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, paymentEscrowClient, voucherService);
     }
 
     private OrderItemCreateRequest validItem(String currency) {

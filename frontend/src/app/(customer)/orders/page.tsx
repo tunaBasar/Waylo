@@ -5,6 +5,20 @@ import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 
+// ── Local types ───────────────────────────────────────────────────────────────
+
+interface OrderItem {
+  id: string;
+  vertical: 'HOTEL' | 'CAR' | 'FLIGHT' | string;
+  description: string;
+  unitAmount: number;
+  quantity: number;
+  subtotal: number;
+  currency: string;
+  pickupAt: string | null;
+  returnAt: string | null;
+}
+
 interface Order {
   id: string;
   status: string;
@@ -13,6 +27,7 @@ interface Order {
   totalAmount: number;
   createdAt: string;
   holdExpiresAt?: string | null;
+  items?: OrderItem[];
 }
 
 interface Voucher {
@@ -24,6 +39,8 @@ interface Voucher {
   validFrom: string;
   validUntil: string;
   redeemedAt: string | null;
+  pickupAt?: string | null;
+  returnAt?: string | null;
 }
 
 interface Intent {
@@ -36,6 +53,17 @@ interface OrderPayment {
   intent: Intent | null;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Format an offsetless local datetime (e.g. "2026-11-06T09:00:00") as dd.MM.yyyy HH:mm */
+function formatOffsetDateTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}$/);
+  if (!match) return iso;
+  const [, year, month, day, hour, minute] = match;
+  return `${day}.${month}.${year} ${hour}:${minute}`;
+}
+
 const VOUCHER_STATUS_TR: Record<Voucher['status'], string> = {
   ACTIVE: 'Gecerli',
   REDEEMED: 'Kullanildi',
@@ -43,6 +71,19 @@ const VOUCHER_STATUS_TR: Record<Voucher['status'], string> = {
 };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
+
+const STATUS_TR: Record<string, string> = {
+  PENDING: 'Odeme bekleniyor',
+  CONFIRMED: 'Onaylandi',
+  CANCELLED: 'Iptal edildi',
+  EXPIRED: 'Suresi doldu',
+};
+
+function statusLabel(status: string): string {
+  return STATUS_TR[status] ?? status;
+}
+
+// ── Components ────────────────────────────────────────────────────────────────
 
 function QrImage({ payload }: { payload: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -79,6 +120,11 @@ function VoucherList({ orderId, testMode }: { orderId: string; testMode: boolean
             {VOUCHER_STATUS_TR[v.status]} · Gecerlilik: {fmt(v.validFrom)} - {fmt(v.validUntil)}
             {v.redeemedAt && ` · Kullanim: ${fmt(v.redeemedAt)}`}
           </p>
+          {v.pickupAt && v.returnAt && (
+            <p className="text-xs text-on-surface-variant">
+              Gidis: {formatOffsetDateTime(v.pickupAt)} · Donus: {formatOffsetDateTime(v.returnAt)}
+            </p>
+          )}
           {v.payload && <QrImage payload={v.payload} />}
           {v.payload && (
             <div className="flex flex-wrap items-center gap-2">
@@ -110,7 +156,11 @@ function PayPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       }
       onPaid();
     } catch (err) {
-      setMsg(err instanceof ApiError ? err.message : 'Odeme basarisiz');
+      if (err instanceof ApiError && err.code === 'COMMISSION_RATE_MISSING') {
+        setMsg('Bu urun icin satis henuz acik degil (komisyon orani tanimli degil). Lutfen daha sonra tekrar deneyin.');
+      } else {
+        setMsg(err instanceof ApiError ? err.message : 'Odeme basarisiz');
+      }
     } finally {
       setBusy(false);
     }
@@ -144,9 +194,17 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
     <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-on-surface">#{order.id}</span>
-        <span className="text-xs text-on-surface-variant">{order.status}</span>
+        <span className="text-xs text-on-surface-variant">{statusLabel(order.status)}</span>
       </div>
       <p className="mt-2 text-lg font-bold text-primary">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: order.currency }).format(order.totalAmount)}</p>
+      {order.items && order.items.map(item => (
+        <div key={item.id} className="mt-1 text-xs text-on-surface-variant">
+          <p>{item.description}</p>
+          {item.vertical === 'CAR' && item.pickupAt && item.returnAt && (
+            <p>Alis: {formatOffsetDateTime(item.pickupAt)} - Teslim: {formatOffsetDateTime(item.returnAt)}</p>
+          )}
+        </div>
+      ))}
       {order.status === 'PENDING' && order.holdExpiresAt && (
         <p className="text-xs font-medium text-error">
           {fmt(order.holdExpiresAt)} saate kadar odeme yapin
@@ -176,7 +234,7 @@ function OrdersContent() {
   return (
     <div className="space-y-space-md">
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Siparislerim</h2>
-      {createdId && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu: {createdId}</p>}
+      {createdId && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu. 15 dakika icinde odeme yapin.</p>}
       {error && <p className="rounded-xl bg-error-container p-3 text-sm text-on-error-container">{error}</p>}
       {orders.length === 0 && !error ? (
         <p className="text-sm text-on-surface-variant">Siparis bulunamadi</p>

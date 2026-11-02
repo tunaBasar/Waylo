@@ -10,5 +10,7 @@ public enum Permission {
     /** See reservations/order items of the organization: ORGANIZATION_OWNER, HOTEL_OWNER, HOTEL_MANAGER, HOTEL_STAFF. */
     RESERVATION_READ,
     /** Redeem a customer voucher (releases escrow): same roles as RESERVATION_READ. */
-    RESERVATION_REDEEM
+    RESERVATION_REDEEM,
+    /** Manage vehicles for CAR_RENTAL orgs: ORGANIZATION_OWNER of a CAR_RENTAL org only. */
+    FLEET_MANAGE
 }

@@ -1,5 +1,7 @@
 package com.waylo.authservice.service;
 
+import com.waylo.authservice.domain.BusinessType;
+import com.waylo.authservice.domain.LegalType;
 import com.waylo.authservice.domain.Organization;
 import com.waylo.authservice.domain.OrganizationMembership;
 import com.waylo.authservice.domain.Role;
@@ -72,7 +74,7 @@ class OrganizationServiceTest {
         membershipIdField = OrganizationMembership.class.getDeclaredField("id");
         membershipIdField.setAccessible(true);
 
-        organization = new Organization(ORG_NAME);
+        organization = new Organization(ORG_NAME, BusinessType.HOTEL, LegalType.COMPANY);
         setOrganizationId(organization, ORG_ID);
 
         membership = new OrganizationMembership(user, organization);
@@ -91,7 +93,7 @@ class OrganizationServiceTest {
     @Test
     void createOrganization_savesOrgMembershipAndOwner() throws Exception {
         // Arrange
-        CreateOrganizationRequest req = new CreateOrganizationRequest(" Acme Corp ");
+        CreateOrganizationRequest req = new CreateOrganizationRequest(" Acme Corp ", BusinessType.HOTEL, LegalType.COMPANY);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(0L);
         when(organizationRepository.saveAndFlush(any(Organization.class))).thenAnswer(invocation -> {
@@ -124,7 +126,7 @@ class OrganizationServiceTest {
     @Test
     void createOrganization_unknownUser_returns404() {
         // Arrange
-        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org");
+        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org", BusinessType.HOTEL, LegalType.COMPANY);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -139,7 +141,7 @@ class OrganizationServiceTest {
     @Test
     void createOrganization_assignsORGANIZATION_OWNERWithOrganizationScope() throws Exception {
         // Arrange
-        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org");
+        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org", BusinessType.HOTEL, LegalType.COMPANY);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(0L);
         when(organizationRepository.saveAndFlush(any(Organization.class))).thenAnswer(invocation -> {
@@ -204,7 +206,7 @@ class OrganizationServiceTest {
     @Test
     void createOrganization_limitReached_returns409() {
         // Arrange
-        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org");
+        CreateOrganizationRequest req = new CreateOrganizationRequest("Test Org", BusinessType.HOTEL, LegalType.COMPANY);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(membershipRepository.countOwnedOrganizations(USER_ID)).thenReturn(5L);
 

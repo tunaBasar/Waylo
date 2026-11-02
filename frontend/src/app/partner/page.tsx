@@ -13,7 +13,7 @@
 import { useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
-import { partnerApi, ORGANIZATION_STATUS_LABEL, ROLE_LABEL, type HotelRequest, type OrganizationStatus } from '@/lib/partner';
+import { partnerApi, ORGANIZATION_STATUS_LABEL, ROLE_LABEL, type HotelRequest, type OrganizationStatus, type BusinessType, type LegalType } from '@/lib/partner';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const STATUS_TONE: Record<OrganizationStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -27,6 +27,8 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
   const toast = useToast();
   const { reload } = usePartner();
   const [name, setName] = useState('');
+  const [businessType, setBusinessType] = useState<BusinessType>('HOTEL');
+  const [legalType, setLegalType] = useState<LegalType>('COMPANY');
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
 
@@ -36,7 +38,7 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
     inFlight.current = true;
     setSaving(true);
     try {
-      const res = await partnerApi.createOrganization(name.trim());
+      const res = await partnerApi.createOrganization({ name: name.trim(), businessType, legalType });
       toast.success('Isletme olusturuldu. Platform onayindan sonra oteller yayina alinir.');
       await reload({ organizationId: res.data.id });
       onDone();
@@ -57,6 +59,20 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
               onChange={e => setName(e.target.value)} placeholder="Ornek: Ege Otelcilik A.S." />
           </Field>
         </div>
+        <Field label="Isletme tipi">
+          <select className={inputClass} value={businessType}
+            onChange={e => setBusinessType(e.target.value as BusinessType)}>
+            <option value="HOTEL">Otel</option>
+            <option value="CAR_RENTAL">Araclar</option>
+          </select>
+        </Field>
+        <Field label="Hukuki sekil">
+          <select className={inputClass} value={legalType}
+            onChange={e => setLegalType(e.target.value as LegalType)}>
+            <option value="COMPANY">Sirket</option>
+            <option value="INDIVIDUAL">Mukerrat</option>
+          </select>
+        </Field>
         <Button type="submit" icon="check" disabled={saving || !name.trim()}>{saving ? 'Kaydediliyor' : 'Olustur'}</Button>
         <Button type="button" variant="ghost" onClick={onDone}>Vazgec</Button>
       </form>

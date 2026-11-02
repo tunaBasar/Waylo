@@ -21,7 +21,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
     @Query(value = """
             select new com.waylo.packagebookingservice.dto.PartnerOrderItemResponse(
                 i.id, o.id, cast(o.status as string), o.createdAt, i.description,
-                i.unitAmount * i.quantity, i.currency, i.fulfillmentRef)
+                i.unitAmount * i.quantity, i.currency, i.fulfillmentRef, i.pickupAt, i.returnAt)
             from OrderItem i join Order o on o.id = i.orderId
             where i.supplierOrganizationId = :orgId
               and o.status in :statuses

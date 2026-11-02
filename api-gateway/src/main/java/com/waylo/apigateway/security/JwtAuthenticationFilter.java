@@ -119,7 +119,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     /**
      * Check if the path is a public catalog browse path.
-     * Covers /api/hotels, /api/flights, /api/airports, /api/seat-inventory, /api/vehicles and their sub-paths.
+     * Covers /api/hotels, /api/flights, /api/airports, /api/seat-inventory, /api/car-branches and /api/car-offers.
      * Uses exact segment matching (equals prefix or starts with prefix + "/").
      */
     private boolean isPublicCatalogBrowsePath(String path) {
@@ -139,8 +139,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (path.equals("/api/seat-inventory") || path.startsWith("/api/seat-inventory/")) {
             return true;
         }
-        // Vehicles (car rental catalog)
-        if (path.equals("/api/vehicles") || path.startsWith("/api/vehicles/")) {
+        // Car rental catalog (sellable branches and offers)
+        if (path.equals("/api/car-branches") || path.equals("/api/car-offers")) {
             return true;
         }
         return false;

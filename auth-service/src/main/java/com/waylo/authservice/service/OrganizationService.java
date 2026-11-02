@@ -54,7 +54,7 @@ public class OrganizationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Organization limit reached");
         }
 
-        Organization organization = new Organization(req.name().trim());
+        Organization organization = new Organization(req.name().trim(), req.businessType(), req.legalType());
         organization = organizationRepository.saveAndFlush(organization);
 
         OrganizationMembership membership = new OrganizationMembership(user, organization);
@@ -68,7 +68,8 @@ public class OrganizationService {
                 organization.getId(), user.getId());
 
         return new OrganizationResponse(organization.getId(),
-                organization.getName(), organization.getStatus());
+                organization.getName(), organization.getStatus(),
+                organization.getBusinessType(), organization.getLegalType());
     }
 
     @Transactional(readOnly = true)
@@ -85,6 +86,7 @@ public class OrganizationService {
 
             return new MembershipResponse(membership.getId(),
                     org.getId(), org.getName(), org.getStatus(),
+                    org.getBusinessType(), org.getLegalType(),
                     membership.getStatus(), roles);
         }).toList();
     }

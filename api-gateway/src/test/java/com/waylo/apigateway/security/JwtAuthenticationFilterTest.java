@@ -1194,14 +1194,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void publicVehicleGet_anon_passesWithoutIdentity() {
+    void publicCarOffersGet_anon_passesWithoutIdentity() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             capturedRequest.set(exchange.getRequest());
             return exchange.getResponse().setComplete();
         };
 
-        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehicles/available?from=2026-11-01&to=2026-11-03").build();
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/car-offers?pickupBranchId=a&returnBranchId=b&pickupAt=2026-11-01T10:00:00&returnAt=2026-11-03T10:00:00&driverAge=30").build();
         ServerWebExchange exchange = MockServerWebExchange.from(request);
 
         JwtVerifier verifier = new JwtVerifier(SECRET);
@@ -1215,14 +1215,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void publicVehicleGet_withValidToken_forwardIdentityHeaders() {
+    void publicCarOffersGet_withValidToken_forwardIdentityHeaders() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             capturedRequest.set(exchange.getRequest());
             return exchange.getResponse().setComplete();
         };
 
-        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehicles/available?from=2026-11-01&to=2026-11-03")
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/car-offers?pickupBranchId=a&returnBranchId=b&pickupAt=2026-11-01T10:00:00&returnAt=2026-11-03T10:00:00&driverAge=30")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
                 .build();
         ServerWebExchange exchange = MockServerWebExchange.from(request);
@@ -1238,14 +1238,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void anonPOST_toVehicles_returns401() {
+    void anonGET_toPartnerCarBranches_returns401() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             capturedRequest.set(exchange.getRequest());
             return exchange.getResponse().setComplete();
         };
 
-        MockServerHttpRequest request = MockServerHttpRequest.post("/api/vehicles").build();
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/partner/organizations/x/branches").build();
         ServerWebExchange exchange = MockServerWebExchange.from(request);
 
         JwtVerifier verifier = new JwtVerifier(SECRET);
@@ -1278,14 +1278,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void vehiclesX_notPublic_returns401() {
+    void carOffersX_notPublic_returns401() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             capturedRequest.set(exchange.getRequest());
             return exchange.getResponse().setComplete();
         };
 
-        MockServerHttpRequest request = MockServerHttpRequest.get("/api/vehiclesX/available").build();
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/car-offersX").build();
         ServerWebExchange exchange = MockServerWebExchange.from(request);
 
         JwtVerifier verifier = new JwtVerifier(SECRET);

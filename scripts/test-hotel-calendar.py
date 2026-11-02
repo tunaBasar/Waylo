@@ -78,7 +78,7 @@ def ln(email, password):
 
 # ── Fixture builders ───────────────────────────────────────────────────────
 def mkorg(token, name="Org A"):
-    s, d = req("POST", "/api/organizations", {"name": name}, token=token)
+    s, d = req("POST", "/api/organizations", {"name": name, "businessType": "HOTEL", "legalType": "COMPANY"}, token=token)
     ok(s == 201, f"Org: 201 got {s}")
     # ApiResponse.success("Organization created", resp) → data is OrganizationResponse
     return d["data"]["id"]

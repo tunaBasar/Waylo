@@ -45,7 +45,8 @@ public class AdminOrganizationService {
             }
             result = organizationRepository.findByStatus(status, pageable);
         }
-        return result.map(org -> new OrganizationResponse(org.getId(), org.getName(), org.getStatus()));
+        return result.map(org -> new OrganizationResponse(org.getId(), org.getName(), org.getStatus(),
+                org.getBusinessType(), org.getLegalType()));
     }
 
     @Transactional

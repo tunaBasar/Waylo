@@ -80,7 +80,7 @@ def main():
 
     user_id, token = reg()
 
-    s, d = req("POST", "/api/organizations", {"name": f"PubProj Org {uuid.uuid4().hex[:8]}"}, token=token)
+    s, d = req("POST", "/api/organizations", {"name": f"PubProj Org {uuid.uuid4().hex[:8]}", "businessType": "HOTEL", "legalType": "COMPANY"}, token=token)
     ok(s == 201, f"Create org 201 got {s}")
     org_id = d["data"]["id"]
     ok(d["data"]["status"] == "PENDING", "New org starts PENDING")

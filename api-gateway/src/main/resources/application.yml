@@ -50,7 +50,7 @@ spring:
             - id: car-rental-service
               uri: lb://car-rental-service
               predicates:
-                - Path=/api/vehicles/**,/api/rentals/**
+                - Path=/api/partner/organizations/*/branches,/api/partner/organizations/*/branches/**,/api/partner/organizations/*/vehicles,/api/partner/organizations/*/vehicles/**,/api/partner/organizations/*/rates,/api/partner/organizations/*/rates/**,/api/partner/organizations/*/one-way-routes,/api/partner/organizations/*/one-way-routes/**,/api/partner/organizations/*/documents,/api/partner/organizations/*/documents/**,/api/partner/organizations/*/rentals,/api/partner/organizations/*/rentals/**,/api/partner/organizations/*/status,/api/admin/car-documents,/api/admin/car-documents/**,/api/admin/car-vehicles,/api/admin/car-vehicles/**,/api/car-branches,/api/car-offers,/api/rentals/**
             - id: package-booking-service
               uri: lb://package-booking-service
               predicates:

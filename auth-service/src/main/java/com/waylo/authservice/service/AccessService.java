@@ -98,9 +98,30 @@ public class AccessService {
                     || role == Role.HOTEL_MANAGER || role == Role.HOTEL_STAFF;
         }
 
+        // HOTEL_CREATE: denied on CAR_RENTAL orgs; otherwise allowed for ORGANIZATION_OWNER with org scope.
+        if (permission == Permission.HOTEL_CREATE) {
+            if (scopeType == ScopeType.ORGANIZATION) {
+                BusinessType businessType = getOrganizationBusinessType(grant);
+                if (businessType == BusinessType.CAR_RENTAL) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // FLEET_MANAGE: allowed only for ORGANIZATION_OWNER of a CAR_RENTAL org.
+        if (permission == Permission.FLEET_MANAGE) {
+            if (role != Role.ORGANIZATION_OWNER || scopeType != ScopeType.ORGANIZATION) {
+                return false;
+            }
+            return getOrganizationBusinessType(grant) == BusinessType.CAR_RENTAL;
+        }
+
         switch (role) {
             case ORGANIZATION_OWNER:
-                // ORGANIZATION_OWNER with scope ORGANIZATION -> allows all permissions for any hotel
+                // ORGANIZATION_OWNER with scope ORGANIZATION -> allows HOTEL_MANAGE/ROOM_MANAGE
+                // for HOTEL orgs (other permissions handled above).
                 if (scopeType == ScopeType.ORGANIZATION) {
                     return true;
                 }
@@ -110,10 +131,6 @@ public class AccessService {
             case HOTEL_MANAGER:
                 // Requires scope HOTEL and matching scopeId == hotelId
                 if (scopeType == ScopeType.HOTEL && scopeId != null && scopeId.equals(hotelId)) {
-                    // HOTEL_CREATE is not allowed for hotel-scoped roles
-                    if (permission == Permission.HOTEL_CREATE) {
-                        return false;
-                    }
                     // HOTEL_MANAGE and ROOM_MANAGE are allowed for own hotel
                     return (permission == Permission.HOTEL_MANAGE || permission == Permission.ROOM_MANAGE);
                 }
@@ -126,6 +143,22 @@ public class AccessService {
             default:
                 return false;
         }
+    }
+
+    /** Read businessType from the organization behind the grant's membership. */
+    private static BusinessType getOrganizationBusinessType(RoleAssignment grant) {
+        try {
+            com.waylo.authservice.domain.OrganizationMembership membership = grant.getMembership();
+            if (membership != null) {
+                com.waylo.authservice.domain.Organization org = membership.getOrganization();
+                if (org != null) {
+                    return org.getBusinessType();
+                }
+            }
+        } catch (Exception e) {
+            // If any accessor throws, fall back to HOTEL (fail-safe).
+        }
+        return BusinessType.HOTEL;
     }
 
     /** Collect role names from the grant set. */

@@ -4,6 +4,7 @@ import com.waylo.packagebookingservice.domain.OrderItemVertical;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record OrderItemResponse(
@@ -18,5 +19,7 @@ public record OrderItemResponse(
         int quantity,
         BigDecimal subtotal,
         String currency,
-        Instant createdAt
+        Instant createdAt,
+        LocalDateTime pickupAt,
+        LocalDateTime returnAt
 ) {}

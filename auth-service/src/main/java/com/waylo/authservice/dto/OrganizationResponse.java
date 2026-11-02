@@ -1,5 +1,7 @@
 package com.waylo.authservice.dto;
 
+import com.waylo.authservice.domain.BusinessType;
+import com.waylo.authservice.domain.LegalType;
 import com.waylo.authservice.domain.OrganizationStatus;
 
 import java.util.UUID;
@@ -7,6 +9,8 @@ import java.util.UUID;
 public record OrganizationResponse(
         UUID id,
         String name,
-        OrganizationStatus status
+        OrganizationStatus status,
+        BusinessType businessType,
+        LegalType legalType
 ) {
 }

@@ -83,7 +83,7 @@ owner_id, owner = register()
 foreign_id, foreign = register()
 hotel_id = None
 try:
-    organization = data('POST', '/api/organizations', {'name': f'QH acceptance {uuid.uuid4().hex[:10]}'}, owner)
+    organization = data('POST', '/api/organizations', {'name': f'QH acceptance {uuid.uuid4().hex[:10]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, owner)
     org_id = organization['id']
     hotel = data('POST', '/api/hotels', {
         'name': 'Quote hold acceptance fixture', 'city': f'QH{uuid.uuid4().hex[:10]}',

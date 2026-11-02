@@ -51,10 +51,24 @@ public class Organization {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_type", nullable = false, length = 20)
+    private BusinessType businessType = BusinessType.HOTEL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "legal_type", nullable = false, length = 20)
+    private LegalType legalType = LegalType.COMPANY;
+
     protected Organization() {}
 
     public Organization(String name) {
         setName(name);
+    }
+
+    public Organization(String name, BusinessType businessType, LegalType legalType) {
+        setName(name);
+        setBusinessType(businessType);
+        setLegalType(legalType);
     }
 
     public UUID getId() { return id; }
@@ -63,6 +77,8 @@ public class Organization {
     public long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public BusinessType getBusinessType() { return businessType; }
+    public LegalType getLegalType() { return legalType; }
 
     public void setName(String name) {
         if (name == null || name.isBlank() || name.length() > 255) {
@@ -73,5 +89,13 @@ public class Organization {
 
     public void setStatus(OrganizationStatus status) {
         this.status = Objects.requireNonNull(status, "Organization status is required");
+    }
+
+    public void setBusinessType(BusinessType businessType) {
+        this.businessType = Objects.requireNonNull(businessType, "businessType is required");
+    }
+
+    public void setLegalType(LegalType legalType) {
+        this.legalType = Objects.requireNonNull(legalType, "legalType is required");
     }
 }

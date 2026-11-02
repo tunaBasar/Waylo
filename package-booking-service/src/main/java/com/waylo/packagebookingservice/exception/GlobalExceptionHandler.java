@@ -163,6 +163,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(response);
     }
 
+    @ExceptionHandler(CarRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleCarRejected(CarRejectedException ex, HttpServletRequest request) {
+        HttpStatus status = ex.getCarStatus() == 409 ? HttpStatus.CONFLICT : HttpStatus.UNPROCESSABLE_ENTITY;
+        var response = new ErrorResponse(status.value(), ex.getCode(), ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(status).body(response);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex,
                                                            HttpServletRequest request) {

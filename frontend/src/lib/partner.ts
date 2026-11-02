@@ -9,6 +9,8 @@ import { api, ApiError } from './api';
 
 // ---------- shared enums (string unions, values identical to backend enums) ----------
 
+export type BusinessType = 'HOTEL' | 'CAR_RENTAL';
+export type LegalType = 'COMPANY' | 'INDIVIDUAL';
 export type OrganizationStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 export type MembershipStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
 export type PartnerRole = 'ORGANIZATION_OWNER' | 'HOTEL_OWNER' | 'HOTEL_MANAGER' | 'HOTEL_STAFF';
@@ -24,10 +26,18 @@ export type Money = number;
 
 // ---------- auth-service ----------
 
+export interface CreateOrganizationRequest {
+  name: string;
+  businessType: BusinessType;
+  legalType: LegalType;
+}
+
 export interface Organization {
   id: string;
   name: string;
   status: OrganizationStatus;
+  businessType: BusinessType;
+  legalType: LegalType;
 }
 
 export interface RoleGrant {
@@ -41,6 +51,9 @@ export interface Membership {
   organizationId: string;
   organizationName: string;
   organizationStatus: OrganizationStatus;
+  /** auth-service MembershipResponse field names. */
+  organizationBusinessType: BusinessType;
+  organizationLegalType: LegalType;
   status: MembershipStatus;
   roles: RoleGrant[];
 }
@@ -257,7 +270,8 @@ const enc = encodeURIComponent;
 export const partnerApi = {
   // organizations and memberships
   myMemberships: () => api.get<Membership[]>('/api/me/memberships'),
-  createOrganization: (name: string) => api.post<Organization>('/api/organizations', { name }),
+  createOrganization: (body: CreateOrganizationRequest) =>
+    api.post<Organization>('/api/organizations', body),
   grantRole: (organizationId: string, body: RoleGrantRequest) =>
     api.post<RoleGrantResult>(`/api/organizations/${enc(organizationId)}/role-grants`, body),
   revokeRole: (organizationId: string, grantId: string) =>

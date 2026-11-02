@@ -11,6 +11,7 @@ const nav: NavItem[] = [
   { href: '/admin/airports', label: 'Havalimanlari', icon: 'flight_takeoff' },
   { href: '/admin/seats', label: 'Koltuklar', icon: 'airline_seat_recline_normal' },
   { href: '/admin/vehicles', label: 'Araclar', icon: 'directions_car' },
+  { href: '/admin/car-documents', label: 'Arac Belgeleri', icon: 'assignment_turned_in' },
   { href: '/admin/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
   { href: '/admin/customers', label: 'Musteriler', icon: 'group' },
   { href: '/admin/payments', label: 'Odemeler', icon: 'payments' },
