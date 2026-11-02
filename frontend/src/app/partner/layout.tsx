@@ -7,6 +7,7 @@ import { SurfaceShell, type NavItem } from '@/components/SurfaceShell';
 import { SurfaceGuard } from '@/components/SurfaceGuard';
 import { inputClass } from '@/components/partner/ui';
 import { partnerCarApi, type PartnerCarStatus } from '@/lib/partner-car';
+import { partnerBusApi, type BusPartnerStatus } from '@/lib/bus';
 
 const UNSAVED_LEAVE_MESSAGE =
   'Kaydedilmemis degisiklikler kaybolacak. Sayfadan ayrilmak istiyor musunuz?';
@@ -61,6 +62,41 @@ function CarStatusBanner() {
   );
 }
 
+// ── Bus status banner ──────────────────────────────────────────────────────────
+
+function BusStatusBanner() {
+  const { organizationId } = usePartner();
+  const [loaded, setLoaded] = useState<{ orgId: string; status: BusPartnerStatus } | null>(null);
+
+  useEffect(() => {
+    if (!organizationId) return;
+    let cancelled = false;
+    partnerBusApi.status(organizationId)
+      .then(res => { if (!cancelled) setLoaded({ orgId: organizationId, status: res.data }); })
+      .catch(() => { /* advisory only */ });
+    return () => { cancelled = true; };
+  }, [organizationId]);
+
+  const status = loaded && loaded.orgId === organizationId ? loaded.status : null;
+  if (!status || (status.sellable && status.salesEnabled)) return null;
+  return (
+    <div className="space-y-2 rounded-xl bg-warning-container px-4 py-3 text-sm text-on-warning-container">
+      {!status.salesEnabled && (
+        <div className="flex items-start gap-2">
+          <span className="material-symbols-outlined text-[20px]">lock</span>
+          <span>Otobus bileti satisi yasal onay tamamlanana kadar kapali. Otobus, sefer ve belgelerinizi simdiden hazirlayabilirsiniz.</span>
+        </div>
+      )}
+      {status.missingOrgDocuments.length > 0 && (
+        <div className="flex items-start gap-2">
+          <span className="material-symbols-outlined text-[20px]">description</span>
+          <span>Eksik firma belgeleri: {status.missingOrgDocuments.join(', ')}. Tamamlayin.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Hotel nav (unchanged) ─────────────────────────────────────────────────────
 
 const hotelNav: NavItem[] = [
@@ -83,10 +119,18 @@ const carNav: NavItem[] = [
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
+const busNav: NavItem[] = [
+  { href: '/partner/bus/buses', label: 'Otobusler', icon: 'directions_bus' },
+  { href: '/partner/bus/trips', label: 'Seferler', icon: 'route' },
+  { href: '/partner/bus/documents', label: 'Belgeler', icon: 'description' },
+  { href: '/partner/bus/bookings', label: 'Biletler', icon: 'confirmation_number' },
+  { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
+];
+
 // ── Workspace bar (hotel selector hidden for CAR_RENTAL) ───────────────────────
 
 function WorkspaceBar() {
-  const { memberships, organizationId, hotels, hotelId, selectOrganization, selectHotel, loading, error, reload, hasUnsavedChanges, isCarRentalOrg } = usePartner();
+  const { memberships, organizationId, hotels, hotelId, selectOrganization, selectHotel, loading, error, reload, hasUnsavedChanges, isCarRentalOrg, isBusOrg } = usePartner();
   if (error) {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-error-container text-on-error-container px-4 py-3 text-sm">
@@ -109,7 +153,7 @@ function WorkspaceBar() {
         </select>
       </label>
       {/* Hotel selector only for HOTEL orgs */}
-      {!isCarRentalOrg && (
+      {!isCarRentalOrg && !isBusOrg && (
         <label className="space-y-1 min-w-[200px]">
           <span className="text-[11px] font-medium text-on-surface-variant">Otel</span>
           <select className={inputClass} value={hotelId ?? ''} disabled={hotels.length === 0 || hasUnsavedChanges}
@@ -128,7 +172,7 @@ function WorkspaceBar() {
 
 function PartnerChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { hotelId, hasUnsavedChanges, isCarRentalOrg } = usePartner();
+  const { hotelId, hasUnsavedChanges, isCarRentalOrg, isBusOrg } = usePartner();
   const leaving = useRef(false);
 
   // ---- link-click guard (existing) ----
@@ -182,8 +226,9 @@ function PartnerChrome({ children }: { children: React.ReactNode }) {
     <div className="space-y-space-md">
       <WorkspaceBar />
       {isCarRentalOrg && <CarStatusBanner />}
+      {isBusOrg && <BusStatusBanner />}
       {/* key: switching hotel remounts the page for HOTEL orgs; for CAR_RENTAL, switching org remounts too */}
-      <div key={isCarRentalOrg ? 'car' : (hotelId ?? 'none')}>{children}</div>
+      <div key={isCarRentalOrg ? 'car' : isBusOrg ? 'bus' : (hotelId ?? 'none')}>{children}</div>
     </div>
   );
 }
@@ -191,16 +236,16 @@ function PartnerChrome({ children }: { children: React.ReactNode }) {
 // ── Frame (selects nav based on businessType) ─────────────────────────────────
 
 function PartnerFrame({ children }: { children: React.ReactNode }) {
-  const { memberships, loading, error, membership, isCarRentalOrg } = usePartner();
+  const { memberships, loading, error, membership, isCarRentalOrg, isBusOrg } = usePartner();
   const hasMembership = loading || error ? null : memberships.length > 0;
 
   // Determine nav and subtitle
-  const nav = isCarRentalOrg ? carNav : hotelNav;
+  const nav = isCarRentalOrg ? carNav : isBusOrg ? busNav : hotelNav;
   const subtitle = membership?.organizationName ?? 'Isletme Paneli';
 
   return (
     <SurfaceGuard hasMembership={hasMembership}>
-      <SurfaceShell brand="WAYLO" subtitle={subtitle} icon={isCarRentalOrg ? 'directions_car' : 'storefront'}
+      <SurfaceShell brand="WAYLO" subtitle={subtitle} icon={isCarRentalOrg ? 'directions_car' : isBusOrg ? 'directions_bus' : 'storefront'}
         nav={nav} bottomNav={nav}>
         <PartnerChrome>{children}</PartnerChrome>
       </SurfaceShell>

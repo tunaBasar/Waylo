@@ -6,5 +6,6 @@ package com.waylo.authservice.domain;
  */
 public enum BusinessType {
     HOTEL,
-    CAR_RENTAL
+    CAR_RENTAL,
+    BUS
 }

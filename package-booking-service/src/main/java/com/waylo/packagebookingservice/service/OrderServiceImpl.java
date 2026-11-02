@@ -2,6 +2,11 @@ package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.client.HotelHoldClient;
 import com.waylo.packagebookingservice.client.CarHoldClient;
+import com.waylo.packagebookingservice.client.BusHoldClient;
+import com.waylo.packagebookingservice.dto.BusOrderCreateRequest;
+import com.waylo.packagebookingservice.client.FlightHoldClient;
+import com.waylo.packagebookingservice.dto.FlightItemDetails;
+import com.waylo.packagebookingservice.dto.FlightOrderCreateRequest;
 import com.waylo.packagebookingservice.client.PaymentEscrowClient;
 import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.domain.Order;
@@ -27,6 +32,7 @@ import com.waylo.packagebookingservice.repository.OrderItemRepository;
 import com.waylo.packagebookingservice.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +54,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderEventPublisher eventPublisher;
     private final HotelHoldClient hotelHoldClient;
     private final CarHoldClient carHoldClient;
+    private final BusHoldClient busHoldClient;
+    private final FlightHoldClient flightHoldClient;
+    private final UUID flightSellerOrganizationId;
     private final PaymentEscrowClient paymentEscrowClient;
     private final VoucherService voucherService;
 
@@ -56,6 +65,9 @@ public class OrderServiceImpl implements OrderService {
                              OrderEventPublisher eventPublisher,
                              HotelHoldClient hotelHoldClient,
                              CarHoldClient carHoldClient,
+                             BusHoldClient busHoldClient,
+                             FlightHoldClient flightHoldClient,
+                             @Value("${waylo.flight.seller-organization-id:}") String flightSellerOrganizationId,
                              PaymentEscrowClient paymentEscrowClient,
                              VoucherService voucherService) {
         this.voucherService = voucherService;
@@ -64,6 +76,10 @@ public class OrderServiceImpl implements OrderService {
         this.eventPublisher = eventPublisher;
         this.hotelHoldClient = hotelHoldClient;
         this.carHoldClient = carHoldClient;
+        this.busHoldClient = busHoldClient;
+        this.flightHoldClient = flightHoldClient;
+        this.flightSellerOrganizationId = flightSellerOrganizationId == null || flightSellerOrganizationId.isBlank()
+                ? null : UUID.fromString(flightSellerOrganizationId.trim());
         this.paymentEscrowClient = paymentEscrowClient;
     }
 
@@ -151,6 +167,111 @@ public class OrderServiceImpl implements OrderService {
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
         } catch (RuntimeException e) { try { carHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release car hold {}", hold.holdId(), releaseFailure); } throw e; }
+    }
+
+    /** Bus order: price, route and times come from the bus hold, never from the client. productRef = tripId. */
+    @Override
+    public OrderResponse createBusOrder(UUID actorUserId, BusOrderCreateRequest request) {
+        requireIdentity(actorUserId);
+        UUID orderId = UUID.randomUUID();
+        String seats = request.passengers().stream().map(p -> String.valueOf(p.seatNo())).sorted().collect(java.util.stream.Collectors.joining(","));
+        String key = "bo-" + UUID.nameUUIDFromBytes((actorUserId + ":" + request.tripId() + ":" + request.fromSeq() + ":" + request.toSeq() + ":" + seats)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        List<BusHoldClient.Passenger> passengers = request.passengers().stream()
+                .map(p -> new BusHoldClient.Passenger(p.seatNo(), p.name().trim(), p.gender(), p.identityNumber())).toList();
+        BusHoldClient.HoldDto hold = busHoldClient.hold(new BusHoldClient.HoldRequest(request.tripId(), request.fromSeq(), request.toSeq(),
+                passengers, actorUserId, key, orderId.toString())).data();
+        try {
+            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); order.setTotalAmount(hold.totalAmount()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
+            order = orderRepository.saveAndFlush(order);
+            OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.BUS); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.tripId()); item.setFulfillmentRef(hold.holdId());
+            item.setDescription(busDescription(hold)); item.setUnitAmount(hold.totalAmount()); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.boardingAt()); item.setReturnAt(hold.arrivalAt());
+            OrderItem saved = orderItemRepository.saveAndFlush(item);
+            eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+            return toResponse(order, List.of(saved));
+        } catch (RuntimeException e) { try { busHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release bus hold {}", hold.holdId(), releaseFailure); } throw e; }
+    }
+
+    static String busDescription(BusHoldClient.HoldDto hold) {
+        java.time.LocalDateTime t = hold.boardingAt();
+        String when = t == null ? "" : String.format(", %02d.%02d.%d %02d:%02d", t.getDayOfMonth(), t.getMonthValue(), t.getYear(), t.getHour(), t.getMinute());
+        String seats = hold.seatNos() == null ? "" : ", koltuk " + hold.seatNos().stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
+        String text = hold.fromCity() + " - " + hold.toCity() + when + seats;
+        return text.length() > 500 ? text.substring(0, 500) : text;
+    }
+
+    @Override
+    public OrderResponse createFlightOrder(UUID actorUserId, FlightOrderCreateRequest request) {
+        requireIdentity(actorUserId);
+        if (flightSellerOrganizationId == null) {
+            throw new BusinessRuleException("FLIGHT_SELLER_NOT_CONFIGURED",
+                    "Flight sales are not open: no seller organization is configured");
+        }
+        UUID orderId = UUID.randomUUID();
+        String seat = request.seatNumber() == null || request.seatNumber().isBlank() ? "" : request.seatNumber().trim().toUpperCase();
+        // one hold per (user, offer, seat, passenger): a double submit returns the same hold, and the order below is new
+        String key = "fo-" + UUID.nameUUIDFromBytes((actorUserId + ":" + request.offerId() + ":" + seat + ":"
+                + request.passengerFirstName().trim() + ":" + request.passengerLastName().trim())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        FlightHoldClient.HoldDto hold = flightHoldClient.hold(new FlightHoldClient.HoldRequest(request.offerId(),
+                seat.isEmpty() ? null : seat, request.passengerFirstName().trim(), request.passengerLastName().trim(),
+                actorUserId, key, orderId.toString())).data();
+        if (!orderItemRepository.findByFulfillmentRef(hold.holdId()).isEmpty()) {
+            // idempotent replay of an earlier request: return the order that already owns this hold
+            OrderItem prior = orderItemRepository.findByFulfillmentRef(hold.holdId()).get(0);
+            Order priorOrder = findOrThrow(prior.getOrderId());
+            return toResponse(priorOrder, orderItemRepository.findByOrderId(priorOrder.getId()));
+        }
+        try {
+            Order order = new Order();
+            order.setId(orderId);
+            order.setCustomerId(actorUserId);
+            order.setCurrency(hold.currency());
+            order.setTotalAmount(hold.totalAmount());
+            order.setStatus(OrderStatus.PENDING);
+            order.setHoldExpiresAt(hold.expiresAt());
+            order = orderRepository.saveAndFlush(order);
+
+            OrderItem item = new OrderItem();
+            item.setOrderId(order.getId());
+            item.setVertical(OrderItemVertical.FLIGHT);
+            item.setSupplierOrganizationId(flightSellerOrganizationId);
+            item.setProductRef(UUID.nameUUIDFromBytes(("flight:" + hold.flightNumber()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            item.setFulfillmentRef(hold.holdId());
+            item.setDescription(flightDescription(hold));
+            item.setUnitAmount(hold.totalAmount());
+            item.setQuantity(1);
+            item.setCurrency(hold.currency());
+            applyFlight(item, hold);
+            OrderItem saved = orderItemRepository.saveAndFlush(item);
+            eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+            return toResponse(order, List.of(saved));
+        } catch (RuntimeException e) {
+            try {
+                flightHoldClient.release(hold.holdId());
+            } catch (RuntimeException releaseFailure) {
+                log.error("Could not release flight hold {}; expiry scheduler will reclaim it", hold.holdId(), releaseFailure);
+            }
+            throw e;
+        }
+    }
+
+    private static void applyFlight(OrderItem item, FlightHoldClient.HoldDto hold) {
+        item.setFlightNumber(hold.flightNumber());
+        item.setDepartureAt(hold.departureTime());
+        item.setSeatNumber(hold.seatNumber());
+        item.setPassengerFirstName(hold.passengerFirstName());
+        item.setPassengerLastName(hold.passengerLastName());
+        item.setPnr(hold.pnr());
+        item.setTicketNumber(hold.ticketNumber());
+        item.setSupplier(hold.supplier());
+    }
+
+    static String flightDescription(FlightHoldClient.HoldDto hold) {
+        String when = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                .format(hold.departureTime().atZone(VoucherService.DEFAULT_ZONE));
+        return hold.flightNumber() + " " + hold.departureAirport() + "-" + hold.arrivalAirport() + ", " + when
+                + ", koltuk " + hold.seatNumber();
     }
 
     @Override
@@ -272,6 +393,10 @@ public class OrderServiceImpl implements OrderService {
                 }
             } else if (item.getVertical() == OrderItemVertical.CAR && item.getFulfillmentRef() != null) {
                 carHoldClient.release(item.getFulfillmentRef());
+            } else if (item.getVertical() == OrderItemVertical.BUS && item.getFulfillmentRef() != null) {
+                busHoldClient.release(item.getFulfillmentRef());
+            } else if (item.getVertical() == OrderItemVertical.FLIGHT && item.getFulfillmentRef() != null) {
+                flightHoldClient.release(item.getFulfillmentRef());
             }
         }
 
@@ -309,6 +434,12 @@ public class OrderServiceImpl implements OrderService {
                 hotelHoldClient.confirm(item.getFulfillmentRef());
             } else if (item.getVertical() == OrderItemVertical.CAR && item.getFulfillmentRef() != null) {
                 carHoldClient.confirm(item.getFulfillmentRef());
+            } else if (item.getVertical() == OrderItemVertical.BUS && item.getFulfillmentRef() != null) {
+                busHoldClient.confirm(item.getFulfillmentRef());
+            } else if (item.getVertical() == OrderItemVertical.FLIGHT && item.getFulfillmentRef() != null) {
+                // confirm issues the ticket (PNR + e-ticket number), copy them onto the item
+                applyFlight(item, flightHoldClient.confirm(item.getFulfillmentRef()).data());
+                orderItemRepository.save(item);
             }
         }
         order.setStatus(OrderStatus.CONFIRMED);
@@ -392,7 +523,12 @@ public class OrderServiceImpl implements OrderService {
                 item.getCurrency(),
                 item.getCreatedAt(),
                 item.getPickupAt(),
-                item.getReturnAt()
+                item.getReturnAt(),
+                item.getVertical() == OrderItemVertical.FLIGHT
+                        ? new FlightItemDetails(item.getFlightNumber(), item.getDepartureAt(), item.getSeatNumber(),
+                                item.getPassengerFirstName(), item.getPassengerLastName(), item.getPnr(),
+                                item.getTicketNumber(), item.getSupplier())
+                        : null
         );
     }
 }

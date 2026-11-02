@@ -7,5 +7,6 @@ package com.waylo.packagebookingservice.domain;
 public enum OrderItemVertical {
     HOTEL,
     FLIGHT,
-    CAR
+    CAR,
+    BUS
 }

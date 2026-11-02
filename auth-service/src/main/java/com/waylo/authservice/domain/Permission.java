@@ -12,5 +12,7 @@ public enum Permission {
     /** Redeem a customer voucher (releases escrow): same roles as RESERVATION_READ. */
     RESERVATION_REDEEM,
     /** Manage vehicles for CAR_RENTAL orgs: ORGANIZATION_OWNER of a CAR_RENTAL org only. */
-    FLEET_MANAGE
+    FLEET_MANAGE,
+    /** Manage buses, trips and documents for BUS orgs: ORGANIZATION_OWNER of a BUS org only. */
+    BUS_MANAGE
 }

@@ -441,6 +441,50 @@ class AccessServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("BUS_MANAGE")
+    class BusManageTests {
+
+        @Test
+        @DisplayName("ORGANIZATION_OWNER of BUS org is allowed")
+        void busManage_busOrgOwner_allowed() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    CAR_ORG_ID, BusinessType.BUS);
+            when(accessQueryRepository.findActiveGrants(USER_ID, CAR_ORG_ID)).thenReturn(List.of(grant));
+            assertTrue(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.BUS_MANAGE).allowed());
+        }
+
+        @Test
+        @DisplayName("Owners of HOTEL and CAR_RENTAL orgs are denied")
+        void busManage_otherTypes_denied() {
+            for (BusinessType type : List.of(BusinessType.HOTEL, BusinessType.CAR_RENTAL)) {
+                var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                        ORG_ID, type);
+                when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+                assertFalse(accessService.check(USER_ID, ORG_ID, null, Permission.BUS_MANAGE).allowed());
+            }
+        }
+
+        @Test
+        @DisplayName("Non-owner denied on BUS org")
+        void busManage_nonOwner_denied() {
+            var grant = makeGrantWithBusinessType(Role.HOTEL_MANAGER, ScopeType.HOTEL, HOTEL_ID, BusinessType.BUS);
+            when(accessQueryRepository.findActiveGrants(USER_ID, ORG_ID)).thenReturn(List.of(grant));
+            assertFalse(accessService.check(USER_ID, ORG_ID, null, Permission.BUS_MANAGE).allowed());
+        }
+
+        @Test
+        @DisplayName("BUS org owner cannot HOTEL_CREATE or FLEET_MANAGE but can redeem")
+        void busOrg_otherPermissions() {
+            var grant = makeGrantWithBusinessType(Role.ORGANIZATION_OWNER, ScopeType.ORGANIZATION,
+                    CAR_ORG_ID, BusinessType.BUS);
+            when(accessQueryRepository.findActiveGrants(USER_ID, CAR_ORG_ID)).thenReturn(List.of(grant));
+            assertFalse(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.HOTEL_CREATE).allowed());
+            assertFalse(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.FLEET_MANAGE).allowed());
+            assertTrue(accessService.check(USER_ID, CAR_ORG_ID, null, Permission.RESERVATION_REDEEM).allowed());
+        }
+    }
+
     // ---- Helper: create a mocked RoleAssignment ----
 
     private RoleAssignment makeGrant(Role role, ScopeType scopeType, UUID scopeId) {

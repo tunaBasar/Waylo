@@ -1,68 +1,117 @@
 'use client';
 
 import { FormEvent, Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { api } from '@/lib/api';
-import type { Flight } from '@/lib/types';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { api, ApiError } from '@/lib/api';
+import type { Airport } from '@/lib/types';
+import { CABIN_LABEL, flightErrorMessage, searchFlightOffers } from '@/lib/flight';
+import type { FlightOffer } from '@/lib/flight';
 
-const statusMap: Record<Flight['status'], { label: string; class: string }> = {
-  SCHEDULED: { label: 'PLANLANDI', class: 'text-primary bg-primary-fixed' },
-  CANCELLED: { label: 'IPTAL EDILDI', class: 'text-error bg-error-container' },
-};
+const time = (iso: string) => new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+const money = (v: number, currency: string) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(v);
 
 function FlightsContent() {
   const params = useSearchParams();
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | Flight['status']>('all');
+  const router = useRouter();
+  const [airports, setAirports] = useState<Airport[]>([]);
   const [from, setFrom] = useState(params.get('from') ?? '');
   const [to, setTo] = useState(params.get('to') ?? '');
   const [date, setDate] = useState(params.get('date') ?? '');
+  const [offers, setOffers] = useState<FlightOffer[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const f = params.get('from'), t = params.get('to'), d = params.get('date');
-    const request = f && t && d
-      ? api.get<Flight[]>(`/api/flights/search?${new URLSearchParams({ from: f.toUpperCase(), to: t.toUpperCase(), date: d })}`)
-      : api.get<Flight[]>('/api/flights');
-    request.then(res => setFlights(res.data)).catch(() => setError('Ucuslar yuklenemedi.')).finally(() => setLoading(false));
-  }, [params]);
+    api.get<Airport[]>('/api/airports').then(res => setAirports(res.data)).catch(() => setError('Havalimanlari yuklenemedi.'));
+  }, []);
 
-  async function searchFlights(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!from || !to || !date) {
-      setError('Kalkis, varis ve tarih alanlarini doldurun.');
-      return;
-    }
+  async function run(f: string, t: string, d: string) {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ from: from.toUpperCase(), to: to.toUpperCase(), date });
-      const res = await api.get<Flight[]>(`/api/flights/search?${params}`);
-      setFlights(res.data);
-    } catch {
-      setError('Ucus aramasi yapilamadi.');
+      const res = await searchFlightOffers({ from: f, to: t, date: d });
+      setOffers(res.data);
+    } catch (cause) {
+      setOffers(null);
+      setError(flightErrorMessage((cause as ApiError).code, 'Ucus aramasi yapilamadi.'));
     } finally {
       setLoading(false);
     }
   }
 
-  const filtered = flights.filter(f => (!search || f.flightNumber.toLowerCase().includes(search.toLowerCase()) || f.airline.toLowerCase().includes(search.toLowerCase())) && (statusFilter === 'all' || f.status === statusFilter));
+  useEffect(() => {
+    const f = params.get('from'), t = params.get('to'), d = params.get('date');
+    if (f && t && d) void Promise.resolve().then(() => run(f, t, d));
+  }, [params]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!from || !to || !date) { setError('Kalkis, varis ve tarih secin.'); return; }
+    if (from === to) { setError('Kalkis ve varis ayni olamaz.'); return; }
+    router.push(`/flights?${new URLSearchParams({ from, to, date })}`);
+  }
+
+  const options = airports.map(a => <option key={a.iataCode} value={a.iataCode}>{a.city} ({a.iataCode}) {a.name}</option>);
 
   return (
     <div className="space-y-space-md">
-      <div className="flex items-center justify-between gap-space-xs"><div className="flex items-center gap-space-xs"><h2 className="text-xl font-semibold text-on-surface tracking-tight">Ucuslar</h2><span className="bg-primary-fixed text-on-primary-fixed-variant text-xs font-semibold px-2.5 py-0.5 rounded-full">{flights.length} Ucus</span></div></div>
-      <form onSubmit={searchFlights} className="grid gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm md:grid-cols-4">
-        <input value={from} onChange={e => setFrom(e.target.value.toUpperCase())} maxLength={3} placeholder="Kalkis IATA" className="rounded-lg bg-surface-container px-3 py-2 text-sm uppercase focus:outline-none" />
-        <input value={to} onChange={e => setTo(e.target.value.toUpperCase())} maxLength={3} placeholder="Varis IATA" className="rounded-lg bg-surface-container px-3 py-2 text-sm uppercase focus:outline-none" />
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-lg bg-surface-container px-3 py-2 text-sm focus:outline-none" />
-        <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container">Ucus Ara</button>
+      <h2 className="text-xl font-semibold text-on-surface tracking-tight">Ucus Ara</h2>
+      <form onSubmit={submit} className="grid gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm md:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Nereden</label>
+          <select value={from} onChange={e => setFrom(e.target.value)} className="w-full rounded-lg bg-surface-container px-3 py-2 text-sm">
+            <option value="">Secin</option>{options}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Nereye</label>
+          <select value={to} onChange={e => setTo(e.target.value)} className="w-full rounded-lg bg-surface-container px-3 py-2 text-sm">
+            <option value="">Secin</option>{options}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Tarih</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().slice(0, 10)}
+            className="w-full rounded-lg bg-surface-container px-3 py-2 text-sm" />
+        </div>
+        <div className="flex items-end">
+          <button className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container">Ucus Ara</button>
+        </div>
       </form>
-      <div className="relative w-full shadow-sm rounded-xl bg-surface-container-lowest"><input value={search} onChange={e => setSearch(e.target.value)} className="w-full px-4 py-3 bg-transparent rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none" placeholder="Ucus No veya Havayolu ara..." /></div>
-      <div className="flex items-center gap-space-xs overflow-x-auto pb-1 no-scrollbar">{[{ key: 'all', label: `Tumu (${flights.length})` }, { key: 'SCHEDULED', label: `PLANLANDI (${flights.filter(f => f.status === 'SCHEDULED').length})` }, { key: 'CANCELLED', label: `IPTAL (${flights.filter(f => f.status === 'CANCELLED').length})` }].map(filter => <button key={filter.key} onClick={() => setStatusFilter(filter.key as typeof statusFilter)} className={`text-xs font-medium px-3.5 py-1.5 rounded-full whitespace-nowrap shadow-sm ${statusFilter === filter.key ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest text-on-surface-variant'}`}>{filter.label}</button>)}</div>
+      <p className="text-xs text-on-surface-variant">1 yolcu icin arama yapilir.</p>
       {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
-      {loading ? <div className="text-center py-12 text-sm text-on-surface-variant">Ucuslar yukleniyor...</div> : filtered.length === 0 ? <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">flight_takeoff</span><p className="text-on-surface-variant text-sm">Ucus bulunamadi</p></div> : <div className="space-y-space-sm">{filtered.map(flight => { const status = statusMap[flight.status]; return <div key={flight.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-4"><div className="flex items-center justify-between mb-3"><div><span className="text-lg font-bold text-on-surface">{flight.flightNumber}</span><span className="text-xs text-on-surface-variant ml-1.5">{flight.airline}</span></div><span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${status.class}`}>{status.label}</span></div><div className="flex items-center justify-between"><div><p className="text-xl font-bold text-on-surface">{new Date(flight.departureTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p><p className="text-sm font-bold text-on-surface">{flight.departureAirportCode}</p></div><div className="flex-1 mx-4 h-px bg-primary-fixed" /><div className="text-right"><p className="text-xl font-bold text-on-surface">{new Date(flight.arrivalTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p><p className="text-sm font-bold text-on-surface">{flight.arrivalAirportCode}</p></div></div></div>; })}</div>}
+      {loading ? (
+        <p className="py-12 text-center text-sm text-on-surface-variant">Teklifler araniyor...</p>
+      ) : offers && offers.length === 0 ? (
+        <div className="py-12 text-center">
+          <span className="material-symbols-outlined text-outline text-5xl mb-3 block">flight_takeoff</span>
+          <p className="text-sm text-on-surface-variant">Bu tarihte uygun ucus bulunamadi</p>
+        </div>
+      ) : (
+        <div className="space-y-space-sm">
+          {(offers ?? []).map(o => (
+            <div key={o.offerId} className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-lg font-bold text-on-surface">{o.flightNumber}</span>
+                  <span className="ml-1.5 text-xs text-on-surface-variant">{o.airline} · {CABIN_LABEL[o.cabin] ?? o.cabin}</span>
+                </div>
+                <p className="text-lg font-bold text-primary">{money(o.totalAmount, o.currency)}</p>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <div><p className="text-xl font-bold text-on-surface">{time(o.departureTime)}</p><p className="text-sm font-bold text-on-surface">{o.departureAirport}</p></div>
+                <div className="mx-4 h-px flex-1 bg-primary-fixed" />
+                <div className="text-right"><p className="text-xl font-bold text-on-surface">{time(o.arrivalTime)}</p><p className="text-sm font-bold text-on-surface">{o.arrivalAirport}</p></div>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-on-surface-variant">{o.availableSeats} koltuk kaldi</p>
+                <Link href={`/flights/offer?id=${encodeURIComponent(o.offerId)}`} className="rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-on-tertiary">Sec</Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

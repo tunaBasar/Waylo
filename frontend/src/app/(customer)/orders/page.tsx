@@ -17,6 +17,7 @@ interface OrderItem {
   currency: string;
   pickupAt: string | null;
   returnAt: string | null;
+  flight?: { flightNumber: string; passengerFirstName: string; passengerLastName: string; seatNumber: string; pnr: string | null; ticketNumber: string | null } | null;
 }
 
 interface Order {
@@ -200,6 +201,12 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
       {order.items && order.items.map(item => (
         <div key={item.id} className="mt-1 text-xs text-on-surface-variant">
           <p>{item.description}</p>
+          {item.vertical === 'FLIGHT' && item.flight && (
+            <>
+              <p>Yolcu: {item.flight.passengerFirstName} {item.flight.passengerLastName}</p>
+              {item.flight.pnr && item.flight.ticketNumber && <p>PNR: {item.flight.pnr} · E-bilet: {item.flight.ticketNumber}</p>}
+            </>
+          )}
           {item.vertical === 'CAR' && item.pickupAt && item.returnAt && (
             <p>Alis: {formatOffsetDateTime(item.pickupAt)} - Teslim: {formatOffsetDateTime(item.returnAt)}</p>
           )}

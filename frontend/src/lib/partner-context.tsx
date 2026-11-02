@@ -32,6 +32,8 @@ interface PartnerContextValue {
   setHasUnsavedChanges: (dirty: boolean) => void;
   /** True when the currently selected org is CAR_RENTAL. */
   isCarRentalOrg: boolean;
+  /** True when the currently selected org is BUS. */
+  isBusOrg: boolean;
 }
 
 const PartnerContext = createContext<PartnerContextValue | null>(null);
@@ -137,6 +139,7 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
     hasUnsavedChanges,
     setHasUnsavedChanges,
     isCarRentalOrg: membership?.organizationBusinessType === 'CAR_RENTAL',
+    isBusOrg: membership?.organizationBusinessType === 'BUS',
   }), [loading, error, memberships, organizationId, hotels, hotelId, membership, selectOrganization, selectHotel, reload, hasUnsavedChanges]);
 
   return <PartnerContext.Provider value={value}>{children}</PartnerContext.Provider>;

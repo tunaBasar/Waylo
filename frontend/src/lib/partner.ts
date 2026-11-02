@@ -9,7 +9,7 @@ import { api, ApiError } from './api';
 
 // ---------- shared enums (string unions, values identical to backend enums) ----------
 
-export type BusinessType = 'HOTEL' | 'CAR_RENTAL';
+export type BusinessType = 'HOTEL' | 'CAR_RENTAL' | 'BUS';
 export type LegalType = 'COMPANY' | 'INDIVIDUAL';
 export type OrganizationStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 export type MembershipStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED';

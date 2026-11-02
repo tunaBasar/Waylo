@@ -24,7 +24,7 @@ test('partner guard: needs a membership, never for ADMIN', () => {
 });
 
 test('customer guard: ADMIN is sent to /admin, purchase pages carry the message', () => {
-  for (const p of ['/hotels/abc', '/quotes/q1', '/vehicles', '/orders', '/rentals']) {
+  for (const p of ['/hotels/abc', '/quotes/q1', '/vehicles', '/flights/offer', '/orders', '/rentals']) {
     assert.deepEqual(m.guardRedirect(p, 'ADMIN'), { to: '/admin', notice: m.ADMIN_PURCHASE_MESSAGE }, p);
   }
   assert.deepEqual(m.guardRedirect('/', 'ADMIN'), { to: '/admin' });

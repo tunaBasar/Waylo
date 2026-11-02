@@ -21,5 +21,6 @@ public record OrderItemResponse(
         String currency,
         Instant createdAt,
         LocalDateTime pickupAt,
-        LocalDateTime returnAt
+        LocalDateTime returnAt,
+        FlightItemDetails flight
 ) {}

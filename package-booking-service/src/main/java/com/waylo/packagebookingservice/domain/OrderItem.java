@@ -72,6 +72,16 @@ public class OrderItem {
     @Column(name = "pickup_at") private LocalDateTime pickupAt;
     @Column(name = "return_at") private LocalDateTime returnAt;
 
+    @Column(name = "flight_number", length = 10) private String flightNumber;
+    @Column(name = "departure_at") private Instant departureAt;
+    @Column(name = "seat_number", length = 5) private String seatNumber;
+    @Column(name = "passenger_first_name", length = 80) private String passengerFirstName;
+    @Column(name = "passenger_last_name", length = 80) private String passengerLastName;
+    @Column(name = "pnr", length = 8) private String pnr;
+    @Column(name = "ticket_number", length = 20) private String ticketNumber;
+    @Column(name = "supplier", length = 20) private String supplier;
+    @Column(name = "supplier_order_ref", length = 100) private String supplierOrderRef;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -121,6 +131,25 @@ public class OrderItem {
     public void setPickupAt(LocalDateTime pickupAt) { this.pickupAt = pickupAt; }
     public LocalDateTime getReturnAt() { return returnAt; }
     public void setReturnAt(LocalDateTime returnAt) { this.returnAt = returnAt; }
+
+    public String getFlightNumber() { return flightNumber; }
+    public void setFlightNumber(String v) { this.flightNumber = v; }
+    public Instant getDepartureAt() { return departureAt; }
+    public void setDepartureAt(Instant v) { this.departureAt = v; }
+    public String getSeatNumber() { return seatNumber; }
+    public void setSeatNumber(String v) { this.seatNumber = v; }
+    public String getPassengerFirstName() { return passengerFirstName; }
+    public void setPassengerFirstName(String v) { this.passengerFirstName = v; }
+    public String getPassengerLastName() { return passengerLastName; }
+    public void setPassengerLastName(String v) { this.passengerLastName = v; }
+    public String getPnr() { return pnr; }
+    public void setPnr(String v) { this.pnr = v; }
+    public String getTicketNumber() { return ticketNumber; }
+    public void setTicketNumber(String v) { this.ticketNumber = v; }
+    public String getSupplier() { return supplier; }
+    public void setSupplier(String v) { this.supplier = v; }
+    public String getSupplierOrderRef() { return supplierOrderRef; }
+    public void setSupplierOrderRef(String v) { this.supplierOrderRef = v; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

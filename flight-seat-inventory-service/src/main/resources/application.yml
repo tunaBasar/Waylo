@@ -51,3 +51,12 @@ management:
 waylo:
   seat-hold:
     minutes: 15
+  internal:
+    token: ${INTERNAL_API_TOKEN}
+  flight:
+    offer-secret: ${FLIGHT_OFFER_SECRET:${INTERNAL_API_TOKEN}}
+    offer-ttl-minutes: 10
+    hold-ttl-minutes: 15
+    sales-cutoff-minutes: 120
+    paid-supplier:
+      enabled: false

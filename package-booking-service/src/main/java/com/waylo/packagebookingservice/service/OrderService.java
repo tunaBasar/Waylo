@@ -2,6 +2,7 @@ package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.dto.HotelOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.CarOrderCreateRequest;
+import com.waylo.packagebookingservice.dto.BusOrderCreateRequest;
 import com.waylo.packagebookingservice.dto.InternalOrderResponse;
 import com.waylo.packagebookingservice.dto.OrderCreateRequest;
 import com.waylo.packagebookingservice.dto.OrderResponse;
@@ -16,6 +17,10 @@ public interface OrderService {
 
     OrderResponse createHotelOrder(UUID actorUserId, HotelOrderCreateRequest request);
     OrderResponse createCarOrder(UUID actorUserId, CarOrderCreateRequest request);
+
+    OrderResponse createBusOrder(UUID actorUserId, BusOrderCreateRequest request);
+
+    OrderResponse createFlightOrder(UUID actorUserId, com.waylo.packagebookingservice.dto.FlightOrderCreateRequest request);
 
     OrderResponse getById(UUID actorUserId, UUID orderId);
 

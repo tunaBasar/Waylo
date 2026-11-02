@@ -1,0 +1,50 @@
+server:
+  port: 8096
+
+spring:
+  application:
+    name: bus-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bus_db
+    username: ${DB_USERNAME:waylo}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+waylo:
+  internal:
+    token: ${INTERNAL_API_TOKEN}
+  bus:
+    sales-enabled: ${BUS_SALES_ENABLED:false}
+    hold-ttl-minutes: 15
+    sales-close-minutes: 30
+    documents-dir: ${BUS_DOCUMENTS_DIR:/data/bus-documents}

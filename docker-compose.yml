@@ -12,7 +12,7 @@ services:
       POSTGRES_MULTIPLE_DATABASES: >-
         flight_db,flight_seat_inventory_db,hotel_db,car_rental_db,
         package_booking_db,pricing_db,payment_db,crm_db,checkin_db,
-        notification_db,saga_db,auth_db
+        notification_db,saga_db,auth_db,bus_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
@@ -221,6 +221,7 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/flight_seat_inventory_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -326,6 +327,43 @@ services:
         limits:
           memory: 384M
 
+  bus-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: bus-service
+    container_name: waylo-bus-service
+    ports:
+      - "127.0.0.1:8096:8096"
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/bus_db"
+      SPRING_DATASOURCE_USERNAME: waylo
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
+      BUS_SALES_ENABLED: "${BUS_SALES_ENABLED:-false}"
+    volumes:
+      - bus_documents:/data/bus-documents
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8096/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
   package-booking-service:
     build:
       context: .
@@ -338,6 +376,7 @@ services:
     environment:
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       VOUCHER_SECRET: "${VOUCHER_SECRET:?VOUCHER_SECRET must be set in .env}"
+      FLIGHT_SELLER_ORGANIZATION_ID: "${FLIGHT_SELLER_ORGANIZATION_ID:-}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
@@ -682,3 +721,4 @@ services:
 volumes:
   postgres_data:
   car_documents:
+  bus_documents:

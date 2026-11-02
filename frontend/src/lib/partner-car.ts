@@ -8,7 +8,7 @@ import { api } from './api';
 
 // ── shared enums (string unions, values identical to backend enums) ──────────
 
-export type BusinessType = 'HOTEL' | 'CAR_RENTAL';
+export type BusinessType = 'HOTEL' | 'CAR_RENTAL' | 'BUS';
 export type LegalType = 'COMPANY' | 'INDIVIDUAL';
 export type RentalStatus = 'HELD' | 'CONFIRMED' | 'CANCELLED' | 'EXPIRED';
 export type DocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

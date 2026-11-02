@@ -40,7 +40,7 @@ class OrderControllerTest {
     private OrderResponse buildResponse() {
         OrderItemResponse item = new OrderItemResponse(
                 UUID.randomUUID(), orderId, OrderItemVertical.HOTEL, UUID.randomUUID(), UUID.randomUUID(), null,
-                "Deluxe room", new BigDecimal("100.00"), 2, new BigDecimal("200.00"), "USD", Instant.now(), null, null);
+                "Deluxe room", new BigDecimal("100.00"), 2, new BigDecimal("200.00"), "USD", Instant.now(), null, null, null);
         return new OrderResponse(orderId, userId, OrderStatus.PENDING, "USD", null,
                 new BigDecimal("200.00"), null, 0L, List.of(item), Instant.now(), Instant.now(), null);
     }

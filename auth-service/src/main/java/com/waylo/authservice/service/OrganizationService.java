@@ -54,6 +54,10 @@ public class OrganizationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Organization limit reached");
         }
 
+        if (req.businessType() == com.waylo.authservice.domain.BusinessType.BUS
+                && req.legalType() != com.waylo.authservice.domain.LegalType.COMPANY) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Bus partners must be companies");
+        }
         Organization organization = new Organization(req.name().trim(), req.businessType(), req.legalType());
         organization = organizationRepository.saveAndFlush(organization);
 

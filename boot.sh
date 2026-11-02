@@ -17,7 +17,7 @@ NC='\033[0m'
 # Service groups in startup order
 PHASE_0=("config-service" "discovery-service")
 PHASE_1=("api-gateway")
-PHASE_2=("flight-service" "flight-seat-inventory-service" "hotel-service" "car-rental-service" "package-booking-service" "pricing-service" "payment-service" "crm-service" "checkin-service" "notification-service")
+PHASE_2=("flight-service" "flight-seat-inventory-service" "hotel-service" "car-rental-service" "bus-service" "package-booking-service" "pricing-service" "payment-service" "crm-service" "checkin-service" "notification-service")
 PHASE_3=("package-booking-saga-orchestrator")
 PHASE_4=("traffic-simulator")
 
@@ -30,6 +30,7 @@ PORTS[flight-service]=8081
 PORTS[flight-seat-inventory-service]=8082
 PORTS[hotel-service]=8083
 PORTS[car-rental-service]=8084
+PORTS[bus-service]=8096
 PORTS[package-booking-service]=8085
 PORTS[pricing-service]=8086
 PORTS[payment-service]=8087

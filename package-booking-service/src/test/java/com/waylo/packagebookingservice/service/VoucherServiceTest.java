@@ -102,4 +102,26 @@ class VoucherServiceTest {
         assertThat(active.getStatus()).isEqualTo(VoucherStatus.VOID);
         assertThat(redeemed.getStatus()).isEqualTo(VoucherStatus.REDEEMED);
     }
+
+    @Test
+    void flightWindowIsThreeHoursBeforeToOneHourAfterDeparture() {
+        OrderItem item = new OrderItem();
+        item.setVertical(com.waylo.packagebookingservice.domain.OrderItemVertical.FLIGHT);
+        java.time.Instant dep = java.time.Instant.parse("2026-11-10T06:30:00Z");
+        item.setDepartureAt(dep);
+        java.time.Instant[] w = VoucherService.window(item);
+        org.junit.jupiter.api.Assertions.assertEquals(dep.minusSeconds(3 * 3600), w[0]);
+        org.junit.jupiter.api.Assertions.assertEquals(dep.plusSeconds(3600), w[1]);
+    }
+
+    @Test
+    void busWindowIsTwoHoursBeforeToOneHourAfterBoarding() {
+        OrderItem item = new OrderItem();
+        item.setVertical(com.waylo.packagebookingservice.domain.OrderItemVertical.BUS);
+        item.setPickupAt(java.time.LocalDateTime.of(2027, 2, 2, 22, 0));
+        java.time.Instant boarding = java.time.Instant.parse("2027-02-02T19:00:00Z");
+        java.time.Instant[] w = VoucherService.window(item);
+        org.junit.jupiter.api.Assertions.assertEquals(boarding.minusSeconds(2 * 3600), w[0]);
+        org.junit.jupiter.api.Assertions.assertEquals(boarding.plusSeconds(3600), w[1]);
+    }
 }

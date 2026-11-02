@@ -98,11 +98,11 @@ public class AccessService {
                     || role == Role.HOTEL_MANAGER || role == Role.HOTEL_STAFF;
         }
 
-        // HOTEL_CREATE: denied on CAR_RENTAL orgs; otherwise allowed for ORGANIZATION_OWNER with org scope.
+        // HOTEL_CREATE: denied on CAR_RENTAL and BUS orgs; otherwise allowed for ORGANIZATION_OWNER with org scope.
         if (permission == Permission.HOTEL_CREATE) {
             if (scopeType == ScopeType.ORGANIZATION) {
                 BusinessType businessType = getOrganizationBusinessType(grant);
-                if (businessType == BusinessType.CAR_RENTAL) {
+                if (businessType == BusinessType.CAR_RENTAL || businessType == BusinessType.BUS) {
                     return false;
                 }
                 return true;
@@ -116,6 +116,14 @@ public class AccessService {
                 return false;
             }
             return getOrganizationBusinessType(grant) == BusinessType.CAR_RENTAL;
+        }
+
+        // BUS_MANAGE: allowed only for ORGANIZATION_OWNER of a BUS org.
+        if (permission == Permission.BUS_MANAGE) {
+            if (role != Role.ORGANIZATION_OWNER || scopeType != ScopeType.ORGANIZATION) {
+                return false;
+            }
+            return getOrganizationBusinessType(grant) == BusinessType.BUS;
         }
 
         switch (role) {

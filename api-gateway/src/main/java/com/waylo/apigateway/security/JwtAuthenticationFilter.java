@@ -139,8 +139,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (path.equals("/api/seat-inventory") || path.startsWith("/api/seat-inventory/")) {
             return true;
         }
+        // Flight offers (search and re-price). Orders stay authenticated.
+        if (path.equals("/api/flight-offers") || path.startsWith("/api/flight-offers/")) {
+            return true;
+        }
         // Car rental catalog (sellable branches and offers)
         if (path.equals("/api/car-branches") || path.equals("/api/car-offers")) {
+            return true;
+        }
+        // Bus catalog (terminals, trip search, seat map). Bookings stay authenticated.
+        if (path.equals("/api/bus-terminals") || path.equals("/api/bus-sales-status") || path.equals("/api/bus-trips")
+                || (path.startsWith("/api/bus-trips/") && path.endsWith("/seats"))) {
             return true;
         }
         return false;

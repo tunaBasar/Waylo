@@ -13,12 +13,13 @@ CORE="postgres kafka redis config-service discovery-service api-gateway auth-ser
 
 case "${1:-car}" in
   car)   SET="$CORE car-rental-service package-booking-service payment-service" ;;
+  bus)   SET="$CORE bus-service package-booking-service payment-service" ;;
   hotel) SET="$CORE hotel-service package-booking-service payment-service" ;;
   flight) SET="$CORE flight-service flight-seat-inventory-service package-booking-service payment-service" ;;
   mail)  SET="$CORE notification-service" ;;
   all)   SET="" ;;
   down)  docker compose stop; exit 0 ;;
-  *) echo "unknown set: $1 (car|hotel|flight|mail|all|down)"; exit 1 ;;
+  *) echo "unknown set: $1 (car|bus|hotel|flight|mail|all|down)"; exit 1 ;;
 esac
 shift || true
 

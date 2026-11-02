@@ -16,6 +16,9 @@ import java.util.UUID;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
+    List<OrderItem> findByFulfillmentRef(UUID fulfillmentRef);
+
+
     List<OrderItem> findByOrderId(UUID orderId);
 
     @Query(value = """

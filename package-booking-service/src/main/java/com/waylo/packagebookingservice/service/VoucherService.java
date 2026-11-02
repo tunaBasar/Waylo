@@ -80,6 +80,15 @@ public class VoucherService {
         if (item.getVertical() == OrderItemVertical.CAR && item.getPickupAt() != null && item.getReturnAt() != null) {
             return new Instant[] { item.getPickupAt().minusHours(2).atZone(DEFAULT_ZONE).toInstant(), item.getReturnAt().atZone(DEFAULT_ZONE).toInstant() };
         }
+        if (item.getVertical() == OrderItemVertical.BUS && item.getPickupAt() != null) {
+            // boarding scan window: 2h before to 1h after the boarding stop departure
+            Instant boarding = item.getPickupAt().atZone(DEFAULT_ZONE).toInstant();
+            return new Instant[] { boarding.minus(Duration.ofHours(2)), boarding.plus(Duration.ofHours(1)) };
+        }
+        if (item.getVertical() == OrderItemVertical.FLIGHT && item.getDepartureAt() != null) {
+            // check-in desk opens ~3h before departure; 1h grace after scheduled departure for delays
+            return new Instant[] { item.getDepartureAt().minus(Duration.ofHours(3)), item.getDepartureAt().plus(Duration.ofHours(1)) };
+        }
         if (item.getVertical() == OrderItemVertical.HOTEL && item.getCheckIn() != null && item.getCheckOut() != null) {
             return new Instant[] {
                     item.getCheckIn().atStartOfDay(DEFAULT_ZONE).toInstant(),

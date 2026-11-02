@@ -90,4 +90,26 @@ class GlobalExceptionHandlerHttpErrorsTest {
         assertThat(response.getBody().status()).isEqualTo(500);
         assertThat(response.getBody().error()).isEqualTo("INTERNAL_SERVER_ERROR");
     }
+
+    @Test
+    void missingParameter_handler_returnsBadRequest() {
+        var ex = new org.springframework.web.bind.MissingServletRequestParameterException("date", "LocalDate");
+
+        ResponseEntity<ErrorResponse> response = handler.handleBadParam(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().status()).isEqualTo(400);
+        assertThat(response.getBody().error()).isEqualTo("BAD_REQUEST");
+    }
+
+    @Test
+    void typeMismatch_handler_returnsBadRequest() {
+        var ex = new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                "date", java.time.LocalDate.class, "date", null, new IllegalArgumentException("bad"));
+
+        ResponseEntity<ErrorResponse> response = handler.handleBadParam(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().error()).isEqualTo("BAD_REQUEST");
+    }
 }

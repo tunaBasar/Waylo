@@ -56,6 +56,14 @@ class OrderServiceImplTest {
     private com.waylo.packagebookingservice.client.CarHoldClient carHoldClient;
 
     @Mock
+    private com.waylo.packagebookingservice.client.BusHoldClient busHoldClient;
+
+    @Mock
+    private com.waylo.packagebookingservice.client.FlightHoldClient flightHoldClient;
+
+    private static final UUID SELLER = UUID.randomUUID();
+
+    @Mock
     private com.waylo.packagebookingservice.client.PaymentEscrowClient paymentEscrowClient;
 
     @Mock
@@ -67,7 +75,7 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, paymentEscrowClient, voucherService);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, busHoldClient, flightHoldClient, SELLER.toString(), paymentEscrowClient, voucherService);
     }
 
     private OrderItemCreateRequest validItem(String currency) {
@@ -85,6 +93,180 @@ class OrderServiceImplTest {
         order.setTotalAmount(new BigDecimal("200.00"));
         order.setVersion(version);
         return order;
+    }
+
+    // --- flight ---
+
+    private com.waylo.packagebookingservice.client.FlightHoldClient.HoldDto flightHold(UUID holdId) {
+        return new com.waylo.packagebookingservice.client.FlightHoldClient.HoldDto(holdId, "INTERNAL", "TK100", "THY", "IST", "ESB",
+                Instant.parse("2026-11-10T06:30:00Z"), Instant.parse("2026-11-10T07:30:00Z"), "ECONOMY", "12A", "Ali", "Yilmaz",
+                "TRY", new BigDecimal("150.00"), BigDecimal.ZERO, "HELD", Instant.now().plusSeconds(900), null, null);
+    }
+
+    private com.waylo.packagebookingservice.dto.FlightOrderCreateRequest flightRequest() {
+        return new com.waylo.packagebookingservice.dto.FlightOrderCreateRequest("offer", "12A", "Ali", "Yilmaz");
+    }
+
+
+    private com.waylo.packagebookingservice.dto.BusOrderCreateRequest busRequest() {
+        return new com.waylo.packagebookingservice.dto.BusOrderCreateRequest(UUID.randomUUID(), 0, 2, List.of(
+                new com.waylo.packagebookingservice.dto.BusOrderCreateRequest.Passenger(5, "Ali Veli", "MALE", null),
+                new com.waylo.packagebookingservice.dto.BusOrderCreateRequest.Passenger(6, "Ayse Veli", "FEMALE", null)));
+    }
+
+    private com.waylo.packagebookingservice.client.BusHoldClient.HoldDto busHold(UUID holdId) {
+        return new com.waylo.packagebookingservice.client.BusHoldClient.HoldDto(holdId, SELLER, UUID.randomUUID(), 0, 2,
+                UUID.randomUUID(), UUID.randomUUID(), "Istanbul", "Ankara", "Esenler", "ASTI", "Acme Bus",
+                java.time.LocalDateTime.of(2027, 2, 2, 22, 0), java.time.LocalDateTime.of(2027, 2, 3, 5, 0), List.of(5, 6),
+                "TRY", new BigDecimal("1500.00"), "HELD", Instant.now().plusSeconds(900));
+    }
+
+    @Test
+    void createBus_buildsOrderFromHoldOnly() {
+        UUID holdId = UUID.randomUUID();
+        when(busHoldClient.hold(any())).thenReturn(new com.waylo.packagebookingservice.client.BusHoldClient.Envelope<>(true, busHold(holdId), null));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.saveAndFlush(any(OrderItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = service.createBusOrder(customerId, busRequest());
+
+        assertThat(response.totalAmount()).isEqualByComparingTo("1500.00");
+        var item = response.items().get(0);
+        assertThat(item.vertical()).isEqualTo(OrderItemVertical.BUS);
+        assertThat(item.supplierOrganizationId()).isEqualTo(SELLER);
+        assertThat(item.fulfillmentRef()).isEqualTo(holdId);
+        assertThat(item.description()).isEqualTo("Istanbul - Ankara, 02.02.2027 22:00, koltuk 5, 6");
+    }
+
+    @Test
+    void createBus_releasesHoldWhenOrderSaveFails() {
+        UUID holdId = UUID.randomUUID();
+        when(busHoldClient.hold(any())).thenReturn(new com.waylo.packagebookingservice.client.BusHoldClient.Envelope<>(true, busHold(holdId), null));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenThrow(new IllegalStateException("db down"));
+        assertThatThrownBy(() -> service.createBusOrder(customerId, busRequest())).isInstanceOf(IllegalStateException.class);
+        verify(busHoldClient).release(holdId);
+    }
+
+    @Test
+    void createBus_withoutHoldNoOrder() {
+        when(busHoldClient.hold(any())).thenThrow(new com.waylo.packagebookingservice.exception.BusRejectedException(409, "SEAT_TAKEN", "x"));
+        assertThatThrownBy(() -> service.createBusOrder(customerId, busRequest()))
+                .isInstanceOf(com.waylo.packagebookingservice.exception.BusRejectedException.class);
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void markPaid_confirmsBusHold() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0);
+        OrderItem item = new OrderItem();
+        item.setId(UUID.randomUUID());
+        item.setVertical(OrderItemVertical.BUS);
+        item.setFulfillmentRef(holdId);
+        item.setUnitAmount(new BigDecimal("1500.00"));
+        item.setQuantity(1);
+        item.setCurrency("TRY");
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        service.markPaid(orderId);
+        verify(busHoldClient).confirm(holdId);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void cancel_releasesBusHold() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0);
+        OrderItem item = new OrderItem();
+        item.setId(UUID.randomUUID());
+        item.setVertical(OrderItemVertical.BUS);
+        item.setFulfillmentRef(holdId);
+        item.setUnitAmount(new BigDecimal("1500.00"));
+        item.setQuantity(1);
+        item.setCurrency("TRY");
+        item.setDescription("x");
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        service.cancel(customerId, orderId, null);
+        verify(busHoldClient).release(holdId);
+    }
+
+    @Test
+    void createFlight_buildsOrderFromHoldOnly() {
+        UUID holdId = UUID.randomUUID();
+        when(flightHoldClient.hold(any())).thenReturn(new com.waylo.packagebookingservice.client.FlightHoldClient.Envelope<>(true, flightHold(holdId), null));
+        when(orderItemRepository.findByFulfillmentRef(holdId)).thenReturn(List.of());
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.saveAndFlush(any(OrderItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = service.createFlightOrder(customerId, flightRequest());
+
+        assertThat(response.totalAmount()).isEqualByComparingTo("150.00");
+        var item = response.items().get(0);
+        assertThat(item.vertical()).isEqualTo(OrderItemVertical.FLIGHT);
+        assertThat(item.supplierOrganizationId()).isEqualTo(SELLER);
+        assertThat(item.fulfillmentRef()).isEqualTo(holdId);
+        assertThat(item.description()).startsWith("TK100 IST-ESB, 10.11.2026 09:30").endsWith("koltuk 12A");
+        assertThat(item.flight().passengerLastName()).isEqualTo("Yilmaz");
+        assertThat(item.flight().pnr()).isNull();
+    }
+
+    @Test
+    void createFlight_releasesHoldWhenOrderSaveFails() {
+        UUID holdId = UUID.randomUUID();
+        when(flightHoldClient.hold(any())).thenReturn(new com.waylo.packagebookingservice.client.FlightHoldClient.Envelope<>(true, flightHold(holdId), null));
+        when(orderItemRepository.findByFulfillmentRef(holdId)).thenReturn(List.of());
+        when(orderRepository.saveAndFlush(any(Order.class))).thenThrow(new IllegalStateException("db down"));
+        assertThatThrownBy(() -> service.createFlightOrder(customerId, flightRequest())).isInstanceOf(IllegalStateException.class);
+        verify(flightHoldClient).release(holdId);
+    }
+
+    @Test
+    void createFlight_withoutHoldNoOrder() {
+        when(flightHoldClient.hold(any())).thenThrow(new com.waylo.packagebookingservice.exception.FlightRejectedException(409, "OFFER_EXPIRED", "x"));
+        assertThatThrownBy(() -> service.createFlightOrder(customerId, flightRequest()))
+                .isInstanceOf(com.waylo.packagebookingservice.exception.FlightRejectedException.class);
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void createFlight_noSellerConfigured_422() {
+        OrderServiceImpl noSeller = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient,
+                carHoldClient, busHoldClient, flightHoldClient, "", paymentEscrowClient, voucherService);
+        assertThatThrownBy(() -> noSeller.createFlightOrder(customerId, flightRequest()))
+                .isInstanceOf(BusinessRuleException.class);
+        verifyNoInteractions(flightHoldClient);
+    }
+
+    @Test
+    void markPaid_confirmsFlightHoldAndCopiesTicket() {
+        UUID orderId = UUID.randomUUID();
+        UUID holdId = UUID.randomUUID();
+        Order order = persistedOrder(orderId, customerId, OrderStatus.PENDING, 0);
+        OrderItem item = new OrderItem();
+        item.setId(UUID.randomUUID());
+        item.setVertical(OrderItemVertical.FLIGHT);
+        item.setFulfillmentRef(holdId);
+        item.setUnitAmount(new BigDecimal("150.00"));
+        item.setQuantity(1);
+        item.setCurrency("TRY");
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        var confirmed = new com.waylo.packagebookingservice.client.FlightHoldClient.HoldDto(holdId, "INTERNAL", "TK100", "THY", "IST", "ESB",
+                Instant.parse("2026-11-10T06:30:00Z"), Instant.parse("2026-11-10T07:30:00Z"), "ECONOMY", "12A", "Ali", "Yilmaz",
+                "TRY", new BigDecimal("150.00"), BigDecimal.ZERO, "CONFIRMED", Instant.now(), "ABC234", "WL12345678901");
+        when(flightHoldClient.confirm(holdId)).thenReturn(new com.waylo.packagebookingservice.client.FlightHoldClient.Envelope<>(true, confirmed, null));
+
+        service.markPaid(orderId);
+
+        assertThat(item.getPnr()).isEqualTo("ABC234");
+        assertThat(item.getTicketNumber()).isEqualTo("WL12345678901");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
     }
 
     // --- create ---

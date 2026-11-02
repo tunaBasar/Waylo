@@ -38,7 +38,7 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
     inFlight.current = true;
     setSaving(true);
     try {
-      const res = await partnerApi.createOrganization({ name: name.trim(), businessType, legalType });
+      const res = await partnerApi.createOrganization({ name: name.trim(), businessType, legalType: businessType === 'BUS' ? 'COMPANY' : legalType });
       toast.success('Isletme olusturuldu. Platform onayindan sonra oteller yayina alinir.');
       await reload({ organizationId: res.data.id });
       onDone();
@@ -64,15 +64,18 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
             onChange={e => setBusinessType(e.target.value as BusinessType)}>
             <option value="HOTEL">Otel</option>
             <option value="CAR_RENTAL">Araclar</option>
+            <option value="BUS">Otobus firmasi</option>
           </select>
         </Field>
-        <Field label="Hukuki sekil">
-          <select className={inputClass} value={legalType}
-            onChange={e => setLegalType(e.target.value as LegalType)}>
-            <option value="COMPANY">Sirket</option>
-            <option value="INDIVIDUAL">Mukerrat</option>
-          </select>
-        </Field>
+        {businessType !== 'BUS' && (
+          <Field label="Hukuki sekil">
+            <select className={inputClass} value={legalType}
+              onChange={e => setLegalType(e.target.value as LegalType)}>
+              <option value="COMPANY">Sirket</option>
+              <option value="INDIVIDUAL">Mukerrat</option>
+            </select>
+          </Field>
+        )}
         <Button type="submit" icon="check" disabled={saving || !name.trim()}>{saving ? 'Kaydediliyor' : 'Olustur'}</Button>
         <Button type="button" variant="ghost" onClick={onDone}>Vazgec</Button>
       </form>
@@ -148,7 +151,7 @@ function NewHotelForm({ organizationId, onDone }: { organizationId: string; onDo
 }
 
 export default function PartnerOrganizationsPage() {
-  const { loading, error, memberships, membership, organizationId, hotels, hotelId, selectHotel } = usePartner();
+  const { loading, error, memberships, membership, organizationId, hotels, hotelId, selectHotel, isBusOrg } = usePartner();
   const [showOrgForm, setShowOrgForm] = useState(false);
   const [showHotelForm, setShowHotelForm] = useState(false);
 
@@ -198,7 +201,7 @@ export default function PartnerOrganizationsPage() {
         )}
       </section>
 
-      {organizationId && (
+      {organizationId && !isBusOrg && (
         <section className="space-y-space-sm">
           <PageHeader
             title="Oteller"

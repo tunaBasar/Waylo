@@ -163,6 +163,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(response);
     }
 
+    @ExceptionHandler(FlightRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleFlightRejected(FlightRejectedException ex, HttpServletRequest request) {
+        HttpStatus status = switch (ex.getFlightStatus()) {
+            case 409 -> HttpStatus.CONFLICT;
+            case 404 -> HttpStatus.NOT_FOUND;
+            case 400 -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.UNPROCESSABLE_ENTITY;
+        };
+        var response = new ErrorResponse(status.value(), ex.getCode(), ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(status).body(response);
+    }
+
+    @ExceptionHandler(BusRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleBusRejected(BusRejectedException ex, HttpServletRequest request) {
+        HttpStatus status = ex.getBusStatus() == 409 ? HttpStatus.CONFLICT : HttpStatus.UNPROCESSABLE_ENTITY;
+        var response = new ErrorResponse(status.value(), ex.getCode(), ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(status).body(response);
+    }
+
     @ExceptionHandler(CarRejectedException.class)
     public ResponseEntity<ErrorResponse> handleCarRejected(CarRejectedException ex, HttpServletRequest request) {
         HttpStatus status = ex.getCarStatus() == 409 ? HttpStatus.CONFLICT : HttpStatus.UNPROCESSABLE_ENTITY;

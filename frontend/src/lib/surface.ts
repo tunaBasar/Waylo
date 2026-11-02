@@ -30,11 +30,12 @@ export function isAccountPath(pathname: string): boolean {
   return under(pathname, '/profile') || under(pathname, '/settings');
 }
 
-/** Customer pages that book or buy something: hotel detail/booking, quotes, vehicle rent, orders, rentals. */
+/** Customer pages that book or buy something: hotel detail/booking, quotes, vehicle rent, flight offers, orders, rentals. */
 export function isPurchasePath(pathname: string): boolean {
   return pathname.startsWith('/hotels/')
     || under(pathname, '/quotes')
     || under(pathname, '/vehicles')
+    || under(pathname, '/flights/offer')
     || under(pathname, '/orders')
     || under(pathname, '/rentals');
 }

@@ -42,7 +42,7 @@ spring:
             - id: flight-seat-inventory-service
               uri: lb://flight-seat-inventory-service
               predicates:
-                - Path=/api/seat-inventory/**
+                - Path=/api/seat-inventory/**,/api/flight-offers,/api/flight-offers/**
             - id: hotel-service
               uri: lb://hotel-service
               predicates:
@@ -51,6 +51,10 @@ spring:
               uri: lb://car-rental-service
               predicates:
                 - Path=/api/partner/organizations/*/branches,/api/partner/organizations/*/branches/**,/api/partner/organizations/*/vehicles,/api/partner/organizations/*/vehicles/**,/api/partner/organizations/*/rates,/api/partner/organizations/*/rates/**,/api/partner/organizations/*/one-way-routes,/api/partner/organizations/*/one-way-routes/**,/api/partner/organizations/*/documents,/api/partner/organizations/*/documents/**,/api/partner/organizations/*/rentals,/api/partner/organizations/*/rentals/**,/api/partner/organizations/*/status,/api/admin/car-documents,/api/admin/car-documents/**,/api/admin/car-vehicles,/api/admin/car-vehicles/**,/api/car-branches,/api/car-offers,/api/rentals/**
+            - id: bus-service
+              uri: lb://bus-service
+              predicates:
+                - Path=/api/bus-partner/**,/api/bus-trips,/api/bus-trips/**,/api/bus-terminals,/api/bus-sales-status,/api/bus-bookings/**,/api/admin/bus-documents,/api/admin/bus-documents/**,/api/admin/bus-vehicles,/api/admin/bus-terminals,/api/admin/bus-terminals/**
             - id: package-booking-service
               uri: lb://package-booking-service
               predicates:
@@ -62,7 +66,7 @@ spring:
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/payments/**,/api/admin/commission-rates,/api/admin/ledger
+                - Path=/api/payments/**,/api/admin/commission-rates,/api/admin/ledger,/api/admin/supplier-accounts,/api/admin/supplier-accounts/**
             - id: crm-service
               uri: lb://crm-service
               predicates:

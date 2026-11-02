@@ -1194,6 +1194,30 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void publicBusSearchAndSeats_anon_passes_butBookingsNeedAuth() {
+        for (String path : new String[]{"/api/bus-terminals", "/api/bus-sales-status", "/api/bus-trips?fromCity=a&toCity=b&date=2027-01-01",
+                "/api/bus-trips/abc/seats?fromSeq=0&toSeq=1"}) {
+            AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+            GatewayFilterChain chain = exchange -> {
+                captured.set(exchange.getRequest());
+                return exchange.getResponse().setComplete();
+            };
+            ServerWebExchange exchange = ServerWebExchange.class.cast(MockServerWebExchange.from(MockServerHttpRequest.get(path).build()));
+            new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper()).filter(exchange, chain).block();
+            assertThat(captured.get()).as(path).isNotNull();
+        }
+        AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            captured.set(exchange.getRequest());
+            return exchange.getResponse().setComplete();
+        };
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/bus-bookings/me").build());
+        new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper()).filter(exchange, chain).block();
+        assertThat(captured.get()).isNull();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void publicCarOffersGet_anon_passesWithoutIdentity() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
