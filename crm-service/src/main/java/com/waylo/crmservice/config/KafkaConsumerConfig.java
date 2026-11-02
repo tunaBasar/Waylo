@@ -39,7 +39,10 @@ public class KafkaConsumerConfig {
      */
     private static final String TYPE_MAPPINGS =
             "bookingCreated:com.waylo.crmservice.event.BookingCreatedEvent,"
-          + "bookingCancelled:com.waylo.crmservice.event.BookingCancelledEvent";
+          + "bookingCancelled:com.waylo.crmservice.event.BookingCancelledEvent,"
+          + "orderCreated:com.waylo.crmservice.event.OrderEvent,"
+          + "orderCancelled:com.waylo.crmservice.event.OrderEvent,"
+          + "orderItemRedeemed:com.waylo.crmservice.event.OrderEvent";
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {

@@ -4,8 +4,9 @@ import com.waylo.crmservice.domain.CustomerTier;
 import java.time.Instant;
 import java.util.UUID;
 
+/** passport_number is stored but intentionally never returned by any endpoint. */
 public record CustomerResponse(
         UUID id, String firstName, String lastName, String email, String phone,
-        String passportNumber, CustomerTier tier, int loyaltyPoints, boolean active,
+        CustomerTier tier, int loyaltyPoints, boolean active,
         Instant createdAt, Instant updatedAt
 ) {}

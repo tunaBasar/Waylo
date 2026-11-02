@@ -151,14 +151,20 @@ class AccountServiceDeletionTest {
     }
 
     @Test
-    void updateProfile_publishesProfileUpdated() {
+    void updateProfile_publishesUserUpdated() {
         service.updateProfile(userId, new UpdateProfileRequest(" Grace ", " Hopper "));
         ArgumentCaptor<Object> cap = ArgumentCaptor.forClass(Object.class);
         verify(publisher).publishEvent(cap.capture());
         AccountService.AuthEvent ev = (AccountService.AuthEvent) cap.getValue();
-        assertEquals("PROFILE_UPDATED", ev.eventType());
+        assertEquals("USER_UPDATED", ev.eventType());
         assertEquals("a@b.com", ev.email());
         assertEquals("Grace Hopper", ev.name());
+    }
+
+    @Test
+    void updateProfile_unchangedName_publishesNothing() {
+        service.updateProfile(userId, new UpdateProfileRequest("Ada", "Lovelace"));
+        verify(publisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

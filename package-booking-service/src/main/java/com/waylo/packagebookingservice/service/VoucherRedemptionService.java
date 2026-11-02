@@ -10,7 +10,10 @@ import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.exception.AuthenticationRequiredException;
 import com.waylo.packagebookingservice.exception.AuthorizationUnavailableException;
 import com.waylo.packagebookingservice.exception.VoucherException;
+import com.waylo.packagebookingservice.event.OrderEventPublisher;
+import com.waylo.packagebookingservice.event.OrderItemRedeemedEvent;
 import com.waylo.packagebookingservice.repository.OrderItemRepository;
+import com.waylo.packagebookingservice.repository.OrderRepository;
 import com.waylo.packagebookingservice.repository.VoucherRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,16 +46,21 @@ public class VoucherRedemptionService {
     private final AuthAccessClient authAccessClient;
     private final RedemptionAttemptLimiter limiter;
     private final TransactionTemplate tx;
+    private final OrderRepository orderRepository;
+    private final OrderEventPublisher eventPublisher;
 
     public VoucherRedemptionService(VoucherRepository voucherRepository, OrderItemRepository orderItemRepository,
                                     PaymentEscrowClient paymentEscrowClient, AuthAccessClient authAccessClient,
-                                    RedemptionAttemptLimiter limiter, PlatformTransactionManager txManager) {
+                                    RedemptionAttemptLimiter limiter, PlatformTransactionManager txManager,
+                                    OrderRepository orderRepository, OrderEventPublisher eventPublisher) {
         this.voucherRepository = voucherRepository;
         this.orderItemRepository = orderItemRepository;
         this.paymentEscrowClient = paymentEscrowClient;
         this.authAccessClient = authAccessClient;
         this.limiter = limiter;
         this.tx = new TransactionTemplate(txManager);
+        this.orderRepository = orderRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public RedeemResponse redeem(UUID userId, UUID orgId, String payload) {
@@ -62,7 +70,9 @@ public class VoucherRedemptionService {
             throw new VoucherException("TOO_MANY_ATTEMPTS", HttpStatus.TOO_MANY_REQUESTS);
         }
         try {
-            return tx.execute(status -> doRedeem(userId, orgId, payload));
+            RedeemResponse response = tx.execute(status -> doRedeem(userId, orgId, payload));
+            publishRedeemed(response);
+            return response;
         } catch (VoucherException e) {
             limiter.recordFailure(orgId);
             throw e;
@@ -104,6 +114,22 @@ public class VoucherRedemptionService {
         log.info("Voucher {} redeemed by org {}", v.getId(), orgId);
         return new RedeemResponse(v.getId(), item.getId(), item.getDescription(),
                 escrow == null ? null : escrow.supplierAmount(), escrow == null ? item.getCurrency() : escrow.currency(), now);
+    }
+
+    /** After commit, fail-soft: a Kafka problem must never undo a committed redemption. */
+    private void publishRedeemed(RedeemResponse r) {
+        try {
+            OrderItem item = orderItemRepository.findById(r.orderItemId()).orElse(null);
+            if (item == null) return;
+            var order = orderRepository.findById(item.getOrderId()).orElse(null);
+            if (order == null) return;
+            java.math.BigDecimal amount = item.getGrossAmount() != null ? item.getGrossAmount()
+                    : item.getUnitAmount().multiply(java.math.BigDecimal.valueOf(item.getQuantity()));
+            eventPublisher.publishOrderItemRedeemed(new OrderItemRedeemedEvent(
+                    order.getId(), item.getId(), order.getCustomerId(), item.getCurrency(), amount));
+        } catch (RuntimeException e) {
+            log.warn("ORDER_ITEM_REDEEMED publish failed for item {}: {}", r.orderItemId(), e.getMessage());
+        }
     }
 
     private static VoucherException invalid() {

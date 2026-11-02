@@ -24,4 +24,9 @@ public class OrderEventPublisher {
         log.info("Publishing OrderCancelledEvent: orderId={}", event.getOrderId());
         kafkaTemplate.send(KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
     }
+
+    public void publishOrderItemRedeemed(OrderItemRedeemedEvent event) {
+        log.info("Publishing OrderItemRedeemedEvent: orderItemId={}", event.getOrderItemId());
+        kafkaTemplate.send(KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+    }
 }

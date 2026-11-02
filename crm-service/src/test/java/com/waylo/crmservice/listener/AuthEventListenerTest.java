@@ -30,11 +30,13 @@ class AuthEventListenerTest {
     private CustomerMapper mapper;
     @Mock
     private Acknowledgment ack;
+    @Mock
+    private com.waylo.crmservice.service.IdempotencyService idempotency;
 
     private final UUID userId = UUID.randomUUID();
 
     private AuthEventListener listener() {
-        return new AuthEventListener(new CustomerServiceImpl(repository, mapper), repository);
+        return new AuthEventListener(new CustomerServiceImpl(repository, mapper), repository, idempotency);
     }
 
     private static ConsumerRecord<String, Object> rec(Object value) {
@@ -139,6 +141,21 @@ class AuthEventListenerTest {
         verify(repository).save(c);
         verify(repository, never()).insertIfAbsent(any(), anyString(), anyString(), anyString());
         verify(ack).acknowledge();
+    }
+
+    @Test
+    void userUpdated_updatesCustomer_andDuplicateEventIdIsSkipped() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        when(idempotency.tryAcquire("e1")).thenReturn(true, false);
+        String json = "{\"eventType\":\"USER_UPDATED\",\"eventId\":\"e1\",\"userId\":\"" + userId
+                + "\",\"name\":\"Grace Hopper\",\"email\":\"grace@waylo.test\"}";
+        listener().handleAuthEvent(rec(json), ack);
+        listener().handleAuthEvent(rec(json), ack);
+        org.junit.jupiter.api.Assertions.assertEquals("Grace", c.getFirstName());
+        org.junit.jupiter.api.Assertions.assertEquals("Hopper", c.getLastName());
+        verify(repository, times(1)).save(c);
+        verify(ack, times(2)).acknowledge();
     }
 
     @Test

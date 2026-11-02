@@ -60,10 +60,12 @@ public class AccountService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Kullanici bulunamadi"));
         if (user.getDeletedAt() != null) throw new ResponseStatusException(UNAUTHORIZED, "Kimlik dogrulanamadi");
+        boolean changed = !req.firstName().trim().equals(user.getFirstName()) || !req.lastName().trim().equals(user.getLastName());
         user.setFirstName(req.firstName().trim());
         user.setLastName(req.lastName().trim());
         userRepository.save(user);
-        eventPublisher.publishEvent(new AuthEvent("PROFILE_UPDATED", user.getId(), user.getEmail(), user.getFullName(), null));
+        // auth-service has no phone field and no email-change flow yet; name is the only mutable profile data.
+        if (changed) eventPublisher.publishEvent(new AuthEvent("USER_UPDATED", user.getId(), user.getEmail(), user.getFullName(), null));
         return UserProfileResponse.from(user);
     }
 

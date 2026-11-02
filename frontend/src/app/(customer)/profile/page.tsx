@@ -16,6 +16,12 @@ interface ProfileData {
   createdAt: string;
 }
 
+interface MyLoyalty {
+  loyaltyEnabled: boolean;
+  loyaltyPoints: number | null;
+  tier: string | null;
+}
+
 const PASSWORD_HINT = 'Sifre 10-128 karakter olmali, en az bir harf ve bir rakam icermeli ve e-posta ile ayni olmamali';
 const isStrongPassword = (p: string, email?: string) =>
   p.length >= 10 && p.length <= 128 && /\p{L}/u.test(p) && /\p{N}/u.test(p) && (!email || p.toLowerCase() !== email.trim().toLowerCase());
@@ -25,6 +31,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loyalty, setLoyalty] = useState<MyLoyalty | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -54,6 +61,10 @@ export default function ProfilePage() {
       }
     }
     fetchProfile();
+    // Loyalty is optional: hidden unless crm-service reports the feature as enabled.
+    api.get<MyLoyalty>('/api/customers/me')
+      .then(r => { if (r.success && r.data?.loyaltyEnabled) setLoyalty(r.data); })
+      .catch(() => {});
   }, []);
 
   const handleSave = async () => {
@@ -176,6 +187,13 @@ export default function ProfilePage() {
           </span>
         </div>
       </div>
+
+      {loyalty && loyalty.loyaltyPoints != null && (
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-5 flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-on-surface">Sadakat Puani</h4>
+          <span className="text-sm text-on-surface">{loyalty.loyaltyPoints.toLocaleString('tr-TR')} puan{loyalty.tier ? ` · ${loyalty.tier}` : ''}</span>
+        </div>
+      )}
 
       {/* Info card */}
       <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-5">

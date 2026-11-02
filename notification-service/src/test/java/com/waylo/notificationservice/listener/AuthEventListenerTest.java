@@ -39,4 +39,7 @@ class AuthEventListenerTest {
 
     @Test
     void profileUpdated_sendsNoEmailAndNoUnknownLog() { assertIgnored("PROFILE_UPDATED"); }
+
+    @Test
+    void userUpdated_sendsNoEmailAndNoUnknownLog() { assertIgnored("USER_UPDATED"); }
 }

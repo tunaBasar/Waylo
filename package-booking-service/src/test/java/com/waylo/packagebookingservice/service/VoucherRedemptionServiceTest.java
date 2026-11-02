@@ -1,5 +1,6 @@
 package com.waylo.packagebookingservice.service;
 
+import org.mockito.ArgumentCaptor;
 import com.waylo.packagebookingservice.client.AuthAccessClient;
 import com.waylo.packagebookingservice.client.PaymentEscrowClient;
 import com.waylo.packagebookingservice.domain.OrderItem;
@@ -49,6 +50,8 @@ class VoucherRedemptionServiceTest {
     PaymentEscrowClient payment = mock(PaymentEscrowClient.class);
     AuthAccessClient auth = mock(AuthAccessClient.class);
     RedemptionAttemptLimiter limiter = mock(RedemptionAttemptLimiter.class);
+    com.waylo.packagebookingservice.repository.OrderRepository orderRepo = mock(com.waylo.packagebookingservice.repository.OrderRepository.class);
+    com.waylo.packagebookingservice.event.OrderEventPublisher publisher = mock(com.waylo.packagebookingservice.event.OrderEventPublisher.class);
     VoucherService vouchers;
     VoucherRedemptionService service;
 
@@ -78,7 +81,7 @@ class VoucherRedemptionServiceTest {
     @BeforeEach
     void setUp() {
         vouchers = new VoucherService(voucherRepo, itemRepo, SECRET);
-        service = new VoucherRedemptionService(voucherRepo, itemRepo, payment, auth, limiter, txm);
+        service = new VoucherRedemptionService(voucherRepo, itemRepo, payment, auth, limiter, txm, orderRepo, publisher);
         item = new OrderItem();
         item.setId(UUID.randomUUID());
         item.setVertical(OrderItemVertical.HOTEL);
@@ -124,6 +127,26 @@ class VoucherRedemptionServiceTest {
         assertThat(voucher.getRedeemedByUserId()).isEqualTo(user);
         verify(payment, times(1)).release(item.getId());
         verify(auth).check(user, org, "RESERVATION_REDEEM");
+    }
+
+    @Test
+    void redeem_publishesOrderItemRedeemed_afterCommit_andPublishFailureDoesNotFailRedeem() {
+        UUID orderId = UUID.randomUUID(), customer = UUID.randomUUID();
+        item.setOrderId(orderId);
+        var order = new com.waylo.packagebookingservice.domain.Order();
+        order.setId(orderId);
+        order.setCustomerId(customer);
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+        service.redeem(user, org, payload);
+        var cap = ArgumentCaptor.forClass(com.waylo.packagebookingservice.event.OrderItemRedeemedEvent.class);
+        verify(publisher).publishOrderItemRedeemed(cap.capture());
+        assertThat(cap.getValue().getCustomerId()).isEqualTo(customer);
+        assertThat(cap.getValue().getOrderItemId()).isEqualTo(item.getId());
+        assertThat(cap.getValue().getAmount()).isEqualByComparingTo("100.00");
+        assertThat(cap.getValue().getEventType()).isEqualTo("ORDER_ITEM_REDEEMED");
+        doThrow(new RuntimeException("kafka down")).when(publisher).publishOrderItemRedeemed(any());
+        voucher.setStatus(VoucherStatus.ACTIVE);
+        assertThat(service.redeem(user, org, payload).amountReleased()).isEqualByComparingTo("90.00");
     }
 
     @Test

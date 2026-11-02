@@ -4,7 +4,9 @@ import com.waylo.crmservice.domain.CustomerTier;
 import com.waylo.crmservice.dto.ApiResponse;
 import com.waylo.crmservice.dto.CustomerRequest;
 import com.waylo.crmservice.dto.CustomerResponse;
+import com.waylo.crmservice.dto.MyCustomerResponse;
 import com.waylo.crmservice.service.CustomerService;
+import com.waylo.crmservice.service.LoyaltyService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +19,20 @@ import java.util.UUID;
 @RequestMapping("/api/customers")
 public class CustomerController {
     private final CustomerService customerService;
-    public CustomerController(CustomerService customerService) { this.customerService = customerService; }
+    private final LoyaltyService loyaltyService;
+    public CustomerController(CustomerService customerService, LoyaltyService loyaltyService) {
+        this.customerService = customerService;
+        this.loyaltyService = loyaltyService;
+    }
+
+    /** Own record only (identity from the gateway-verified X-User-Id). Loyalty fields are hidden while the feature is disabled. */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<MyCustomerResponse>> me(@RequestHeader("X-User-Id") UUID userId) {
+        CustomerResponse c = customerService.getById(userId);
+        boolean on = loyaltyService.isEnabled();
+        return ResponseEntity.ok(ApiResponse.of(new MyCustomerResponse(c.id(), c.firstName(), c.lastName(), c.email(),
+                on, on ? c.loyaltyPoints() : null, on ? c.tier() : null)));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<CustomerResponse>> create(@Valid @RequestBody CustomerRequest request) {

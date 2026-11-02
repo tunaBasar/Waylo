@@ -11,7 +11,7 @@ import java.util.UUID;
  * Looks up a customer's contact details for notification delivery.
  * Response is wrapped in the standard ApiResponse envelope used by all services.
  */
-@FeignClient(name = "crm-service", path = "/api/customers")
+@FeignClient(name = "crm-service", path = "/api/customers", configuration = InternalTokenFeignConfig.class)
 public interface CrmServiceClient {
 
     @GetMapping("/{id}")

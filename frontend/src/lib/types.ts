@@ -137,7 +137,6 @@ export interface Customer {
   lastName: string;
   email: string;
   phone: string | null;
-  passportNumber: string | null;
   tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
   loyaltyPoints: number;
   active: boolean;

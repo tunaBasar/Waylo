@@ -8,7 +8,7 @@ Registers a user through the gateway (no manual CRM call), then asserts:
 order-events have no CRM or notification consumer, so no booking/loyalty assertions here.)
 Standard library only.
 """
-import argparse, json, secrets, subprocess, sys, time, uuid
+import argparse, json, pathlib, secrets, subprocess, sys, time, uuid
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -52,6 +52,13 @@ def poll(fn, timeout=20):
         time.sleep(1)
 
 
+def env_value(key):
+    for line in (pathlib.Path(__file__).resolve().parent.parent / ".env").read_text().splitlines():
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
 def main():
     global BASE_URL
     ap = argparse.ArgumentParser()
@@ -70,8 +77,12 @@ def main():
     ok(s == 200 and d and d.get("success"), f"login after verify 200 (got {s})")
     uid, tok = d["data"]["userId"], d["data"]["token"]
 
+    s, a = req("POST", "/api/auth/login", {"email": env_value("WAYLO_BOOTSTRAP_ADMIN_EMAIL"),
+                                          "password": env_value("WAYLO_BOOTSTRAP_ADMIN_PASSWORD")})
+    atok = a["data"]["token"] if s == 200 else None
+
     def customer():
-        s, c = req("GET", f"/api/customers/{uid}", None, tok)
+        s, c = req("GET", f"/api/customers/{uid}", None, atok)
         return c["data"] if s == 200 and c and c.get("data") else None
 
     c = poll(customer)
@@ -81,8 +92,45 @@ def main():
     s2, _ = req("POST", "/api/auth/register",
                 {"firstName": "Plain", "lastName": "User", "email": email, "password": secrets.token_urlsafe(16)})
     ok(s2 in (400, 409, 422), f"duplicate register rejected (got {s2})")
-    s3, lst = req("GET", f"/api/customers/email/{email}", None, tok)
+    s3, lst = req("GET", f"/api/customers/email/{email}", None, atok)
     ok(s3 == 200 and lst and lst.get("data", {}).get("id") == uid, "exactly the same CRM customer found by email")
+
+    # --- access control ---
+    s, _ = req("GET", "/api/customers", None, tok)
+    ok(s == 403, f"non-admin list customers 403 (got {s})")
+    s, _ = req("GET", f"/api/customers/{uid}", None, tok)
+    ok(s == 403, f"non-admin read by id (even own) 403 (got {s})")
+    s, _ = req("GET", "/api/customers/search?q=Plain", None, tok)
+    ok(s == 403, f"non-admin search 403 (got {s})")
+    s, _ = req("DELETE", f"/api/customers/{uid}", None, tok)
+    ok(s == 403, f"non-admin delete 403 (got {s})")
+    s, _ = req("PUT", f"/api/customers/{uid}", {"firstName": "X", "lastName": "Y", "email": email}, tok)
+    ok(s == 403, f"non-admin put 403 (got {s})")
+    s, _ = req("POST", f"/api/customers/{uid}/loyalty-points?points=999", None, tok)
+    ok(s == 403, f"non-admin add loyalty 403 (got {s})")
+    s, _ = req("GET", "/api/customers", None, None)
+    ok(s == 401, f"anonymous list 401 (got {s})")
+    s, me = req("GET", "/api/customers/me", None, tok)
+    ok(s == 200 and me["data"]["id"] == uid and "passportNumber" not in me["data"], "GET /me returns own record, no passport")
+    ok(me["data"].get("loyaltyEnabled") is False and me["data"].get("loyaltyPoints") is None,
+       "loyalty disabled by default: /me hides points (no points earned)")
+
+    # --- profile change propagates ---
+    s, _ = req("PATCH", "/api/me", {"firstName": "Renamed", "lastName": "Person"}, tok)
+    ok(s == 200, f"profile update 200 (got {s})")
+
+    # --- admin ---
+    ok(atok is not None, "admin login")
+    s, lst = req("GET", "/api/customers", None, atok)
+    ok(s == 200 and isinstance(lst["data"], list) and len(lst["data"]) > 0, "admin list customers 200")
+    ok(all("passportNumber" not in c for c in lst["data"]), "admin list never contains passportNumber")
+
+    def renamed():
+        s, c = req("GET", f"/api/customers/{uid}", None, atok)
+        d = c["data"] if s == 200 and c else None
+        return d if d and d["firstName"] == "Renamed" and d["lastName"] == "Person" else None
+
+    ok(poll(renamed, 15) is not None, "profile name change propagated to CRM (USER_UPDATED)")
 
     print(f"\n{P} passed, {F} failed")
     sys.exit(1 if F else 0)

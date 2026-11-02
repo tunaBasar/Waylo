@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.waylo.crmservice.repository.CustomerRepository;
 import com.waylo.crmservice.service.CustomerService;
+import com.waylo.crmservice.service.IdempotencyService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +33,11 @@ public class AuthEventListener {
 
     private final CustomerService customerService;
     private final CustomerRepository customerRepository;
+    private final IdempotencyService idempotencyService;
 
-    public AuthEventListener(CustomerService customerService, CustomerRepository customerRepository) {
+    public AuthEventListener(CustomerService customerService, CustomerRepository customerRepository,
+                             IdempotencyService idempotencyService) {
+        this.idempotencyService = idempotencyService;
         this.customerService = customerService;
         this.customerRepository = customerRepository;
     }
@@ -64,7 +68,9 @@ public class AuthEventListener {
                 });
                 return;
             }
-            if ("PROFILE_UPDATED".equals(eventType)) {
+            if ("PROFILE_UPDATED".equals(eventType) || "USER_UPDATED".equals(eventType)) {
+                String eventId = node.path("eventId").asText(null);
+                if (eventId != null && !idempotencyService.tryAcquire(eventId)) return;
                 customerRepository.findById(userId).filter(c -> c.isActive()).ifPresent(c -> { String[] n = node.path("name").asText("").trim().split("\\s+", 2); c.setFirstName(n.length > 0 ? n[0] : ""); c.setLastName(n.length > 1 ? n[1] : ""); if (email != null) c.setEmail(email); customerRepository.save(c); });
                 return;
             }

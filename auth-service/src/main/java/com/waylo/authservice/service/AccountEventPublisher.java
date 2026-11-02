@@ -16,7 +16,7 @@ public class AccountEventPublisher {
     public AccountEventPublisher(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) { this.kafkaTemplate = kafkaTemplate; this.objectMapper = objectMapper; }
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publish(AccountService.AuthEvent event) throws Exception {
-        Map<String, Object> payload = new HashMap<>(); payload.put("eventType", event.eventType()); payload.put("userId", event.userId().toString());
+        Map<String, Object> payload = new HashMap<>(); payload.put("eventType", event.eventType()); payload.put("userId", event.userId().toString()); payload.put("eventId", java.util.UUID.randomUUID().toString());
         if (event.email() != null) payload.put("email", event.email()); if (event.name() != null) payload.put("name", event.name()); if (event.token() != null) payload.put("token", event.token());
         kafkaTemplate.send("auth-events", event.userId().toString(), objectMapper.writeValueAsString(payload));
     }

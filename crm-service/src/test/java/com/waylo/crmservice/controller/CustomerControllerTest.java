@@ -33,7 +33,7 @@ class CustomerControllerTest {
 
     private CustomerResponse buildResponse() {
         return new CustomerResponse(customerId, "John", "Doe", "john.doe@example.com", "+90123456789",
-                "P1234567", CustomerTier.BRONZE, 0, true, Instant.now(), Instant.now());
+                CustomerTier.BRONZE, 0, true, Instant.now(), Instant.now());
     }
 
     @Test

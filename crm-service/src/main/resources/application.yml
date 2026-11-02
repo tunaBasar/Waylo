@@ -39,6 +39,16 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
+waylo:
+  internal:
+    token: ${INTERNAL_API_TOKEN:}
+  crm:
+    loyalty:
+      points-per-try: ${CRM_LOYALTY_POINTS_PER_TRY:0}
+      tier-silver-points: ${CRM_LOYALTY_TIER_SILVER:0}
+      tier-gold-points: ${CRM_LOYALTY_TIER_GOLD:0}
+      tier-platinum-points: ${CRM_LOYALTY_TIER_PLATINUM:0}
+
 management:
   endpoints:
     web:
