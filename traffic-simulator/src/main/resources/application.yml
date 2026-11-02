@@ -13,3 +13,7 @@ management:
   endpoint:
     health:
       show-details: always
+
+waylo:
+  simulator:
+    base-url: ${SIMULATOR_BASE_URL:http://api-gateway:8080}

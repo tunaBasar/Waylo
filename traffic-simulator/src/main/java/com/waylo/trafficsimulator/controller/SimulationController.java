@@ -17,23 +17,42 @@ public class SimulationController {
     private final SimulationService simulationService;
     public SimulationController(SimulationService simulationService) { this.simulationService = simulationService; }
 
+    private static boolean isAdmin(String role) {
+        return "ADMIN".equals(role);
+    }
+
+    private static <T> ResponseEntity<ApiResponse<T>> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.of(null, "Admin access required"));
+    }
+
     @PostMapping
-    public ResponseEntity<ApiResponse<SimulationResponse>> start(@Valid @RequestBody SimulationRequest request) {
+    public ResponseEntity<ApiResponse<SimulationResponse>> start(
+            @Valid @RequestBody SimulationRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAdmin(role)) {
+            return forbidden();
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(simulationService.start(request), "Simulation started"));
     }
 
     @GetMapping("/{simulationId}")
-    public ResponseEntity<ApiResponse<SimulationResponse>> getStatus(@PathVariable String simulationId) {
+    public ResponseEntity<ApiResponse<SimulationResponse>> getStatus(@PathVariable String simulationId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAdmin(role)) return forbidden();
         return ResponseEntity.ok(ApiResponse.of(simulationService.getStatus(simulationId)));
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<SimulationResponse>>> listAll() {
+    public ResponseEntity<ApiResponse<List<SimulationResponse>>> listAll(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAdmin(role)) return forbidden();
         return ResponseEntity.ok(ApiResponse.of(simulationService.listAll()));
     }
 
     @PostMapping("/{simulationId}/cancel")
-    public ResponseEntity<ApiResponse<SimulationResponse>> cancel(@PathVariable String simulationId) {
+    public ResponseEntity<ApiResponse<SimulationResponse>> cancel(@PathVariable String simulationId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!isAdmin(role)) return forbidden();
         return ResponseEntity.ok(ApiResponse.of(simulationService.cancel(simulationId), "Simulation cancelled"));
     }
 }
