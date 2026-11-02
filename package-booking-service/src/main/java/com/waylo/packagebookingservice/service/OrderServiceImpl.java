@@ -60,6 +60,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentEscrowClient paymentEscrowClient;
     private final VoucherService voucherService;
     private final PricingApplier pricingApplier;
+    private final CancellationPolicyResolver policyResolver;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                              OrderItemRepository orderItemRepository,
@@ -71,7 +72,9 @@ public class OrderServiceImpl implements OrderService {
                              @Value("${waylo.flight.seller-organization-id:}") String flightSellerOrganizationId,
                              PaymentEscrowClient paymentEscrowClient,
                              VoucherService voucherService,
-                             PricingApplier pricingApplier) {
+                             PricingApplier pricingApplier,
+                             CancellationPolicyResolver policyResolver) {
+        this.policyResolver = policyResolver;
         this.pricingApplier = pricingApplier;
         this.voucherService = voucherService;
         this.orderRepository = orderRepository;
@@ -137,6 +140,7 @@ public class OrderServiceImpl implements OrderService {
                     + hold.rooms() + " oda");
             item.setCheckIn(hold.checkIn());
             item.setCheckOut(hold.checkOut());
+            policyResolver.applyHotel(item, hold.cancellationPolicy());
             item.setQuantity(1);
             item.setCurrency(hold.currency());
             priced.applyTo(item);
@@ -168,7 +172,7 @@ public class OrderServiceImpl implements OrderService {
             order = orderRepository.saveAndFlush(order);
             OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.CAR); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.pickupBranchId()); item.setFulfillmentRef(hold.holdId());
             String transmission = "AUTOMATIC".equalsIgnoreCase(hold.transmission()) ? "Otomatik" : "Manuel";
-            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission + "), " + hold.chargeableDays() + " gun"); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.pickupAt()); item.setReturnAt(hold.returnAt());
+            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission + "), " + hold.chargeableDays() + " gun"); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.pickupAt()); item.setReturnAt(hold.returnAt()); policyResolver.applyConfigured(item);
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
@@ -191,7 +195,7 @@ public class OrderServiceImpl implements OrderService {
             Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); PricingApplier.Priced priced = pricingApplier.price("OTOBÜS", hold.organizationId(), hold.totalAmount(), hold.currency(), actorUserId, request.promoCode(), orderId); order.setTotalAmount(priced.net()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
             order = orderRepository.saveAndFlush(order);
             OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.BUS); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.tripId()); item.setFulfillmentRef(hold.holdId());
-            item.setDescription(busDescription(hold)); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.boardingAt()); item.setReturnAt(hold.arrivalAt());
+            item.setDescription(busDescription(hold)); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.boardingAt()); item.setReturnAt(hold.arrivalAt()); policyResolver.applyConfigured(item);
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
@@ -251,6 +255,7 @@ public class OrderServiceImpl implements OrderService {
             item.setCurrency(hold.currency());
             priced.applyTo(item);
             applyFlight(item, hold);
+            policyResolver.applyConfigured(item);
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
@@ -364,6 +369,52 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
+    private static PaymentEscrowClient.PolicyDto policyOf(OrderItem item) {
+        return new PaymentEscrowClient.PolicyDto(item.getCancellationPolicy(), item.getCancelFreeHoursBefore(),
+                CancellationPolicyResolver.serviceStart(item));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.waylo.packagebookingservice.dto.CancellationPreviewResponse cancellationPreview(UUID actorUserId, UUID orderId) {
+        requireIdentity(actorUserId);
+        Order order = findOrThrow(orderId);
+        requireOwner(actorUserId, order);
+        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+        String blocked = null;
+        List<com.waylo.packagebookingservice.dto.CancellationPreviewResponse.Item> out = new java.util.ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO.setScale(2);
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
+            blocked = order.getStatus() == OrderStatus.CANCELLED ? "ALREADY_CANCELLED" : "TERMINAL_STATE";
+        }
+        for (OrderItem item : items) {
+            BigDecimal charged = item.getNetAmount() != null ? item.getNetAmount() : item.getSubtotal();
+            String outcome = "UNPAID";
+            BigDecimal refund = BigDecimal.ZERO.setScale(2);
+            if (blocked != null) {
+                outcome = item.getCancelOutcome() == null ? "NONE" : item.getCancelOutcome();
+                refund = item.getRefundAmount() == null ? refund : item.getRefundAmount();
+            } else if (order.getStatus() == OrderStatus.CONFIRMED) {
+                var p = paymentEscrowClient.preview(item.getId(), policyOf(item)).data();
+                if (!p.cancellable()) {
+                    blocked = "ALREADY_USED";
+                    outcome = "NONE";
+                } else {
+                    outcome = p.outcome();
+                    refund = p.refundAmount();
+                }
+            }
+            total = total.add(refund);
+            out.add(new com.waylo.packagebookingservice.dto.CancellationPreviewResponse.Item(item.getId(), item.getDescription(),
+                    item.getCancellationPolicy(), item.getCancelFreeHoursBefore(), outcome, charged, refund));
+        }
+        if (blocked != null && order.getStatus() == OrderStatus.CONFIRMED) {
+            total = BigDecimal.ZERO.setScale(2);
+        }
+        return new com.waylo.packagebookingservice.dto.CancellationPreviewResponse(orderId, blocked == null, blocked,
+                order.getCurrency(), total, out);
+    }
+
     @Override
     public OrderResponse cancel(UUID actorUserId, UUID orderId, Long expectedVersion) {
         requireIdentity(actorUserId);
@@ -381,13 +432,26 @@ public class OrderServiceImpl implements OrderService {
             throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Order.class, order.getId().toString());
         }
 
-        // Paid order (CONFIRMED): refund every HELD escrow item first. If payment-service is down this throws 503 and the
-        // order stays unchanged. TODO(cancellation policy task): for now this is a FULL refund of all HELD items regardless of
-        // the cancel policy snapshot. Items already RELEASED to the supplier make payment-service answer 422
-        // ESCROW_ALREADY_RELEASED and the cancel is rejected.
+        // Paid order (CONFIRMED): decide every item from its stored policy snapshot. Check first that no item has left escrow
+        // (redeemed or no-show) so a rejected cancel never leaves some items already settled. If payment-service is down
+        // this throws 503 and the order stays unchanged.
+        boolean allRefunded = true;
         if (order.getStatus() == OrderStatus.CONFIRMED) {
-            for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
-                paymentEscrowClient.refund(item.getId());
+            List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+            for (OrderItem item : items) {
+                var preview = paymentEscrowClient.preview(item.getId(), policyOf(item)).data();
+                if (preview != null && !preview.cancellable()) {
+                    throw new BusinessRuleException("ESCROW_ALREADY_RELEASED",
+                            "An item of this order was already used or settled, the order cannot be cancelled");
+                }
+            }
+            for (OrderItem item : items) {
+                var r = paymentEscrowClient.cancel(item.getId(), policyOf(item)).data();
+                boolean refund = "REFUND".equals(r.outcome());
+                allRefunded &= refund;
+                item.setCancelOutcome(r.outcome());
+                item.setRefundAmount(r.refundAmount());
+                orderItemRepository.save(item);
             }
         }
 
@@ -411,7 +475,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.saveAndFlush(order);
-        pricingApplier.release(order.getId());
+        if (allRefunded) pricingApplier.release(order.getId()); // promo is consumed when nothing was refunded
         voucherService.voidForOrder(order.getId());
 
         eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId()));
@@ -547,7 +611,11 @@ public class OrderServiceImpl implements OrderService {
                 item.getDiscountFundedBy(),
                 item.getNetAmount() != null ? item.getNetAmount() : item.getSubtotal(),
                 item.getTaxAmount(),
-                item.getPromoCode()
+                item.getPromoCode(),
+                item.getCancellationPolicy(),
+                item.getCancelFreeHoursBefore(),
+                item.getCancelOutcome(),
+                item.getRefundAmount()
         );
     }
 }

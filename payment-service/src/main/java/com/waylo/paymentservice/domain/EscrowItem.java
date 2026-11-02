@@ -70,6 +70,10 @@ public class EscrowItem {
     @Column(name = "release_trigger", nullable = false, length = 20, updatable = false)
     private ReleaseTrigger releaseTrigger;
 
+    /** Why a RELEASED/REFUNDED item left escrow: REDEMPTION, TICKETING, CANCEL_NO_REFUND, NO_SHOW, CANCEL_REFUND. */
+    @Column(name = "settlement_reason", length = 30)
+    private String settlementReason;
+
     @Column(name = "provider_item_ref")
     private String providerItemRef;
 
@@ -120,6 +124,8 @@ public class EscrowItem {
     public void setStatus(EscrowStatus status) { this.status = status; }
     public ReleaseTrigger getReleaseTrigger() { return releaseTrigger; }
     public void setReleaseTrigger(ReleaseTrigger releaseTrigger) { this.releaseTrigger = releaseTrigger; }
+    public String getSettlementReason() { return settlementReason; }
+    public void setSettlementReason(String settlementReason) { this.settlementReason = settlementReason; }
     public String getProviderItemRef() { return providerItemRef; }
     public void setProviderItemRef(String providerItemRef) { this.providerItemRef = providerItemRef; }
     public Instant getHeldAt() { return heldAt; }

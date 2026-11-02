@@ -78,7 +78,7 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, busHoldClient, flightHoldClient, SELLER.toString(), paymentEscrowClient, voucherService, new PricingApplier(pricingClient));
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, busHoldClient, flightHoldClient, SELLER.toString(), paymentEscrowClient, voucherService, new PricingApplier(pricingClient), new CancellationPolicyResolver("", "", "NON_REFUNDABLE", "", "FREE_UNTIL", "24"));
     }
 
     private OrderItemCreateRequest validItem(String currency) {
@@ -239,7 +239,7 @@ class OrderServiceImplTest {
     @Test
     void createFlight_noSellerConfigured_422() {
         OrderServiceImpl noSeller = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient,
-                carHoldClient, busHoldClient, flightHoldClient, "", paymentEscrowClient, voucherService, new PricingApplier(pricingClient));
+                carHoldClient, busHoldClient, flightHoldClient, "", paymentEscrowClient, voucherService, new PricingApplier(pricingClient), new CancellationPolicyResolver("", "", "NON_REFUNDABLE", "", "FREE_UNTIL", "24"));
         assertThatThrownBy(() -> noSeller.createFlightOrder(customerId, flightRequest()))
                 .isInstanceOf(BusinessRuleException.class);
         verifyNoInteractions(flightHoldClient);
@@ -445,7 +445,7 @@ class OrderServiceImplTest {
     private HotelHoldClient.HoldDto hold() {
         return new HotelHoldClient.HoldDto(UUID.randomUUID(), quoteId, UUID.randomUUID(), orgId, UUID.randomUUID(),
                 UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD",
-                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"));
+                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"), "FREE_CANCELLATION");
     }
 
     private void stubSaves() {
@@ -567,8 +567,17 @@ class OrderServiceImplTest {
         return item;
     }
 
+    private static com.waylo.packagebookingservice.client.PaymentEscrowClient.CancellationDto dto(boolean cancellable, String outcome, String refund) {
+        return new com.waylo.packagebookingservice.client.PaymentEscrowClient.CancellationDto(UUID.randomUUID(), outcome, cancellable,
+                cancellable ? null : "ALREADY_RELEASED", new BigDecimal("100.00"), new BigDecimal(refund), BigDecimal.ZERO, BigDecimal.ZERO, "TRY", "HELD");
+    }
+
+    private static <T> com.waylo.packagebookingservice.client.PaymentEscrowClient.Envelope<T> env(T d) {
+        return new com.waylo.packagebookingservice.client.PaymentEscrowClient.Envelope<>(true, d, null);
+    }
+
     @Test
-    void cancel_paidOrder_refundsEveryItemBeforeCancelling() {
+    void cancel_paidOrder_fullRefund_cancelsPerPolicySnapshotAndReleasesPromo() {
         UUID orderId = UUID.randomUUID();
         OrderItem item = hotelItem(orderId, UUID.randomUUID());
         item.setId(UUID.randomUUID());
@@ -576,24 +585,84 @@ class OrderServiceImplTest {
         when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
         when(hotelHoldClient.release(any())).thenThrow(new HotelRejectedException(422, "HOLD_INVALID_STATE", "confirmed"));
+        when(paymentEscrowClient.preview(eq(item.getId()), any())).thenReturn(env(dto(true, "REFUND", "100.00")));
+        when(paymentEscrowClient.cancel(eq(item.getId()), any())).thenReturn(env(dto(true, "REFUND", "100.00")));
 
         assertThat(service.cancel(customerId, orderId, null).status()).isEqualTo(OrderStatus.CANCELLED);
-        verify(paymentEscrowClient).refund(item.getId());
+        assertThat(item.getCancelOutcome()).isEqualTo("REFUND");
+        assertThat(item.getRefundAmount()).isEqualByComparingTo("100.00");
+        verify(pricingClient).release(orderId);
     }
 
     @Test
-    void cancel_paidOrder_alreadyReleased_rejectedAndOrderUnchanged() {
+    void cancel_paidOrder_noRefund_keepsPromoConsumed() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setId(UUID.randomUUID());
+        item.setCancellationPolicy("NON_REFUNDABLE");
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0L)));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(hotelHoldClient.release(any())).thenThrow(new HotelRejectedException(422, "HOLD_INVALID_STATE", "confirmed"));
+        when(paymentEscrowClient.preview(eq(item.getId()), any())).thenReturn(env(dto(true, "NO_REFUND", "0")));
+        when(paymentEscrowClient.cancel(argThat(id -> id.equals(item.getId())), argThat(p -> "NON_REFUNDABLE".equals(p.policy()))))
+                .thenReturn(env(dto(true, "NO_REFUND", "0")));
+
+        assertThat(service.cancel(customerId, orderId, null).status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(item.getCancelOutcome()).isEqualTo("NO_REFUND");
+        verify(pricingClient, never()).release(any());
+    }
+
+    @Test
+    void cancel_paidOrder_alreadyUsed_rejectedBeforeAnyMoneyMovesAndOrderUnchanged() {
         UUID orderId = UUID.randomUUID();
         OrderItem item = hotelItem(orderId, UUID.randomUUID());
         item.setId(UUID.randomUUID());
         Order order = persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0L);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
-        when(paymentEscrowClient.refund(item.getId())).thenThrow(new BusinessRuleException("ESCROW_ALREADY_RELEASED", "released"));
+        when(paymentEscrowClient.preview(eq(item.getId()), any())).thenReturn(env(dto(false, "NO_REFUND", "0")));
 
         assertThatThrownBy(() -> service.cancel(customerId, orderId, null)).isInstanceOf(BusinessRuleException.class);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(paymentEscrowClient, never()).cancel(any(), any());
         verify(hotelHoldClient, never()).release(any());
+    }
+
+    @Test
+    void preview_sumsRefundsOfPolicyOutcomes_andIsReadOnly() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setId(UUID.randomUUID());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.CONFIRMED, 0L)));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        when(paymentEscrowClient.preview(eq(item.getId()), any())).thenReturn(env(dto(true, "REFUND", "100.00")));
+
+        var p = service.cancellationPreview(customerId, orderId);
+        assertThat(p.cancellable()).isTrue();
+        assertThat(p.totalRefund()).isEqualByComparingTo("100.00");
+        assertThat(p.items().get(0).outcome()).isEqualTo("REFUND");
+        verify(paymentEscrowClient, never()).cancel(any(), any());
+    }
+
+    @Test
+    void preview_pendingOrder_nothingToRefund() {
+        UUID orderId = UUID.randomUUID();
+        OrderItem item = hotelItem(orderId, UUID.randomUUID());
+        item.setId(UUID.randomUUID());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, customerId, OrderStatus.PENDING, 0L)));
+        when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of(item));
+        var p = service.cancellationPreview(customerId, orderId);
+        assertThat(p.cancellable()).isTrue();
+        assertThat(p.totalRefund()).isEqualByComparingTo("0");
+        verifyNoInteractions(paymentEscrowClient);
+    }
+
+    @Test
+    void preview_otherCustomer_denied() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(persistedOrder(orderId, UUID.randomUUID(), OrderStatus.CONFIRMED, 0L)));
+        assertThatThrownBy(() -> service.cancellationPreview(customerId, orderId)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test

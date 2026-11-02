@@ -213,10 +213,33 @@ public class QuoteService {
 
     private UUID reservePromoUsage(QuoteRequest request, PromoCode promoCode,
                                    QuoteResponse quote) {
+        // Lock the campaign row first: the global limit counts reservations across ALL codes of the campaign,
+        // so the promo-code row lock alone does not serialize them. Lock order campaign -> promo code everywhere.
+        Campaign lockedCampaign = campaignRepo.findByIdForUpdate(promoCode.getCampaign().getId())
+                .orElseThrow(() -> new BusinessRuleException(
+                        "PROMO_CODE_INVALID", "Campaign disappeared"));
+
         // Acquire pessimistic lock on the promo code row
         PromoCode locked = promoCodeRepo.findByCodeWithLock(request.promoCode())
                 .orElseThrow(() -> new BusinessRuleException(
                         "PROMO_CODE_INVALID", "Promo code disappeared"));
+
+        // Re-check limits under the lock (the checks in computeQuote are only a fast path)
+        Optional<PromoReservation> already = reservationRepo.findByOrderId(request.orderId());
+        if (already.isPresent()) {
+            return already.get().getId();
+        }
+        if (lockedCampaign.getMaxUsesGlobal() != null
+                && reservationRepo.countActiveByCampaignId(lockedCampaign.getId()) >= lockedCampaign.getMaxUsesGlobal()) {
+            throw new BusinessRuleException(
+                    "PROMO_CODE_MAX_USES_REACHED", "Global campaign limit reached");
+        }
+        if (lockedCampaign.getMaxUsesPerUser() != null
+                && reservationRepo.countByCustomerIdAndPromoCodeId(request.customerId(), locked.getId())
+                        >= lockedCampaign.getMaxUsesPerUser()) {
+            throw new BusinessRuleException(
+                    "PROMO_CODE_MAX_USES_REACHED", "Per-user limit reached");
+        }
 
         // Check promo code own limit
         if (locked.getMaxUsesTotal() != null

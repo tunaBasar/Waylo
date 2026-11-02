@@ -10,6 +10,11 @@ import java.util.UUID;
 
 public interface CampaignRepository extends JpaRepository<Campaign, UUID> {
 
+    /** SELECT ... FOR UPDATE on one campaign. Serializes reservations that share a campaign-wide limit. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Campaign c WHERE c.id = :id")
+    Optional<Campaign> findByIdForUpdate(@Param("id") UUID id);
+
     @Query("""
         SELECT c FROM Campaign c
         WHERE c.vertical = :vertical

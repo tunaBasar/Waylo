@@ -95,6 +95,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.of(orderService.listOwn(userId)));
     }
 
+    @GetMapping("/{id}/cancellation-preview")
+    public ResponseEntity<ApiResponse<com.waylo.packagebookingservice.dto.CancellationPreviewResponse>> cancellationPreview(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.of(orderService.cancellationPreview(userId, id)));
+    }
+
     @PostMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<OrderResponse>> cancel(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,

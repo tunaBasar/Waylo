@@ -42,6 +42,7 @@ public interface HotelHoldClient {
             String status,
             String currency,
             BigDecimal totalAmount,
-            Instant expiresAt
+            Instant expiresAt,
+            String cancellationPolicy
     ) {}
 }

@@ -46,22 +46,33 @@ public class LedgerService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordRelease(UUID orderId, UUID orderItemId, BigDecimal charged, BigDecimal supplier, BigDecimal commission,
                               BigDecimal platformCost, String currency, UUID correlationId) {
+        recordRelease(orderId, orderItemId, charged, supplier, commission, platformCost, currency, correlationId, "release to supplier");
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordRelease(UUID orderId, UUID orderItemId, BigDecimal charged, BigDecimal supplier, BigDecimal commission,
+                              BigDecimal platformCost, String currency, UUID correlationId, String description) {
         BigDecimal gross = charged;
         List<Leg> legs = new ArrayList<>();
         legs.add(Leg.debit(LedgerAccount.CUSTOMER_FUNDS_HELD, gross));
         if (platformCost != null && platformCost.signum() > 0) legs.add(Leg.debit(LedgerAccount.PLATFORM_DISCOUNT_COST, platformCost));
         legs.add(Leg.credit(LedgerAccount.SUPPLIER_PAYABLE, supplier));
         if (commission.signum() > 0) legs.add(Leg.credit(LedgerAccount.PLATFORM_COMMISSION, commission));
-        write(orderId, orderItemId, currency, correlationId, "release to supplier", legs);
+        write(orderId, orderItemId, currency, correlationId, description, legs);
     }
 
     /** Refund of a held item: DR CUSTOMER_FUNDS_HELD, CR CUSTOMER_REFUND. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordRefund(UUID orderId, UUID orderItemId, BigDecimal gross, String currency, UUID correlationId) {
+        recordRefund(orderId, orderItemId, gross, currency, correlationId, "refund to customer");
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordRefund(UUID orderId, UUID orderItemId, BigDecimal gross, String currency, UUID correlationId, String description) {
         List<Leg> legs = List.of(
                 Leg.debit(LedgerAccount.CUSTOMER_FUNDS_HELD, gross),
                 Leg.credit(LedgerAccount.CUSTOMER_REFUND, gross));
-        write(orderId, orderItemId, currency, correlationId, "refund to customer", legs);
+        write(orderId, orderItemId, currency, correlationId, description, legs);
     }
 
     @Transactional(readOnly = true)

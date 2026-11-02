@@ -400,7 +400,8 @@ public class HotelHoldServiceImpl implements HotelHoldService {
                 hold.getExpiresAt(),
                 hold.getConfirmedAt(),
                 hold.getReleasedAt(),
-                hold.getCreatedAt()
+                hold.getCreatedAt(),
+                quoteRepository.findById(hold.getQuoteId()).map(q -> q.getCancellationPolicy().name()).orElse(null)
         );
     }
 }

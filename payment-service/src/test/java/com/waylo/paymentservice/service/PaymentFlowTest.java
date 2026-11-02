@@ -72,6 +72,7 @@ class PaymentFlowTest {
         lenient().when(escrows.save(any())).thenAnswer(i -> { escrowStore.add(i.getArgument(0)); return i.getArgument(0); });
         lenient().when(escrows.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(escrows.findByOrderItemIdForUpdate(any())).thenAnswer(i -> escrowStore.stream().filter(e -> e.getOrderItemId().equals(i.getArgument(0))).findFirst());
+        lenient().when(escrows.findByOrderItemId(any())).thenAnswer(i -> escrowStore.stream().filter(e -> e.getOrderItemId().equals(i.getArgument(0))).findFirst());
         lenient().when(escrows.findByPaymentIntentId(any())).thenAnswer(i -> escrowStore.stream().filter(e -> e.getPaymentIntentId().equals(i.getArgument(0))).toList());
         lenient().when(ledgerRepo.save(any())).thenAnswer(i -> { ledgerStore.add(i.getArgument(0)); return i.getArgument(0); });
         lenient().when(payoutAccounts.findByOrganizationId(any())).thenReturn(Optional.empty());
@@ -356,5 +357,122 @@ class PaymentFlowTest {
         assertThat(EscrowService.deriveStatus(List.of(EscrowStatus.RELEASED, EscrowStatus.RELEASED))).isEqualTo(PaymentIntentStatus.RELEASED);
         assertThat(EscrowService.deriveStatus(List.of(EscrowStatus.REFUNDED, EscrowStatus.REFUNDED))).isEqualTo(PaymentIntentStatus.REFUNDED);
         assertThat(EscrowService.deriveStatus(List.of(EscrowStatus.REFUNDED, EscrowStatus.HELD))).isEqualTo(PaymentIntentStatus.PARTIALLY_REFUNDED);
+    }
+
+    // --- cancellation policy (CANCELLATION-CONTRACT.md) ---
+
+    static com.waylo.paymentservice.dto.CancellationDtos.PolicyRequest pol(String p, Integer h, java.time.Instant start) {
+        return new com.waylo.paymentservice.dto.CancellationDtos.PolicyRequest(com.waylo.paymentservice.domain.CancellationPolicy.valueOf(p), h, start);
+    }
+
+    BigDecimal net(String account) {
+        return ledgerStore.stream().filter(l -> l.getAccount().name().equals(account))
+                .map(l -> l.getCreditAmount().subtract(l.getDebitAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Test
+    void cancel_freeCancellation_refundsChargedAmount_ledgerBalanced_idempotent() {
+        paid(order("HOTEL", "1000.00"));
+        var preview = escrowService.previewCancel(itemId, pol("FREE_CANCELLATION", null, null));
+        var r = escrowService.cancel(itemId, pol("FREE_CANCELLATION", null, null));
+        assertThat(r.outcome()).isEqualTo("REFUND");
+        assertThat(r.refundAmount()).isEqualByComparingTo(preview.refundAmount()).isEqualByComparingTo("1000.00");
+        assertThat(escrowStore.get(0).getStatus()).isEqualTo(EscrowStatus.REFUNDED);
+        assertThat(net("CUSTOMER_REFUND")).isEqualByComparingTo("1000.00");
+        assertThat(net("SUPPLIER_PAYABLE")).isEqualByComparingTo("0");
+        int legs = ledgerStore.size();
+        var again = escrowService.cancel(itemId, pol("NON_REFUNDABLE", null, null));
+        assertThat(again.outcome()).isEqualTo("REFUND");
+        assertThat(ledgerStore).hasSize(legs);
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void cancel_nonRefundable_releasesToPartnerMinusCommission_noRefund() {
+        paid(order("HOTEL", "1000.00"));
+        var preview = escrowService.previewCancel(itemId, pol("NON_REFUNDABLE", null, null));
+        assertThat(preview.refundAmount()).isEqualByComparingTo("0");
+        var r = escrowService.cancel(itemId, pol("NON_REFUNDABLE", null, null));
+        assertThat(r.outcome()).isEqualTo("NO_REFUND");
+        assertThat(r.refundAmount()).isEqualByComparingTo("0");
+        assertThat(r.supplierAmount()).isEqualByComparingTo("900.00");
+        EscrowItem e = escrowStore.get(0);
+        assertThat(e.getStatus()).isEqualTo(EscrowStatus.RELEASED);
+        assertThat(e.getSettlementReason()).isEqualTo("CANCEL_NO_REFUND");
+        assertThat(net("SUPPLIER_PAYABLE")).isEqualByComparingTo("900.00");
+        assertThat(net("PLATFORM_COMMISSION")).isEqualByComparingTo("100.00");
+        assertThat(net("CUSTOMER_REFUND")).isEqualByComparingTo("0");
+        // repeat is idempotent and still cancellable-as-done
+        int legs = ledgerStore.size();
+        assertThat(escrowService.cancel(itemId, pol("NON_REFUNDABLE", null, null)).outcome()).isEqualTo("NO_REFUND");
+        assertThat(ledgerStore).hasSize(legs);
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void cancel_afterRedemption_isRejected_andPreviewSaysNotCancellable() {
+        paid(order("HOTEL", "100.00"));
+        escrowService.release(itemId);
+        assertThat(escrowService.previewCancel(itemId, pol("FREE_CANCELLATION", null, null)).cancellable()).isFalse();
+        assertThatThrownBy(() -> escrowService.cancel(itemId, pol("FREE_CANCELLATION", null, null)))
+                .isInstanceOfSatisfying(BusinessRuleException.class, e -> assertThat(e.getRuleCode()).isEqualTo("ESCROW_ALREADY_RELEASED"));
+    }
+
+    @Test
+    void cancel_freeUntil_dependsOnDeadline() {
+        java.time.Instant start = java.time.Instant.now().plus(java.time.Duration.ofHours(30));
+        paid(order("HOTEL", "100.00"));
+        assertThat(escrowService.previewCancel(itemId, pol("FREE_UNTIL", 24, start)).outcome()).isEqualTo("REFUND");
+        assertThat(escrowService.previewCancel(itemId, pol("FREE_UNTIL", 48, start)).outcome()).isEqualTo("NO_REFUND");
+    }
+
+    @Test
+    void noShow_releasesToPartner_forFreeCancellationToo_andIsIdempotent() {
+        paid(order("HOTEL", "1000.00"));
+        var r = escrowService.noShow(itemId);
+        assertThat(r.outcome()).isEqualTo("NO_REFUND");
+        assertThat(escrowStore.get(0).getStatus()).isEqualTo(EscrowStatus.RELEASED);
+        assertThat(escrowStore.get(0).getSettlementReason()).isEqualTo("NO_SHOW");
+        assertThat(net("SUPPLIER_PAYABLE")).isEqualByComparingTo("900.00");
+        int legs = ledgerStore.size();
+        escrowService.noShow(itemId);
+        assertThat(ledgerStore).hasSize(legs);
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void noShow_onRefundedItem_changesNothing() {
+        paid(order("HOTEL", "100.00"));
+        escrowService.refund(itemId);
+        int legs = ledgerStore.size();
+        assertThat(escrowService.noShow(itemId).outcome()).isEqualTo("REFUND");
+        assertThat(ledgerStore).hasSize(legs);
+    }
+
+    @Test
+    void discountedItem_partnerFunded_refundIsChargedNet_andProportionalLedgerReverses() {
+        // supplier price 1000, partner funded discount 200 -> customer paid 800, commission 10% of net (80), supplier 720
+        OrderClient.OrderDto o = new OrderClient.OrderDto(orderId, customer, "PENDING", "TRY", new BigDecimal("800.00"),
+                List.of(new OrderClient.OrderItemDto(itemId, "HOTEL", supplier, new BigDecimal("800.00"), "TRY",
+                        new BigDecimal("1000.00"), new BigDecimal("200.00"), "PARTNER")));
+        paid(o);
+        EscrowItem e = escrowStore.get(0);
+        assertThat(e.getChargedAmount()).isEqualByComparingTo("800.00");
+        var r = escrowService.cancel(itemId, pol("FREE_CANCELLATION", null, null));
+        assertThat(r.refundAmount()).isEqualByComparingTo("800.00");
+        assertThat(net("CUSTOMER_REFUND")).isEqualByComparingTo("800.00");
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void discountedItem_platformFunded_nonRefundable_releaseUsesDiscountCostAndBalances() {
+        OrderClient.OrderDto o = new OrderClient.OrderDto(orderId, customer, "PENDING", "TRY", new BigDecimal("800.00"),
+                List.of(new OrderClient.OrderItemDto(itemId, "HOTEL", supplier, new BigDecimal("800.00"), "TRY",
+                        new BigDecimal("1000.00"), new BigDecimal("200.00"), "PLATFORM")));
+        paid(o);
+        var r = escrowService.cancel(itemId, pol("NON_REFUNDABLE", null, null));
+        assertThat(r.refundAmount()).isEqualByComparingTo("0");
+        assertThat(net("SUPPLIER_PAYABLE")).isEqualByComparingTo("900.00");
+        assertLedgerBalanced();
     }
 }

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
+import { policyText, refundText } from '@/lib/cancellation';
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -21,6 +22,10 @@ interface OrderItem {
   netAmount?: number | null;
   taxAmount?: number | null;
   promoCode?: string | null;
+  cancellationPolicy?: string | null;
+  cancelFreeHoursBefore?: number | null;
+  cancelOutcome?: string | null;
+  refundAmount?: number | null;
   pickupAt: string | null;
   returnAt: string | null;
   flight?: { flightNumber: string; passengerFirstName: string; passengerLastName: string; seatNumber: string; pnr: string | null; ticketNumber: string | null } | null;
@@ -37,12 +42,19 @@ interface Order {
   items?: OrderItem[];
 }
 
+interface CancellationPreview {
+  cancellable: boolean;
+  blockedReason: string | null;
+  currency: string;
+  totalRefund: number;
+}
+
 interface Voucher {
   voucherId: string;
   orderItemId: string;
   description: string;
   payload: string | null;
-  status: 'ACTIVE' | 'REDEEMED' | 'VOID';
+  status: 'ACTIVE' | 'REDEEMED' | 'VOID' | 'NO_SHOW';
   validFrom: string;
   validUntil: string;
   redeemedAt: string | null;
@@ -75,6 +87,7 @@ const VOUCHER_STATUS_TR: Record<Voucher['status'], string> = {
   ACTIVE: 'Gecerli',
   REDEEMED: 'Kullanildi',
   VOID: 'Iptal edildi',
+  NO_SHOW: 'Gelinmedi',
 };
 
 const money = (v: number, currency: string) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(v);
@@ -189,6 +202,68 @@ function PayPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
   );
 }
 
+function CancelPanel({ order, onChanged }: { order: Order; onChanged: () => void }) {
+  const [preview, setPreview] = useState<CancellationPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const loadPreview = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      setPreview((await api.get<CancellationPreview>(`/api/orders/${encodeURIComponent(order.id)}/cancellation-preview`)).data);
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Iptal bilgisi alinamadi');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api.post(`/api/orders/${encodeURIComponent(order.id)}/cancel`, {});
+      setPreview(null);
+      onChanged();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Iptal edilemedi');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!preview) {
+    return (
+      <div className="mt-3 space-y-1">
+        <button type="button" disabled={busy} onClick={() => void loadPreview()} data-testid="cancel-button"
+          className="rounded-xl bg-surface-container px-4 py-2 text-sm font-semibold text-error disabled:opacity-50">Siparisi iptal et</button>
+        {msg && <p className="text-xs text-error">{msg}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface-container p-3" data-testid="cancel-confirm">
+      {preview.cancellable ? (
+        <p className="text-sm font-semibold text-on-surface" data-testid="refund-preview">
+          {order.status === 'PENDING' ? 'Odeme yapilmadi, tutar cekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}
+        </p>
+      ) : (
+        <p className="text-sm font-semibold text-error">Bu siparis iptal edilemez ({preview.blockedReason}).</p>
+      )}
+      <div className="flex gap-2">
+        {preview.cancellable && (
+          <button type="button" disabled={busy} onClick={() => void confirm()} data-testid="cancel-confirm-button"
+            className="rounded-xl bg-error px-4 py-2 text-sm font-semibold text-on-error disabled:opacity-50">Iptali onayla</button>
+        )}
+        <button type="button" disabled={busy} onClick={() => setPreview(null)}
+          className="rounded-xl bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface">Vazgec</button>
+      </div>
+      {msg && <p className="text-xs text-error">{msg}</p>}
+    </div>
+  );
+}
+
 function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }) {
   const [testMode, setTestMode] = useState(false);
 
@@ -215,6 +290,12 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
               {item.taxAmount != null && ` · Vergi dahil: ${money(item.taxAmount, item.currency)}`}
             </p>
           )}
+          <p data-testid="item-policy">Iptal kosulu: {policyText(item.cancellationPolicy, item.cancelFreeHoursBefore)}</p>
+          {item.cancelOutcome && (
+            <p data-testid="item-cancel-outcome">
+              {item.cancelOutcome === 'REFUND' ? `Iade edildi: ${money(item.refundAmount ?? 0, item.currency)}` : item.cancelOutcome === 'NO_SHOW' ? 'Gelinmedi, iade yapilmadi' : 'Iade yapilmadi'}
+            </p>
+          )}
           {item.vertical === 'FLIGHT' && item.flight && (
             <>
               <p>Yolcu: {item.flight.passengerFirstName} {item.flight.passengerLastName}</p>
@@ -233,6 +314,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
       )}
       <p className="text-xs text-on-surface-variant">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
       {order.status === 'PENDING' && <PayPanel order={order} onPaid={onChanged} />}
+      {(order.status === 'PENDING' || order.status === 'CONFIRMED') && <CancelPanel order={order} onChanged={onChanged} />}
       {order.status === 'CONFIRMED' && <VoucherList orderId={order.id} testMode={testMode} />}
     </div>
   );

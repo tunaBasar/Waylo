@@ -18,6 +18,9 @@ public interface VoucherRepository extends JpaRepository<Voucher, UUID> {
 
     List<Voucher> findByOrderItemIdIn(Collection<UUID> orderItemIds);
 
+    /** ACTIVE vouchers whose window ended: the no-show job's work list. */
+    List<Voucher> findTop200ByStatusAndValidUntilBeforeOrderByValidUntilAsc(com.waylo.packagebookingservice.domain.VoucherStatus status, java.time.Instant before);
+
     /** SELECT ... FOR UPDATE: two concurrent scans of one voucher serialize here. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from Voucher v where v.id = :id")

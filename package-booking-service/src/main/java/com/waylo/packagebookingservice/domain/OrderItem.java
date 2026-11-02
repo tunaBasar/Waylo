@@ -89,6 +89,13 @@ public class OrderItem {
     @Column(name = "tax_amount", precision = 12, scale = 2) private BigDecimal taxAmount;
     @Column(name = "promo_code", length = 50) private String promoCode;
 
+    /** Policy snapshot taken at order creation, never re-read (CANCELLATION-CONTRACT.md). */
+    @Column(name = "cancellation_policy", nullable = false, length = 20) private String cancellationPolicy = "FREE_CANCELLATION";
+    @Column(name = "cancel_free_hours_before") private Integer cancelFreeHoursBefore;
+    /** REFUND | NO_REFUND | NO_SHOW once the item left escrow through cancellation or the no-show job. */
+    @Column(name = "cancel_outcome", length = 20) private String cancelOutcome;
+    @Column(name = "refund_amount", precision = 12, scale = 2) private BigDecimal refundAmount;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -170,6 +177,15 @@ public class OrderItem {
     public void setSupplier(String v) { this.supplier = v; }
     public String getSupplierOrderRef() { return supplierOrderRef; }
     public void setSupplierOrderRef(String v) { this.supplierOrderRef = v; }
+
+    public String getCancellationPolicy() { return cancellationPolicy; }
+    public void setCancellationPolicy(String v) { this.cancellationPolicy = v; }
+    public Integer getCancelFreeHoursBefore() { return cancelFreeHoursBefore; }
+    public void setCancelFreeHoursBefore(Integer v) { this.cancelFreeHoursBefore = v; }
+    public String getCancelOutcome() { return cancelOutcome; }
+    public void setCancelOutcome(String v) { this.cancelOutcome = v; }
+    public BigDecimal getRefundAmount() { return refundAmount; }
+    public void setRefundAmount(BigDecimal v) { this.refundAmount = v; }
 
     public Instant getCreatedAt() { return createdAt; }
 }

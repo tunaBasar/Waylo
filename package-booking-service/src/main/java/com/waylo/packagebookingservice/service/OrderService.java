@@ -29,6 +29,9 @@ public interface OrderService {
 
     List<OrderResponse> listOwn(UUID actorUserId);
 
+    /** Owner only. What cancelling right now would refund, per item, computed from the stored policy snapshots. */
+    com.waylo.packagebookingservice.dto.CancellationPreviewResponse cancellationPreview(UUID actorUserId, UUID orderId);
+
     OrderResponse cancel(UUID actorUserId, UUID orderId, Long expectedVersion);
 
     /** Internal (payment-service): authoritative order with item amounts. */

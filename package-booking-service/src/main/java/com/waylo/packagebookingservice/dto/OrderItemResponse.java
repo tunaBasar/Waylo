@@ -28,5 +28,9 @@ public record OrderItemResponse(
         String discountFundedBy,
         BigDecimal netAmount,
         BigDecimal taxAmount,
-        String promoCode
+        String promoCode,
+        String cancellationPolicy,
+        Integer cancelFreeHoursBefore,
+        String cancelOutcome,
+        BigDecimal refundAmount
 ) {}
