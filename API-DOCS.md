@@ -359,45 +359,361 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 
 **Port:** 8084 | **DB:** car_rental_db
 
-#### `POST /api/vehicles` - Create Vehicle
+> All responses are wrapped in `ApiResponse<T>`: `{"success": true, "data": {...}, "timestamp": "..."}`. Errors follow the
+> `ErrorResponse` format shown in Common Patterns.
+
+### Authentication
+
+| Group | Auth | Description |
+|-------|------|-------------|
+| Public | None | Branch listings, search offers |
+| Customer | `X-User-Id` (JWT) | View own rentals |
+| Partner | `X-User-Id` + `FLEET_MANAGE` | Manage own vehicles, branches, rates, and documents |
+| Admin | `X-User-Id` (ADMIN role) | Approve/reject photos, view all vehicles |
+| Internal | `X-Internal-Token` | Car hold management (package-booking-service) |
+
+Individual partners (LegalType=INDIVIDUAL) are **rejected by default** when creating a branch. Set the env var
+`CAR_INDIVIDUAL_PARTNERS_ENABLED=true` to allow them.
+
+### Public: Branches and Offers
+
+#### `GET /api/car-branches?city=` - List Sellable Branches (Public)
+
+No auth. Returns only active branches (and only branches from partners whose organization has at least one
+sellable vehicle — `sellable=true`). Returns public fields only (no `active`, `createdAt`, `updatedAt`).
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `city` | String | No | Filter by city (case-insensitive) |
+
+Response: `List<PublicBranchResponse>` — `{id, organizationId, name, city, address, openTime, closeTime}`.
+
+#### `GET /api/car-offers` - Get Vehicle Offers (Public)
+
+No auth. Returns all active offers matching the search criteria. An "offer" represents an available vehicle
+matching the requested category, transmission, and dates at the given branches.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pickupBranchId` | UUID | Yes | Pickup branch |
+| `returnBranchId` | UUID | Yes | Return branch |
+| `pickupAt` | LocalDateTime | Yes | Pickup time (Istanbul local) |
+| `returnAt` | LocalDateTime | Yes | Return time (Istanbul local) |
+| `driverAge` | int | No | Driver age (default 18) |
+
+Response: `List<OfferResponse>` — `{pickupBranchId, returnBranchId, organizationId, category, transmission,
+exampleModel, seatCount, fuelType, chargeableDays, dailyRate, oneWayFee, totalAmount, currency, depositAmount,
+kmLimitPerDay, extraKmFee, minDriverAge, minLicenseYears, authorizationDocumentNumber}`.
+
+### Customer: Rentals
+
+#### `GET /api/rentals/me` - List My Rentals (Customer)
+
+`X-User-Id` required. Returns the authenticated user's rentals, newest first.
+
+Response: `List<RentalResponse>` — `{id, organizationId, customerId, vehicleId, pickupBranchId, returnBranchId,
+category, transmission, pickupAt, returnAt, chargeableDays, dailyRate, oneWayFee, totalAmount, currency,
+depositAmount, kmLimitPerDay, driverAge, status, holdExpiresAt, createdAt, updatedAt}`.
+
+#### `GET /api/rentals/{id}` - Get Rental (Customer / Admin)
+
+`X-User-Id` required. Customers see their own rentals only.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `X-User-Role` | String | No | Pass `ADMIN` to view any rental |
+
+Admins (with `X-User-Role=ADMIN` header) can view any rental by ID.
+
+### Partner: Fleet Management (FLEET_MANAGE)
+
+All partner endpoints are at `/api/partner/organizations/{orgId}`. The caller's `X-User-Id` must hold
+`FLEET_MANAGE` on the organization. Branches and vehicles belong to an organization.
+
+#### Branches
+
+##### `POST /api/partner/organizations/{orgId}/branches` - Create Branch (Partner)
+
+Creates a new branch for the organization. 201 Created.
 
 ```json
 // Request
 {
-  "plateNumber": "34 ABC 123",  // required, unique
-  "brand": "Toyota",            // required
-  "model": "Corolla",           // required
-  "year": 2024,                 // required, min 1990
-  "vehicleType": "COMPACT",     // required: ECONOMY, COMPACT, MIDSIZE, FULLSIZE, SUV, LUXURY, VAN
-  "color": "White",             // optional
-  "seatCount": 5,               // required, min 1
-  "dailyRate": 350.00,          // required, min 0
-  "location": "IST Airport",    // required
-  "mileage": 15000              // optional
+  "name": "Istanbul Airport Branch",
+  "city": "Istanbul",
+  "address": "IST Terminal 1",
+  "phone": "+902120000000",
+  "openTime": "08:00",
+  "closeTime": "22:00",
+  "active": true
 }
-
-// Response: 201 Created - status defaults to AVAILABLE
 ```
 
-#### `GET /api/vehicles/{id}` - Get Vehicle
-#### `GET /api/vehicles/plate/{plateNumber}` - Get by Plate Number
-#### `GET /api/vehicles` - List All
+##### `GET /api/partner/organizations/{orgId}/branches` - List Branches (Partner)
 
-#### `GET /api/vehicles/search` - Search Vehicles
+Returns all branches for the organization, newest first.
+
+Response: `List<BranchResponse>` — `{id, organizationId, name, city, address, phone, openTime, closeTime, active, createdAt, updatedAt}`.
+
+##### `PUT /api/partner/organizations/{orgId}/branches/{id}` - Update Branch (Partner)
+
+Updates an existing branch (same body as create).
+
+##### `DELETE /api/partner/organizations/{orgId}/branches/{id}` - Delete Branch (Partner)
+
+Deletes a branch. The endpoint is not yet implemented.
+
+#### Vehicles
+
+##### `POST /api/partner/organizations/{orgId}/vehicles` - Create Vehicle (Partner)
+
+Creates a new vehicle for the organization. 201 Created.
+
+```json
+// Request
+{
+  "homeBranchId": "uuid",
+  "plateNumber": "34 ABC 123",
+  "brand": "Toyota",
+  "model": "Corolla",
+  "year": 2024,
+  "category": "COMPACT",
+  "transmission": "AUTOMATIC",
+  "fuelType": "PETROL",
+  "seatCount": 5,
+  "active": true
+}
+```
+
+##### `GET /api/partner/organizations/{orgId}/vehicles` - List Vehicles (Partner)
+
+Returns all vehicles for the organization, newest first.
+
+Response: `List<VehicleResponse>` — `{id, organizationId, homeBranchId, plateNumber, brand, model, year, category,
+transmission, fuelType, seatCount, active, sellable, missingDocuments, createdAt, updatedAt}`.
+
+`sellable` indicates whether the vehicle can be offered in public searches. `missingDocuments` lists
+required document types the vehicle still needs.
+
+##### `PUT /api/partner/organizations/{orgId}/vehicles/{id}` - Update Vehicle (Partner)
+
+Updates an existing vehicle (same body as create).
+
+##### `DELETE /api/partner/organizations/{orgId}/vehicles/{id}` - Delete Vehicle (Partner)
+
+Deletes a vehicle. The endpoint is not yet implemented.
+
+##### `POST /api/partner/organizations/{orgId}/vehicles/{id}/deactivate` - Deactivate Vehicle (Partner)
+
+Sets `active=false` on the vehicle. It will no longer appear in public offers.
+
+##### `POST /api/partner/organizations/{orgId}/vehicles/{id}/activate` - Activate Vehicle (Partner)
+
+Sets `active=true` on the vehicle. It will appear in public offers if all required documents are present.
+
+#### Rates
+
+##### `GET /api/partner/organizations/{orgId}/rates` - List Rates (Partner)
+
+Returns all rates for the organization's branches.
+
+Response: `List<RateResponse>` — `{id, organizationId, branchId, category, transmission, currency, dailyRate,
+depositAmount, kmLimitPerDay, extraKmFee, minDriverAge, minLicenseYears}`.
+
+##### `PUT /api/partner/organizations/{orgId}/rates` - Upsert Rates (Partner)
+
+Replaces all rates for the organization. 200 OK with the updated list.
+
+```json
+// Request
+{
+  "items": [
+    {
+      "branchId": "uuid",
+      "category": "COMPACT",
+      "transmission": "AUTOMATIC",
+      "currency": "TRY",
+      "dailyRate": 350.00,
+      "depositAmount": 1000.00,
+      "kmLimitPerDay": 200,
+      "extraKmFee": 5.00,
+      "minDriverAge": 21,
+      "minLicenseYears": 2
+    }
+  ]
+}
+```
+
+#### One-Way Routes
+
+##### `GET /api/partner/organizations/{orgId}/one-way-routes` - List Routes (Partner)
+
+Returns all one-way route surcharges.
+
+Response: `List<RouteResponse>` — `{id, organizationId, fromBranchId, toBranchId, fee, currency}`.
+
+##### `PUT /api/partner/organizations/{orgId}/one-way-routes` - Replace Routes (Partner)
+
+Replaces all one-way routes for the organization.
+
+```json
+// Request
+{
+  "routes": [
+    {
+      "fromBranchId": "uuid",
+      "toBranchId": "uuid",
+      "fee": 150.00,
+      "currency": "TRY"
+    }
+  ]
+}
+```
+
+#### Documents
+
+##### `GET /api/partner/organizations/{orgId}/documents` - List Documents (Partner)
+
+Returns all documents (org-level and vehicle-level) for the organization.
+
+Response: `List<DocumentResponse>` — `{id, organizationId, vehicleId, type, documentNumber, validUntil,
+status, rejectReason, reviewedBy, reviewedAt, fileName, contentType, sizeBytes, uploadedBy, createdAt, updatedAt}`.
+
+`status` is `PENDING`, `APPROVED`, or `REJECTED`.
+
+##### `POST /api/partner/organizations/{orgId}/documents` - Upload Document (Partner)
+
+Uploads a document. 201 Created.
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `location` | String | No | Location filter |
-| `vehicleType` | VehicleType | No | Vehicle type |
-| `status` | VehicleStatus | No | Status filter |
-| `maxDailyRate` | BigDecimal | No | Max daily rate |
+| `file` | MultipartFile | Yes | Document file |
+| `type` | DocumentType | Yes | RENTAL_AUTHORIZATION, TAX_CERTIFICATE, IDENTITY_DOCUMENT, VEHICLE_REGISTRATION, RENTAL_INSURANCE, TRAFFIC_INSURANCE |
+| `documentNumber` | String | Yes | Document number |
+| `validUntil` | LocalDate | No | Expiry date (null = no expiry) |
+| `vehicleId` | UUID | No | If null, document is org-level; otherwise vehicle-level |
 
-#### `PUT /api/vehicles/{id}` - Update Vehicle
-#### `DELETE /api/vehicles/{id}` - Delete Vehicle (204)
-#### `POST /api/vehicles/{id}/status?status=RENTED` - Update Status
-#### `POST /api/vehicles/{id}/deactivate` - Deactivate
-#### `POST /api/vehicles/{id}/activate` - Activate
-#### `GET /api/vehicles/available-count?location=IST Airport` - Available Count by Location
+##### `GET /api/partner/organizations/{orgId}/documents/{id}/file` - Download Document (Partner)
+
+Returns the raw file with `Content-Disposition: attachment`.
+
+#### Partner Rentals
+
+##### `GET /api/partner/organizations/{orgId}/rentals` - List Partner Rentals (Partner)
+
+Returns all rentals for the organization's branches, newest first.
+
+#### Partner Status
+
+##### `GET /api/partner/organizations/{orgId}/status` - Partner Status (Partner)
+
+Returns the partner's readiness status.
+
+Response: `{sellable: boolean, missingOrgDocuments: [DocumentType...], individualGateOpen: boolean}`.
+
+### Admin: Documents and Vehicles
+
+#### Car Documents
+
+##### `GET /api/admin/car-documents?status=` - List Documents (Admin)
+
+Lists all documents across all organizations. Filters by `status` (PENDING, APPROVED, REJECTED) if provided.
+
+Response: `List<AdminDocumentResponse>` — `{id, organizationId, vehicleId, type, documentNumber, validUntil,
+status, rejectReason, reviewedBy, reviewedAt, fileName, contentType, sizeBytes, uploadedBy, createdAt, updatedAt,
+organizationName, legalType, vehicleLabel}`.
+
+##### `GET /api/admin/car-documents/{id}/file` - Download Document (Admin)
+
+Returns the raw file.
+
+##### `POST /api/admin/car-documents/{id}/approve` - Approve Document (Admin)
+
+Approves a document. Changes `PENDING` → `APPROVED`. Requires `X-User-Id` (admin).
+
+##### `POST /api/admin/car-documents/{id}/reject` - Reject Document (Admin)
+
+Rejects a document. Requires `X-User-Id` (admin) and body: `{"reason": "..."}`.
+
+#### Admin Vehicles
+
+##### `GET /api/admin/car-vehicles` - List All Vehicles (Admin)
+
+Returns all vehicles across all organizations with enrichment.
+
+Response: `List<AdminVehicleResponse>` — `{id, organizationId, homeBranchId, plateNumber, brand, model, year,
+category, transmission, fuelType, seatCount, active, organizationName, homeBranchName, sellable, missingDocuments}`.
+
+### Internal: Car Holds
+
+Called by package-booking-service directly (not through gateway). Requires `X-Internal-Token`.
+
+#### `POST /internal/car-holds` - Create Car Hold (Internal)
+
+Reserves an available vehicle matching the search criteria. Returns 409 if a hold already exists for the
+same criteria (idempotent replay).
+
+```json
+// Request
+{
+  "pickupBranchId": "uuid",
+  "returnBranchId": "uuid",
+  "category": "COMPACT",
+  "transmission": "AUTOMATIC",
+  "pickupAt": "2026-12-01T10:00:00",
+  "returnAt": "2026-12-05T10:00:00",
+  "driverAge": 30,
+  "principalUserId": "uuid",
+  "idempotencyKey": "co-...",
+  "orderCorrelationId": "uuid"
+}
+```
+
+Response: `{holdId, organizationId, pickupBranchId, returnBranchId, category, transmission, exampleModel,
+pickupAt, returnAt, chargeableDays, currency, totalAmount, depositAmount, kmLimitPerDay, status, expiresAt}`.
+
+The hold TTL is configured via `car.holdTtlMinutes` (default 15 minutes).
+
+#### `POST /internal/car-holds/{id}/confirm` - Confirm Hold (Internal)
+
+Converts the hold into a confirmed rental. Returns 422 if expired or already released.
+
+#### `POST /internal/car-holds/{id}/release` - Release Hold (Internal)
+
+Cancels the hold and frees the reserved vehicle.
+
+### Customer Car Orders (via Package Booking Service)
+
+#### `POST /api/orders/car` - Create Car Order (Customer)
+
+`X-User-Id` required. Calls car-rental-service to place a hold, then creates an order with the held price.
+
+```json
+// Request
+{
+  "pickupBranchId": "uuid",
+  "returnBranchId": "uuid",
+  "category": "COMPACT",
+  "transmission": "AUTOMATIC",
+  "pickupAt": "2026-12-01T10:00:00",
+  "returnAt": "2026-12-05T10:00:00",
+  "driverAge": 30
+}
+```
+
+Response: `{success, data: {id, customerId, status, currency, totalAmount, notes, version, holdExpiresAt,
+items:[{id, orderId, vertical: "CAR", supplierOrganizationId, productRef: pickupBranchId, fulfillmentRef: holdId,
+description: "ExampleModel (TurkishCategory, TurkishTransmission), X gun", unitAmount, quantity, currency,
+pickupAt, returnAt}], createdAt, updatedAt}}`
+
+Errors: 401 no identity, 403 ADMIN_CANNOT_PURCHASE, 409 HOLD_CONFLICT (car-rental-service returned 409, e.g. NO_VEHICLE_AVAILABLE for the slot), 422 BUSINESS_RULE_VIOLATION (car-rental-service 422: ROUTE_NOT_OFFERED, DRIVER_TOO_YOUNG, OUTSIDE_BRANCH_HOURS, INVALID_TIME, NO_RATE, INDIVIDUAL_PARTNERS_DISABLED, PARTNER_NOT_SELLABLE). Same request from the same user within the hold TTL returns the same hold (idempotent).
+503 if car-rental-service is unavailable.
+
+#### `GET /api/orders/{id}` - Get own order (403 if not owner)
+#### `GET /api/orders` - List caller's own orders
+#### `POST /api/orders/{id}/cancel` - Cancel own order
+
+Cancelling releases the car hold via the payment escrow refund flow.
 
 ---
 
@@ -405,7 +721,8 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 
 **Port:** 8085 | **DB:** package_booking_db
 
-> The `/api/bookings` endpoints below are legacy and internal-only (see "Legacy bookings"). Customers use `/api/orders/hotel`.
+> The `/api/bookings` endpoints below are legacy and internal-only (see "Legacy bookings"). Customers use
+> `/api/orders/hotel` and `/api/orders/car`.
 
 #### `POST /api/bookings` - Create Booking
 
@@ -468,12 +785,22 @@ Response: `{success, data: {id, customerId, status, currency, quoteId, totalAmou
 items:[{id, orderId, vertical, supplierOrganizationId, productRef, fulfillmentRef, description, unitAmount, quantity,
 subtotal, currency, createdAt}], createdAt, updatedAt}}`.
 
+#### `POST /api/orders/car` - Create car order (201)
+
+Body: `{ "pickupBranchId": "uuid", "returnBranchId": "uuid", "category": "COMPACT", "transmission": "AUTOMATIC",
+"pickupAt": "2026-12-01T10:00:00", "returnAt": "2026-12-05T10:00:00", "driverAge": 30 }`. category and transmission
+are optional (any match). Calls car-rental-service to place a hold, then creates an order with the held price.
+Errors: 401 no identity, 403 `ADMIN_CANNOT_PURCHASE`, 422 if no vehicle available, 503 `CAR_RENTAL_SERVICE_UNAVAILABLE`.
+Idempotent on the same (userId, pickupBranchId, returnBranchId, pickupAt, returnAt) key.
+Response: same shape as hotel order with `vertical: "CAR"`, `productRef` = pickupBranchId, `fulfillmentRef` = holdId,
+`description` = "ModelName (CategoryLabel, TransmissionLabel), X gun", and `pickupAt`/`returnAt` set.
+
 #### `GET /api/orders/{id}` - Get own order (403 if not owner)
 #### `GET /api/orders` - List caller's own orders
 #### `POST /api/orders/{id}/cancel?expectedVersion=0` - Cancel own order
 
 `expectedVersion` optional, stale -> 409 `CONCURRENT_MODIFICATION`. Already `CANCELLED`/`FAILED` -> 422.
-Cancelling releases the hotel hold.
+Cancelling releases the hotel hold (and car hold).
 
 ### Legacy bookings: internal only
 
@@ -821,8 +1148,11 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 | **FlightStatus** | `SCHEDULED`, `CANCELLED` |
 | **RoomType** | `SINGLE`, `DOUBLE`, `SUITE`, `DELUXE`, `FAMILY` |
 | **RoomStatus** | `AVAILABLE`, `RESERVED`, `OCCUPIED`, `MAINTENANCE` |
-| **VehicleType** | `ECONOMY`, `COMPACT`, `MIDSIZE`, `FULLSIZE`, `SUV`, `LUXURY`, `VAN` |
-| **VehicleStatus** | `AVAILABLE`, `RESERVED`, `RENTED`, `MAINTENANCE` |
+| **CarCategory** | `ECONOMY`, `COMPACT`, `MIDSIZE`, `FULLSIZE`, `SUV`, `MINIVAN`, `VAN`, `LUXURY` |
+| **FuelType** | `PETROL`, `DIESEL`, `HYBRID`, `ELECTRIC`, `LPG` |
+| **Transmission** | `MANUAL`, `AUTOMATIC` |
+| **RentalStatus** | `HELD`, `CONFIRMED`, `CANCELLED`, `EXPIRED` |
+| **DocumentStatus** | `PENDING`, `APPROVED`, `REJECTED` |
 | **BookingStatus** | `PENDING`, `CONFIRMED`, `CANCELLED`, `FAILED`, `PARTIALLY_CONFIRMED` |
 | **PaymentStatus** | `PENDING`, `COMPLETED`, `FAILED`, `REFUNDED` |
 | **PaymentMethod** | `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `MOCK` |
