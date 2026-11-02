@@ -11,5 +11,7 @@ public record HotelOrderCreateRequest(
         UUID quoteId,
 
         @Size(max = 1000, message = "Notes must be at most 1000 characters")
-        String notes
+        String notes,
+
+        @Size(max = 50) String promoCode
 ) {}

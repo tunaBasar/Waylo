@@ -32,12 +32,24 @@ public class LedgerService {
         write(orderId, orderItemId, currency, correlationId, "capture into escrow", legs);
     }
 
-    /** Release: DR CUSTOMER_FUNDS_HELD gross, CR SUPPLIER_PAYABLE supplier share, CR PLATFORM_COMMISSION commission. */
+    /** Release without a platform-funded discount (charged = gross). */
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordRelease(UUID orderId, UUID orderItemId, BigDecimal gross, BigDecimal supplier, BigDecimal commission,
                               String currency, UUID correlationId) {
+        recordRelease(orderId, orderItemId, gross, supplier, commission, BigDecimal.ZERO, currency, correlationId);
+    }
+
+    /**
+     * Release: DR CUSTOMER_FUNDS_HELD charged (what the customer paid), DR PLATFORM_DISCOUNT_COST platformCost (PLATFORM-funded promo),
+     * CR SUPPLIER_PAYABLE supplier share, CR PLATFORM_COMMISSION commission. Balanced: charged + platformCost = supplier + commission.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordRelease(UUID orderId, UUID orderItemId, BigDecimal charged, BigDecimal supplier, BigDecimal commission,
+                              BigDecimal platformCost, String currency, UUID correlationId) {
+        BigDecimal gross = charged;
         List<Leg> legs = new ArrayList<>();
         legs.add(Leg.debit(LedgerAccount.CUSTOMER_FUNDS_HELD, gross));
+        if (platformCost != null && platformCost.signum() > 0) legs.add(Leg.debit(LedgerAccount.PLATFORM_DISCOUNT_COST, platformCost));
         legs.add(Leg.credit(LedgerAccount.SUPPLIER_PAYABLE, supplier));
         if (commission.signum() > 0) legs.add(Leg.credit(LedgerAccount.PLATFORM_COMMISSION, commission));
         write(orderId, orderItemId, currency, correlationId, "release to supplier", legs);

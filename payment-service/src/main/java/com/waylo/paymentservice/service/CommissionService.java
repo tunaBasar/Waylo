@@ -53,6 +53,28 @@ public class CommissionService {
         return new Split(commission, gross.subtract(commission));
     }
 
+    /**
+     * Commission is always on the supplier gross (PRICING-CONTRACT.md section 2). PLATFORM discount: supplier = gross - commission and
+     * the platform bears {@code platformCost = discount}. PARTNER discount: supplier = net - commission, which must stay >= 0.
+     */
+    public static DiscountSplit splitWithDiscount(BigDecimal gross, BigDecimal discount, String fundedBy, BigDecimal rate) {
+        BigDecimal commission = gross.multiply(rate).setScale(2, RoundingMode.HALF_EVEN);
+        if (discount == null || discount.signum() == 0) {
+            return new DiscountSplit(commission, gross.subtract(commission), BigDecimal.ZERO);
+        }
+        if ("PARTNER".equals(fundedBy)) {
+            BigDecimal supplier = gross.subtract(discount).subtract(commission);
+            if (supplier.signum() < 0) {
+                throw new BusinessRuleException("DISCOUNT_EXCEEDS_PARTNER_SHARE",
+                        "Partner-funded discount is larger than the partner payout");
+            }
+            return new DiscountSplit(commission, supplier, BigDecimal.ZERO);
+        }
+        return new DiscountSplit(commission, gross.subtract(commission), discount);
+    }
+
+    public record DiscountSplit(BigDecimal commission, BigDecimal supplier, BigDecimal platformCost) {}
+
     public record Split(BigDecimal commission, BigDecimal supplier) {}
 
     @Transactional(readOnly = true)

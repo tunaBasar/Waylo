@@ -10,6 +10,8 @@ import {
   CATEGORY_LABEL, TRANSMISSION_LABEL, FUEL_LABEL,
 } from '@/lib/car';
 import type { Branch, CarOffer } from '@/lib/car';
+import { PromoCodeField } from '@/components/PromoCodeField';
+import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 
 const TIME_SLOTS = generateTimeSlots();
 
@@ -35,6 +37,7 @@ function VehiclesContent() {
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [renting, setRenting] = useState<string | null>(null);
 
   // Load branches
@@ -143,11 +146,12 @@ function VehiclesContent() {
         pickupAt,
         returnAt,
         driverAge: age,
+        ...(promoCode.trim() ? { promoCode: normalizePromoCode(promoCode) } : {}),
       });
       router.push(`/orders?created=${encodeURIComponent(res.data.id)}`);
     } catch (cause) {
       const apiError = cause as ApiError;
-      setError(errorToMessage(apiError.code, 'Arac kiralanamadi.'));
+      setError(promoErrorMessage(apiError.code) ?? errorToMessage(apiError.code, 'Arac kiralanamadi.'));
     } finally {
       setRenting(null);
     }
@@ -270,6 +274,10 @@ function VehiclesContent() {
                   </p>
                 </div>
                 <p className="text-lg font-bold text-primary">{money(offer.totalAmount, offer.currency)}</p>
+              </div>
+              <div className="mt-3">
+                <PromoCodeField vertical="ARAÇ" supplierOrganizationId={offer.organizationId} grossAmount={offer.totalAmount}
+                  currency={offer.currency} code={promoCode} onCodeChange={setPromoCode} />
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-on-surface-variant">

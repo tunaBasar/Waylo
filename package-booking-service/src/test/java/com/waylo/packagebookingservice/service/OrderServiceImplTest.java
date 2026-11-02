@@ -69,13 +69,16 @@ class OrderServiceImplTest {
     @Mock
     private VoucherService voucherService;
 
+    @Mock
+    private com.waylo.packagebookingservice.client.PricingClient pricingClient;
+
     private OrderServiceImpl service;
 
     private final UUID customerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, busHoldClient, flightHoldClient, SELLER.toString(), paymentEscrowClient, voucherService);
+        service = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient, carHoldClient, busHoldClient, flightHoldClient, SELLER.toString(), paymentEscrowClient, voucherService, new PricingApplier(pricingClient));
     }
 
     private OrderItemCreateRequest validItem(String currency) {
@@ -104,14 +107,14 @@ class OrderServiceImplTest {
     }
 
     private com.waylo.packagebookingservice.dto.FlightOrderCreateRequest flightRequest() {
-        return new com.waylo.packagebookingservice.dto.FlightOrderCreateRequest("offer", "12A", "Ali", "Yilmaz");
+        return new com.waylo.packagebookingservice.dto.FlightOrderCreateRequest("offer", "12A", "Ali", "Yilmaz", null);
     }
 
 
     private com.waylo.packagebookingservice.dto.BusOrderCreateRequest busRequest() {
         return new com.waylo.packagebookingservice.dto.BusOrderCreateRequest(UUID.randomUUID(), 0, 2, List.of(
                 new com.waylo.packagebookingservice.dto.BusOrderCreateRequest.Passenger(5, "Ali Veli", "MALE", null),
-                new com.waylo.packagebookingservice.dto.BusOrderCreateRequest.Passenger(6, "Ayse Veli", "FEMALE", null)));
+                new com.waylo.packagebookingservice.dto.BusOrderCreateRequest.Passenger(6, "Ayse Veli", "FEMALE", null)), null);
     }
 
     private com.waylo.packagebookingservice.client.BusHoldClient.HoldDto busHold(UUID holdId) {
@@ -236,7 +239,7 @@ class OrderServiceImplTest {
     @Test
     void createFlight_noSellerConfigured_422() {
         OrderServiceImpl noSeller = new OrderServiceImpl(orderRepository, orderItemRepository, eventPublisher, hotelHoldClient,
-                carHoldClient, busHoldClient, flightHoldClient, "", paymentEscrowClient, voucherService);
+                carHoldClient, busHoldClient, flightHoldClient, "", paymentEscrowClient, voucherService, new PricingApplier(pricingClient));
         assertThatThrownBy(() -> noSeller.createFlightOrder(customerId, flightRequest()))
                 .isInstanceOf(BusinessRuleException.class);
         verifyNoInteractions(flightHoldClient);
@@ -461,7 +464,7 @@ class OrderServiceImplTest {
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
         stubSaves();
 
-        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, "hi"));
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, "hi", null));
 
         ArgumentCaptor<HotelHoldClient.HoldRequest> req = ArgumentCaptor.forClass(HotelHoldClient.HoldRequest.class);
         verify(hotelHoldClient).hold(req.capture());
@@ -491,12 +494,12 @@ class OrderServiceImplTest {
     @Test
     void createHotelOrder_requestRecordHasNoPriceFields() {
         assertThat(HotelOrderCreateRequest.class.getRecordComponents())
-                .extracting(c -> c.getName()).containsExactlyInAnyOrder("quoteId", "notes");
+                .extracting(c -> c.getName()).containsExactlyInAnyOrder("quoteId", "notes", "promoCode");
     }
 
     @Test
     void createHotelOrder_noIdentity_throws() {
-        assertThatThrownBy(() -> service.createHotelOrder(null, new HotelOrderCreateRequest(quoteId, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(null, new HotelOrderCreateRequest(quoteId, null, null)))
                 .isInstanceOf(AuthenticationRequiredException.class);
         verifyNoInteractions(hotelHoldClient);
     }
@@ -508,7 +511,7 @@ class OrderServiceImplTest {
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of(existing));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
 
-        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null));
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null));
 
         assertThat(r.id()).isEqualTo(orderId);
         verifyNoInteractions(hotelHoldClient);
@@ -519,11 +522,11 @@ class OrderServiceImplTest {
     void createHotelOrder_hotelRejects_noOrderSaved() {
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
         when(hotelHoldClient.hold(any())).thenThrow(new HotelRejectedException(404, "NOT_FOUND", "no quote"));
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
                 .isInstanceOf(HotelRejectedException.class);
 
         doThrow(new HotelUnavailableException("down")).when(hotelHoldClient).hold(any());
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
                 .isInstanceOf(HotelUnavailableException.class);
 
         verify(orderRepository, never()).saveAndFlush(any());
@@ -537,7 +540,7 @@ class OrderServiceImplTest {
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
         when(orderRepository.saveAndFlush(any(Order.class))).thenThrow(new IllegalStateException("db down"));
 
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
                 .isInstanceOf(IllegalStateException.class).hasMessage("db down");
         verify(hotelHoldClient).release(hold.holdId());
     }

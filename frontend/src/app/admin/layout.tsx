@@ -17,6 +17,7 @@ const nav: NavItem[] = [
   { href: '/admin/bus-terminals', label: 'Otobus Duraklari', icon: 'directions_bus' },
   { href: '/admin/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
   { href: '/admin/customers', label: 'Musteriler', icon: 'group' },
+  { href: '/admin/campaigns', label: 'Kampanyalar', icon: 'sell' },
   { href: '/admin/payments', label: 'Odemeler', icon: 'payments' },
   { href: '/admin/notifications', label: 'Bildirimler', icon: 'notifications' },
   { href: '/admin/checkins', label: 'Check-in', icon: 'check_circle' },

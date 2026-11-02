@@ -64,7 +64,7 @@ public class PaymentIntentService {
     }
 
     /** One planned escrow item: validated order item plus its commission snapshot. */
-    record Plan(OrderClient.OrderItemDto item, Vertical vertical, BigDecimal rate, CommissionService.Split split) {}
+    record Plan(OrderClient.OrderItemDto item, Vertical vertical, BigDecimal rate, CommissionService.DiscountSplit split) {}
 
     @Transactional
     public IntentResponse createIntent(UUID userId, String role, UUID orderId) {
@@ -150,7 +150,10 @@ public class PaymentIntentService {
             e.setOrderItemId(p.item().orderItemId());
             e.setVertical(p.vertical());
             e.setSupplierOrganizationId(p.item().supplierOrganizationId());
-            e.setGrossAmount(p.item().amount());
+            e.setGrossAmount(p.item().effectiveGross());
+            e.setChargedAmount(p.item().amount());
+            e.setDiscountAmount(p.item().effectiveDiscount());
+            e.setDiscountFundedBy(p.item().effectiveDiscount().signum() > 0 ? p.item().discountFundedBy() : null);
             e.setCommissionRate(p.rate());
             e.setCommissionAmount(p.split().commission());
             e.setSupplierAmount(p.split().supplier());
@@ -227,7 +230,16 @@ public class PaymentIntentService {
                 requireActivePayoutAccount(item.supplierOrganizationId());
             }
             BigDecimal rate = commissionService.resolveRate(vertical, item.supplierOrganizationId(), now);
-            plans.add(new Plan(item, vertical, rate, CommissionService.split(item.amount(), rate)));
+            BigDecimal discount = item.effectiveDiscount();
+            BigDecimal gross = item.effectiveGross();
+            if (discount.signum() < 0 || gross.subtract(discount).compareTo(item.amount()) != 0) {
+                throw new BusinessRuleException("ORDER_ITEM_PRICING_MISMATCH", "Order item gross - discount does not equal its amount");
+            }
+            if (discount.signum() > 0 && !"PLATFORM".equals(item.discountFundedBy()) && !"PARTNER".equals(item.discountFundedBy())) {
+                throw new BusinessRuleException("ORDER_ITEM_PRICING_MISMATCH", "Discounted order item has no funding party");
+            }
+            plans.add(new Plan(item, vertical, rate,
+                    CommissionService.splitWithDiscount(gross, discount, item.discountFundedBy(), rate)));
             sum = sum.add(item.amount());
         }
         if (sum.compareTo(order.totalAmount()) != 0) {

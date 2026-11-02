@@ -15,6 +15,12 @@ interface OrderItem {
   quantity: number;
   subtotal: number;
   currency: string;
+  grossAmount?: number | null;
+  discountAmount?: number | null;
+  discountFundedBy?: string | null;
+  netAmount?: number | null;
+  taxAmount?: number | null;
+  promoCode?: string | null;
   pickupAt: string | null;
   returnAt: string | null;
   flight?: { flightNumber: string; passengerFirstName: string; passengerLastName: string; seatNumber: string; pnr: string | null; ticketNumber: string | null } | null;
@@ -70,6 +76,8 @@ const VOUCHER_STATUS_TR: Record<Voucher['status'], string> = {
   REDEEMED: 'Kullanildi',
   VOID: 'Iptal edildi',
 };
+
+const money = (v: number, currency: string) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(v);
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -201,6 +209,12 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
       {order.items && order.items.map(item => (
         <div key={item.id} className="mt-1 text-xs text-on-surface-variant">
           <p>{item.description}</p>
+          {item.discountAmount != null && item.discountAmount > 0 && item.grossAmount != null && item.netAmount != null && (
+            <p data-testid="item-breakdown">
+              Fiyat: {money(item.grossAmount, item.currency)} · Indirim{item.promoCode ? ` (${item.promoCode})` : ''}: -{money(item.discountAmount, item.currency)} · Odenen: {money(item.netAmount, item.currency)}
+              {item.taxAmount != null && ` · Vergi dahil: ${money(item.taxAmount, item.currency)}`}
+            </p>
+          )}
           {item.vertical === 'FLIGHT' && item.flight && (
             <>
               <p>Yolcu: {item.flight.passengerFirstName} {item.flight.passengerLastName}</p>

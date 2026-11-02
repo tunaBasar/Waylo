@@ -40,6 +40,16 @@ public class EscrowItem {
     @Column(name = "gross_amount", nullable = false, precision = 12, scale = 2, updatable = false)
     private BigDecimal grossAmount;
 
+    /** What the customer paid for this item (net). gross_amount stays the supplier price and the commission base. */
+    @Column(name = "charged_amount", nullable = false, precision = 12, scale = 2, updatable = false)
+    private BigDecimal chargedAmount;
+
+    @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2, updatable = false)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "discount_funded_by", length = 20, updatable = false)
+    private String discountFundedBy;
+
     @Column(name = "commission_rate", nullable = false, precision = 5, scale = 4, updatable = false)
     private BigDecimal commissionRate;
 
@@ -92,6 +102,12 @@ public class EscrowItem {
     public void setSupplierOrganizationId(UUID supplierOrganizationId) { this.supplierOrganizationId = supplierOrganizationId; }
     public BigDecimal getGrossAmount() { return grossAmount; }
     public void setGrossAmount(BigDecimal grossAmount) { this.grossAmount = grossAmount; }
+    public BigDecimal getChargedAmount() { return chargedAmount; }
+    public void setChargedAmount(BigDecimal chargedAmount) { this.chargedAmount = chargedAmount; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public String getDiscountFundedBy() { return discountFundedBy; }
+    public void setDiscountFundedBy(String discountFundedBy) { this.discountFundedBy = discountFundedBy; }
     public BigDecimal getCommissionRate() { return commissionRate; }
     public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; }
     public BigDecimal getCommissionAmount() { return commissionAmount; }

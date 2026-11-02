@@ -272,6 +272,83 @@ class PaymentFlowTest {
         assertThat(ledgerStore.stream().map(LedgerEntry::getOrderId).distinct()).containsExactly(orderId);
     }
 
+    OrderClient.OrderDto discounted(String gross, String discount, String fundedBy) {
+        BigDecimal net = new BigDecimal(gross).subtract(new BigDecimal(discount));
+        return new OrderClient.OrderDto(orderId, customer, "PENDING", "TRY", net, List.of(new OrderClient.OrderItemDto(
+                itemId, "HOTEL", supplier, net, "TRY", new BigDecimal(gross), new BigDecimal(discount), fundedBy)));
+    }
+
+    BigDecimal sumOf(String account, boolean credit) {
+        return ledgerStore.stream().filter(l -> l.getAccount().name().equals(account))
+                .map(l -> credit ? l.getCreditAmount() : l.getDebitAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Test
+    void platformFundedDiscount_commissionOnGross_partnerUnchanged_platformBearsDiscount() {
+        paid(discounted("1000.00", "100.00", "PLATFORM"));
+        EscrowItem e = escrowStore.get(0);
+        assertThat(e.getGrossAmount()).isEqualByComparingTo("1000.00");
+        assertThat(e.getChargedAmount()).isEqualByComparingTo("900.00");
+        assertThat(e.getCommissionAmount()).isEqualByComparingTo("100.00");
+        assertThat(e.getSupplierAmount()).isEqualByComparingTo("900.00");
+        assertThat(sumOf("CUSTOMER_PAYMENT", false)).isEqualByComparingTo("900.00");
+        escrowService.release(itemId);
+        assertThat(sumOf("SUPPLIER_PAYABLE", true)).isEqualByComparingTo("900.00");
+        assertThat(sumOf("PLATFORM_COMMISSION", true)).isEqualByComparingTo("100.00");
+        assertThat(sumOf("PLATFORM_DISCOUNT_COST", false)).isEqualByComparingTo("100.00");
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void partnerFundedDiscount_partnerGetsNetMinusCommission_noPlatformCost() {
+        paid(discounted("1000.00", "100.00", "PARTNER"));
+        EscrowItem e = escrowStore.get(0);
+        assertThat(e.getCommissionAmount()).isEqualByComparingTo("100.00");
+        assertThat(e.getSupplierAmount()).isEqualByComparingTo("800.00");
+        escrowService.release(itemId);
+        assertThat(sumOf("SUPPLIER_PAYABLE", true)).isEqualByComparingTo("800.00");
+        assertThat(sumOf("PLATFORM_COMMISSION", true)).isEqualByComparingTo("100.00");
+        assertThat(sumOf("PLATFORM_DISCOUNT_COST", false)).isEqualByComparingTo("0");
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void partnerFundedDiscountLargerThanPartnerShare_422() {
+        givenOrder(discounted("1000.00", "950.00", "PARTNER"));
+        assertThatThrownBy(() -> intentService.createIntent(customer, "CUSTOMER", orderId))
+                .isInstanceOfSatisfying(BusinessRuleException.class, e -> assertThat(e.getRuleCode()).isEqualTo("DISCOUNT_EXCEEDS_PARTNER_SHARE"));
+    }
+
+    @Test
+    void discountedRefund_refundsWhatCustomerPaid_andBalances() {
+        paid(discounted("1000.00", "100.00", "PLATFORM"));
+        escrowService.refund(itemId);
+        assertThat(sumOf("CUSTOMER_REFUND", true)).isEqualByComparingTo("900.00");
+        assertThat(sumOf("PLATFORM_DISCOUNT_COST", false)).isEqualByComparingTo("0");
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void discountedRounding_halfEven_stillBalances() {
+        // 333.35 * 0.1 = 33.335 -> HALF_EVEN 33.34 (even), supplier = gross - commission
+        paid(discounted("333.35", "33.33", "PLATFORM"));
+        EscrowItem e = escrowStore.get(0);
+        assertThat(e.getCommissionAmount()).isEqualByComparingTo("33.34");
+        assertThat(e.getSupplierAmount()).isEqualByComparingTo("300.01");
+        escrowService.release(itemId);
+        assertLedgerBalanced();
+    }
+
+    @Test
+    void inconsistentPricing_rejected() {
+        OrderClient.OrderDto bad = new OrderClient.OrderDto(orderId, customer, "PENDING", "TRY", new BigDecimal("900.00"),
+                List.of(new OrderClient.OrderItemDto(itemId, "HOTEL", supplier, new BigDecimal("900.00"), "TRY",
+                        new BigDecimal("1000.00"), new BigDecimal("50.00"), "PLATFORM")));
+        givenOrder(bad);
+        assertThatThrownBy(() -> intentService.createIntent(customer, "CUSTOMER", orderId))
+                .isInstanceOfSatisfying(BusinessRuleException.class, e -> assertThat(e.getRuleCode()).isEqualTo("ORDER_ITEM_PRICING_MISMATCH"));
+    }
+
     @Test
     void deriveStatus_table() {
         assertThat(EscrowService.deriveStatus(List.of(EscrowStatus.HELD))).isEqualTo(PaymentIntentStatus.AUTHORIZED);

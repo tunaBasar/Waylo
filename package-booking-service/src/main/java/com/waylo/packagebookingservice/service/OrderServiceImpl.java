@@ -59,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final UUID flightSellerOrganizationId;
     private final PaymentEscrowClient paymentEscrowClient;
     private final VoucherService voucherService;
+    private final PricingApplier pricingApplier;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                              OrderItemRepository orderItemRepository,
@@ -69,7 +70,9 @@ public class OrderServiceImpl implements OrderService {
                              FlightHoldClient flightHoldClient,
                              @Value("${waylo.flight.seller-organization-id:}") String flightSellerOrganizationId,
                              PaymentEscrowClient paymentEscrowClient,
-                             VoucherService voucherService) {
+                             VoucherService voucherService,
+                             PricingApplier pricingApplier) {
+        this.pricingApplier = pricingApplier;
         this.voucherService = voucherService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -117,7 +120,9 @@ public class OrderServiceImpl implements OrderService {
             order.setCurrency(hold.currency());
             order.setQuoteId(request.quoteId());
             order.setNotes(request.notes());
-            order.setTotalAmount(hold.totalAmount());
+            PricingApplier.Priced priced = pricingApplier.price("OTEL", hold.organizationId(), hold.totalAmount(),
+                    hold.currency(), actorUserId, request.promoCode(), orderId);
+            order.setTotalAmount(priced.net());
             order.setStatus(OrderStatus.PENDING);
             order.setHoldExpiresAt(hold.expiresAt());
             order = orderRepository.saveAndFlush(order);
@@ -132,15 +137,16 @@ public class OrderServiceImpl implements OrderService {
                     + hold.rooms() + " oda");
             item.setCheckIn(hold.checkIn());
             item.setCheckOut(hold.checkOut());
-            item.setUnitAmount(hold.totalAmount());
             item.setQuantity(1);
             item.setCurrency(hold.currency());
+            priced.applyTo(item);
             OrderItem savedItem = orderItemRepository.saveAndFlush(item);
 
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(
                     order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(savedItem));
         } catch (RuntimeException e) {
+            pricingApplier.release(orderId);
             try {
                 hotelHoldClient.release(hold.holdId());
             } catch (RuntimeException releaseFailure) {
@@ -158,15 +164,15 @@ public class OrderServiceImpl implements OrderService {
         String key = "co-" + UUID.nameUUIDFromBytes((actorUserId + ":" + request.pickupBranchId() + ":" + request.returnBranchId() + ":" + request.pickupAt() + ":" + request.returnAt()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         CarHoldClient.HoldDto hold = carHoldClient.hold(new CarHoldClient.HoldRequest(request.pickupBranchId(), request.returnBranchId(), request.category(), request.transmission(), request.pickupAt(), request.returnAt(), request.driverAge(), actorUserId, key, orderId)).data();
         try {
-            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); order.setTotalAmount(hold.totalAmount()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
+            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); PricingApplier.Priced priced = pricingApplier.price("ARAÇ", hold.organizationId(), hold.totalAmount(), hold.currency(), actorUserId, request.promoCode(), orderId); order.setTotalAmount(priced.net()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
             order = orderRepository.saveAndFlush(order);
             OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.CAR); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.pickupBranchId()); item.setFulfillmentRef(hold.holdId());
             String transmission = "AUTOMATIC".equalsIgnoreCase(hold.transmission()) ? "Otomatik" : "Manuel";
-            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission + "), " + hold.chargeableDays() + " gun"); item.setUnitAmount(hold.totalAmount()); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.pickupAt()); item.setReturnAt(hold.returnAt());
+            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission + "), " + hold.chargeableDays() + " gun"); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.pickupAt()); item.setReturnAt(hold.returnAt());
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
-        } catch (RuntimeException e) { try { carHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release car hold {}", hold.holdId(), releaseFailure); } throw e; }
+        } catch (RuntimeException e) { pricingApplier.release(orderId); try { carHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release car hold {}", hold.holdId(), releaseFailure); } throw e; }
     }
 
     /** Bus order: price, route and times come from the bus hold, never from the client. productRef = tripId. */
@@ -182,14 +188,14 @@ public class OrderServiceImpl implements OrderService {
         BusHoldClient.HoldDto hold = busHoldClient.hold(new BusHoldClient.HoldRequest(request.tripId(), request.fromSeq(), request.toSeq(),
                 passengers, actorUserId, key, orderId.toString())).data();
         try {
-            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); order.setTotalAmount(hold.totalAmount()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
+            Order order = new Order(); order.setId(orderId); order.setCustomerId(actorUserId); order.setCurrency(hold.currency()); PricingApplier.Priced priced = pricingApplier.price("OTOBÜS", hold.organizationId(), hold.totalAmount(), hold.currency(), actorUserId, request.promoCode(), orderId); order.setTotalAmount(priced.net()); order.setStatus(OrderStatus.PENDING); order.setHoldExpiresAt(hold.expiresAt());
             order = orderRepository.saveAndFlush(order);
             OrderItem item = new OrderItem(); item.setOrderId(order.getId()); item.setVertical(OrderItemVertical.BUS); item.setSupplierOrganizationId(hold.organizationId()); item.setProductRef(hold.tripId()); item.setFulfillmentRef(hold.holdId());
-            item.setDescription(busDescription(hold)); item.setUnitAmount(hold.totalAmount()); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.boardingAt()); item.setReturnAt(hold.arrivalAt());
+            item.setDescription(busDescription(hold)); priced.applyTo(item); item.setQuantity(1); item.setCurrency(hold.currency()); item.setPickupAt(hold.boardingAt()); item.setReturnAt(hold.arrivalAt());
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
-        } catch (RuntimeException e) { try { busHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release bus hold {}", hold.holdId(), releaseFailure); } throw e; }
+        } catch (RuntimeException e) { pricingApplier.release(orderId); try { busHoldClient.release(hold.holdId()); } catch (RuntimeException releaseFailure) { log.error("Could not release bus hold {}", hold.holdId(), releaseFailure); } throw e; }
     }
 
     static String busDescription(BusHoldClient.HoldDto hold) {
@@ -227,7 +233,9 @@ public class OrderServiceImpl implements OrderService {
             order.setId(orderId);
             order.setCustomerId(actorUserId);
             order.setCurrency(hold.currency());
-            order.setTotalAmount(hold.totalAmount());
+            PricingApplier.Priced priced = pricingApplier.price("UÇUŞ", flightSellerOrganizationId, hold.totalAmount(),
+                    hold.currency(), actorUserId, request.promoCode(), orderId);
+            order.setTotalAmount(priced.net());
             order.setStatus(OrderStatus.PENDING);
             order.setHoldExpiresAt(hold.expiresAt());
             order = orderRepository.saveAndFlush(order);
@@ -239,14 +247,15 @@ public class OrderServiceImpl implements OrderService {
             item.setProductRef(UUID.nameUUIDFromBytes(("flight:" + hold.flightNumber()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
             item.setFulfillmentRef(hold.holdId());
             item.setDescription(flightDescription(hold));
-            item.setUnitAmount(hold.totalAmount());
             item.setQuantity(1);
             item.setCurrency(hold.currency());
+            priced.applyTo(item);
             applyFlight(item, hold);
             OrderItem saved = orderItemRepository.saveAndFlush(item);
             eventPublisher.publishOrderCreated(new OrderCreatedEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
             return toResponse(order, List.of(saved));
         } catch (RuntimeException e) {
+            pricingApplier.release(orderId);
             try {
                 flightHoldClient.release(hold.holdId());
             } catch (RuntimeException releaseFailure) {
@@ -402,6 +411,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.saveAndFlush(order);
+        pricingApplier.release(order.getId());
         voucherService.voidForOrder(order.getId());
 
         eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId()));
@@ -452,7 +462,10 @@ public class OrderServiceImpl implements OrderService {
         return new InternalOrderResponse(order.getId(), order.getCustomerId(), order.getStatus().name(), order.getCurrency(),
                 order.getTotalAmount(),
                 items.stream().map(i -> new InternalOrderResponse.Item(i.getId(), i.getVertical().name(),
-                        i.getSupplierOrganizationId(), i.getSubtotal(), i.getCurrency())).toList());
+                        i.getSupplierOrganizationId(), i.getSubtotal(), i.getCurrency(),
+                        i.getGrossAmount() != null ? i.getGrossAmount() : i.getSubtotal(),
+                        i.getDiscountAmount() != null ? i.getDiscountAmount() : BigDecimal.ZERO,
+                        i.getDiscountFundedBy())).toList());
     }
 
     private void requireIdentity(UUID actorUserId) {
@@ -528,7 +541,13 @@ public class OrderServiceImpl implements OrderService {
                         ? new FlightItemDetails(item.getFlightNumber(), item.getDepartureAt(), item.getSeatNumber(),
                                 item.getPassengerFirstName(), item.getPassengerLastName(), item.getPnr(),
                                 item.getTicketNumber(), item.getSupplier())
-                        : null
+                        : null,
+                item.getGrossAmount() != null ? item.getGrossAmount() : item.getSubtotal(),
+                item.getDiscountAmount() != null ? item.getDiscountAmount() : BigDecimal.ZERO,
+                item.getDiscountFundedBy(),
+                item.getNetAmount() != null ? item.getNetAmount() : item.getSubtotal(),
+                item.getTaxAmount(),
+                item.getPromoCode()
         );
     }
 }

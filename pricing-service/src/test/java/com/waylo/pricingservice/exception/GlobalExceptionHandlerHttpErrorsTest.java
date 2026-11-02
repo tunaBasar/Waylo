@@ -62,7 +62,7 @@ class GlobalExceptionHandlerHttpErrorsTest {
 
     @Test
     void typeMismatch_handler_returnsBadRequest() {
-        var ex = new MethodArgumentTypeMismatchException("dynamic", com.waylo.pricingservice.domain.PricingType.class, "type", null, null);
+        var ex = new MethodArgumentTypeMismatchException("dynamic", com.waylo.pricingservice.domain.Campaign.class, "type", null, null);
 
         ResponseEntity<ErrorResponse> response = handler.handleTypeMismatch(ex, request);
 
@@ -98,7 +98,7 @@ class GlobalExceptionHandlerHttpErrorsTest {
     @Test
     void optimisticLock_handler_returnsConflict() {
         var ex = new ObjectOptimisticLockingFailureException(
-                com.waylo.pricingservice.domain.PricingRule.class, UUID.randomUUID());
+                com.waylo.pricingservice.domain.PromoCode.class, UUID.randomUUID());
 
         ResponseEntity<ErrorResponse> response = handler.handleOptimisticLock(ex, request);
 

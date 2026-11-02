@@ -9,4 +9,5 @@ public record FlightOrderCreateRequest(
         @NotBlank @Size(max = 600) String offerId,
         @Size(max = 5) String seatNumber,
         @NotBlank @Size(max = 80) @Pattern(regexp = "^[\\p{L} '\\-]+$") String passengerFirstName,
-        @NotBlank @Size(max = 80) @Pattern(regexp = "^[\\p{L} '\\-]+$") String passengerLastName) {}
+        @NotBlank @Size(max = 80) @Pattern(regexp = "^[\\p{L} '\\-]+$") String passengerLastName,
+        @Size(max = 50) String promoCode) {}

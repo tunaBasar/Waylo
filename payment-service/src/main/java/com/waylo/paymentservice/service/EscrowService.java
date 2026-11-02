@@ -15,6 +15,7 @@ import com.waylo.paymentservice.repository.SupplierPayoutAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -58,8 +59,9 @@ public class EscrowService {
 
         provider.releaseItem(new PaymentProvider.ReleaseRequest(intent.getProviderPaymentId(), item.getProviderItemRef(),
                 subMerchantKey, item.getSupplierAmount(), item.getCommissionAmount(), item.getCurrency()));
-        ledgerService.recordRelease(item.getOrderId(), item.getOrderItemId(), item.getGrossAmount(), item.getSupplierAmount(),
-                item.getCommissionAmount(), item.getCurrency(), intent.getId());
+        BigDecimal platformCost = "PLATFORM".equals(item.getDiscountFundedBy()) ? item.getDiscountAmount() : BigDecimal.ZERO;
+        ledgerService.recordRelease(item.getOrderId(), item.getOrderItemId(), item.getChargedAmount(), item.getSupplierAmount(),
+                item.getCommissionAmount(), platformCost, item.getCurrency(), intent.getId());
         item.setStatus(EscrowStatus.RELEASED);
         item.setReleasedAt(Instant.now());
         escrowRepository.saveAndFlush(item);
@@ -76,8 +78,8 @@ public class EscrowService {
         }
         PaymentIntent intent = lockIntent(item);
         provider.refundItem(new PaymentProvider.RefundRequest(intent.getProviderPaymentId(), item.getProviderItemRef(),
-                item.getGrossAmount(), item.getCurrency()));
-        ledgerService.recordRefund(item.getOrderId(), item.getOrderItemId(), item.getGrossAmount(), item.getCurrency(), intent.getId());
+                item.getChargedAmount(), item.getCurrency()));
+        ledgerService.recordRefund(item.getOrderId(), item.getOrderItemId(), item.getChargedAmount(), item.getCurrency(), intent.getId());
         item.setStatus(EscrowStatus.REFUNDED);
         item.setRefundedAt(Instant.now());
         escrowRepository.saveAndFlush(item);

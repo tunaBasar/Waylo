@@ -124,6 +124,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
+    @ExceptionHandler(PricingUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handlePricingUnavailable(PricingUnavailableException ex, HttpServletRequest request) {
+        log.error("Pricing service unavailable: {}", ex.getMessage());
+        var response = new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "PRICING_UNAVAILABLE",
+                "Promo code could not be checked right now, please retry", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
     @ExceptionHandler(PaymentUnavailableException.class)
     public ResponseEntity<ErrorResponse> handlePaymentUnavailable(PaymentUnavailableException ex, HttpServletRequest request) {
         log.error("Payment service unavailable: {}", ex.getMessage());

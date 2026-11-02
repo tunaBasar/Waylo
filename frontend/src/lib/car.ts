@@ -53,6 +53,7 @@ export interface CarOrderRequest {
   pickupAt: string;
   returnAt: string;
   driverAge: number;
+  promoCode?: string;
 }
 
 /** Subset of package-booking-service OrderResponse returned by POST /api/orders/car. */

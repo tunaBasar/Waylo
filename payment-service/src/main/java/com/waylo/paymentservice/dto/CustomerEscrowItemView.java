@@ -14,7 +14,7 @@ public record CustomerEscrowItemView(UUID orderItemId, Vertical vertical, BigDec
                                      EscrowStatus status, ReleaseTrigger releaseTrigger,
                                      Instant heldAt, Instant releasedAt, Instant refundedAt) {
     public static CustomerEscrowItemView from(EscrowItem e) {
-        return new CustomerEscrowItemView(e.getOrderItemId(), e.getVertical(), e.getGrossAmount(), e.getCurrency(),
+        return new CustomerEscrowItemView(e.getOrderItemId(), e.getVertical(), e.getChargedAmount(), e.getCurrency(),
                 e.getStatus(), e.getReleaseTrigger(), e.getHeldAt(), e.getReleasedAt(), e.getRefundedAt());
     }
 }

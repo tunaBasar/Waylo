@@ -40,21 +40,22 @@ class OrderControllerTest {
     private OrderResponse buildResponse() {
         OrderItemResponse item = new OrderItemResponse(
                 UUID.randomUUID(), orderId, OrderItemVertical.HOTEL, UUID.randomUUID(), UUID.randomUUID(), null,
-                "Deluxe room", new BigDecimal("100.00"), 2, new BigDecimal("200.00"), "USD", Instant.now(), null, null, null);
+                "Deluxe room", new BigDecimal("100.00"), 2, new BigDecimal("200.00"), "USD", Instant.now(), null, null, null,
+                new BigDecimal("200.00"), BigDecimal.ZERO, null, new BigDecimal("200.00"), null, null);
         return new OrderResponse(orderId, userId, OrderStatus.PENDING, "USD", null,
                 new BigDecimal("200.00"), null, 0L, List.of(item), Instant.now(), Instant.now(), null);
     }
 
     @Test
     void createHotel_returns201() {
-        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null);
+        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null, null);
         when(orderService.createHotelOrder(userId, req)).thenReturn(buildResponse());
         assertThat(controller.createHotel(userId, "USER", req).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
     void createHotel_admin_forbiddenWithCode() {
-        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null);
+        var req = new com.waylo.packagebookingservice.dto.HotelOrderCreateRequest(UUID.randomUUID(), null, null);
         assertThatThrownBy(() -> controller.createHotel(userId, "ADMIN", req))
                 .isInstanceOfSatisfying(AccessDeniedException.class,
                         e -> assertThat(e.getCode()).isEqualTo("ADMIN_CANNOT_PURCHASE"));

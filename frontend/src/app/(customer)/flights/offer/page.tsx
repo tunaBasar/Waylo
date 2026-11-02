@@ -10,6 +10,8 @@ import {
   mustSearchAgain, postFlightOrder, secondsLeft, seatsForCabin,
 } from '@/lib/flight';
 import type { AvailableSeat, FlightOffer } from '@/lib/flight';
+import { PromoCodeField } from '@/components/PromoCodeField';
+import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' });
 const money = (v: number, currency: string) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(v);
@@ -25,6 +27,7 @@ function OfferContent() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [expired, setExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -74,12 +77,13 @@ function OfferContent() {
         seatNumber: seat || undefined,
         passengerFirstName: firstName.trim(),
         passengerLastName: lastName.trim(),
+        ...(promoCode.trim() ? { promoCode: normalizePromoCode(promoCode) } : {}),
       });
       router.push(`/orders?created=${encodeURIComponent(res.data.id)}`);
     } catch (cause) {
       const code = (cause as ApiError).code;
       setExpired(mustSearchAgain(code));
-      setError(flightErrorMessage(code, 'Siparis olusturulamadi.'));
+      setError(promoErrorMessage(code) ?? flightErrorMessage(code, 'Siparis olusturulamadi.'));
     } finally {
       setBusy(false);
     }
@@ -126,6 +130,9 @@ function OfferContent() {
                   </select>
                 </div>
               )}
+              <div className="md:col-span-2">
+                <PromoCodeField vertical="UÇUŞ" grossAmount={offer.totalAmount} currency={offer.currency} code={promoCode} onCodeChange={setPromoCode} />
+              </div>
               <div className="md:col-span-2">
                 <button disabled={busy} className="w-full rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-on-tertiary disabled:opacity-60">
                   {busy ? 'Siparis olusturuluyor...' : 'Siparis Olustur ve Ode'}

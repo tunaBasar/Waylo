@@ -27,6 +27,7 @@ export interface FlightOrderRequest {
   seatNumber?: string;
   passengerFirstName: string;
   passengerLastName: string;
+  promoCode?: string;
 }
 
 export interface FlightOrderResponse {

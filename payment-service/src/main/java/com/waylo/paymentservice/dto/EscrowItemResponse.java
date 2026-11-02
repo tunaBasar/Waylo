@@ -13,10 +13,12 @@ import java.util.UUID;
 public record EscrowItemResponse(UUID id, UUID orderId, UUID orderItemId, Vertical vertical, UUID supplierOrganizationId,
                                  BigDecimal grossAmount, BigDecimal commissionRate, BigDecimal commissionAmount,
                                  BigDecimal supplierAmount, String currency, EscrowStatus status,
-                                 ReleaseTrigger releaseTrigger, Instant heldAt, Instant releasedAt, Instant refundedAt) {
+                                 ReleaseTrigger releaseTrigger, Instant heldAt, Instant releasedAt, Instant refundedAt,
+                                 BigDecimal chargedAmount, BigDecimal discountAmount, String discountFundedBy) {
     public static EscrowItemResponse from(EscrowItem e) {
         return new EscrowItemResponse(e.getId(), e.getOrderId(), e.getOrderItemId(), e.getVertical(), e.getSupplierOrganizationId(),
                 e.getGrossAmount(), e.getCommissionRate(), e.getCommissionAmount(), e.getSupplierAmount(), e.getCurrency(),
-                e.getStatus(), e.getReleaseTrigger(), e.getHeldAt(), e.getReleasedAt(), e.getRefundedAt());
+                e.getStatus(), e.getReleaseTrigger(), e.getHeldAt(), e.getReleasedAt(), e.getRefundedAt(),
+                e.getChargedAmount(), e.getDiscountAmount(), e.getDiscountFundedBy());
     }
 }

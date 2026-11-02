@@ -82,6 +82,13 @@ public class OrderItem {
     @Column(name = "supplier", length = 20) private String supplier;
     @Column(name = "supplier_order_ref", length = 100) private String supplierOrderRef;
 
+    @Column(name = "gross_amount", precision = 12, scale = 2) private BigDecimal grossAmount;
+    @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2) private BigDecimal discountAmount = BigDecimal.ZERO;
+    @Column(name = "discount_funded_by", length = 20) private String discountFundedBy;
+    @Column(name = "net_amount", precision = 12, scale = 2) private BigDecimal netAmount;
+    @Column(name = "tax_amount", precision = 12, scale = 2) private BigDecimal taxAmount;
+    @Column(name = "promo_code", length = 50) private String promoCode;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -91,6 +98,19 @@ public class OrderItem {
     public BigDecimal getSubtotal() {
         return unitAmount.multiply(BigDecimal.valueOf(quantity));
     }
+
+    public BigDecimal getGrossAmount() { return grossAmount; }
+    public void setGrossAmount(BigDecimal v) { this.grossAmount = v; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal v) { this.discountAmount = v; }
+    public String getDiscountFundedBy() { return discountFundedBy; }
+    public void setDiscountFundedBy(String v) { this.discountFundedBy = v; }
+    public BigDecimal getNetAmount() { return netAmount; }
+    public void setNetAmount(BigDecimal v) { this.netAmount = v; }
+    public BigDecimal getTaxAmount() { return taxAmount; }
+    public void setTaxAmount(BigDecimal v) { this.taxAmount = v; }
+    public String getPromoCode() { return promoCode; }
+    public void setPromoCode(String v) { this.promoCode = v; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

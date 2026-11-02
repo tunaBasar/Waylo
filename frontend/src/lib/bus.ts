@@ -66,7 +66,7 @@ export interface TripOffer {
 export interface SeatState { seatNo: number; available: boolean; occupantGender: Gender | null }
 export interface SeatMap { tripId: string; layout: SeatLayout; rowCount: number; fromSeq: number; toSeq: number; seats: SeatState[] }
 export interface PassengerInput { seatNo: number; name: string; gender: Gender; identityNumber?: string }
-export interface BusOrderRequest { tripId: string; fromSeq: number; toSeq: number; passengers: PassengerInput[] }
+export interface BusOrderRequest { tripId: string; fromSeq: number; toSeq: number; passengers: PassengerInput[]; promoCode?: string }
 
 const enc = encodeURIComponent;
 const P = (orgId: string) => `/api/bus-partner/organizations/${enc(orgId)}`;

@@ -103,4 +103,18 @@ class CommissionServiceTest {
                 .isInstanceOfSatisfying(CommissionRateConflictException.class,
                         e -> assertThat(e.getMessage()).contains("already exists"));
     }
+
+    @Test
+    void splitWithDiscount_platformAndPartner() {
+        var platform = CommissionService.splitWithDiscount(new BigDecimal("1000.00"), new BigDecimal("100.00"), "PLATFORM", new BigDecimal("0.1000"));
+        assertThat(platform.commission()).isEqualByComparingTo("100.00");
+        assertThat(platform.supplier()).isEqualByComparingTo("900.00");
+        assertThat(platform.platformCost()).isEqualByComparingTo("100.00");
+        var partner = CommissionService.splitWithDiscount(new BigDecimal("1000.00"), new BigDecimal("100.00"), "PARTNER", new BigDecimal("0.1000"));
+        assertThat(partner.supplier()).isEqualByComparingTo("800.00");
+        assertThat(partner.platformCost()).isEqualByComparingTo("0");
+        var none = CommissionService.splitWithDiscount(new BigDecimal("100.05"), BigDecimal.ZERO, null, new BigDecimal("0.1000"));
+        assertThat(none.commission()).isEqualByComparingTo("10.00");
+        assertThat(none.supplier()).isEqualByComparingTo("90.05");
+    }
 }

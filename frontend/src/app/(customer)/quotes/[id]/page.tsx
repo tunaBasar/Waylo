@@ -13,6 +13,8 @@ import type { Quote } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
 import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
 import { useAuth } from '@/lib/auth';
+import { PromoCodeField } from '@/components/PromoCodeField';
+import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 
 function ErrorState({ message }: { message: string }) {
   return (
@@ -106,6 +108,7 @@ function QuoteContent() {
   const [hotelName, setHotelName] = useState<string | null>(null);
   const [hotelLoading, setHotelLoading] = useState(false);
   const [booking, setBooking] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
   const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Load quote
@@ -151,6 +154,7 @@ function QuoteContent() {
       const response = await api.post<{ id: string }>('/api/orders/hotel', {
         quoteId: quote.quoteId,
         notes: null,
+        ...(promoCode.trim() ? { promoCode: normalizePromoCode(promoCode) } : {}),
       });
       router.push(`/orders?created=${response.data.id}`);
     } catch (error) {
@@ -158,6 +162,7 @@ function QuoteContent() {
         if (error.code === 'ADMIN_CANNOT_PURCHASE') setBookingError(ADMIN_CANNOT_PURCHASE_MESSAGE);
         else if (error.status === 404) setBookingError('Teklif bulunamadi');
         else if (error.status === 409) setBookingError('Secilen oda icin musaitlik kalmadi veya teklif baska bir islemde kullaniliyor');
+        else if (promoErrorMessage(error.code)) setBookingError(promoErrorMessage(error.code));
         else if (error.status === 422) setBookingError('Teklifin suresi dolmus olabilir. Lutfen yeniden arayin');
         else if (error.status === 503) setBookingError('Otel servisi su an yanit vermiyor, lutfen biraz sonra tekrar deneyin');
         else setBookingError('Rezervasyon olusturulamadi');
@@ -284,6 +289,9 @@ function QuoteContent() {
       {/* Not expired section */}
       {!quote.expired && !isExpired && (
         <div className="text-center py-4">
+          <div className="mx-auto mb-4 max-w-sm text-left">
+            <PromoCodeField vertical="OTEL" grossAmount={quote.totalAmount} currency={quote.currency} code={promoCode} onCodeChange={setPromoCode} />
+          </div>
           {bookingError && <p className="text-sm text-error mb-3">{bookingError}</p>}
           <button onClick={bookQuote} disabled={booking || !user} className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50">
             {booking ? 'Rezervasyon olusturuluyor...' : 'Rezervasyon yap'}

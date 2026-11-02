@@ -22,5 +22,11 @@ public record OrderItemResponse(
         Instant createdAt,
         LocalDateTime pickupAt,
         LocalDateTime returnAt,
-        FlightItemDetails flight
+        FlightItemDetails flight,
+        BigDecimal grossAmount,
+        BigDecimal discountAmount,
+        String discountFundedBy,
+        BigDecimal netAmount,
+        BigDecimal taxAmount,
+        String promoCode
 ) {}

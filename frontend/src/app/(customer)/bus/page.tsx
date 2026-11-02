@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { ApiError } from '@/lib/api';
+import { PromoCodeField } from '@/components/PromoCodeField';
+import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 import {
   customerBusApi, busErrorMessage, seatRows, seatBlockedByGender, formatClock, formatMoney,
   GENDER_LABEL, LAYOUT_LABEL,
@@ -22,6 +25,7 @@ export default function BusPage() {
   const [offers, setOffers] = useState<TripOffer[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [selected, setSelected] = useState<TripOffer | null>(null);
   const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
   const [picked, setPicked] = useState<Picked[]>([]);
@@ -102,10 +106,11 @@ export default function BusPage() {
       const res = await customerBusApi.order({
         tripId: selected.tripId, fromSeq: selected.fromSeq, toSeq: selected.toSeq,
         passengers: picked.map(p => ({ seatNo: p.seatNo, name: p.name.trim(), gender: p.gender })),
+        ...(promoCode.trim() ? { promoCode: normalizePromoCode(promoCode) } : {}),
       });
       router.push(`/orders?created=${encodeURIComponent(res.data.id)}`);
     } catch (err) {
-      setError(busErrorMessage(err, 'Bilet alinamadi.'));
+      setError(promoErrorMessage(err instanceof ApiError ? err.code : null) ?? busErrorMessage(err, 'Bilet alinamadi.'));
       if (selected) void choose(selected);
     } finally {
       setBuying(false);
@@ -213,6 +218,8 @@ export default function BusPage() {
                 {conflicts.has(p.seatNo) && <span className="text-xs text-error">Yan koltukta farkli cinsiyet var</span>}
               </div>
             ))}
+            <PromoCodeField vertical="OTOBÜS" supplierOrganizationId={selected.organizationId} grossAmount={total}
+              currency={selected.currency} code={promoCode} onCodeChange={setPromoCode} />
             <div className="flex items-center justify-between pt-2">
               <span className="font-semibold text-on-surface">{formatMoney(total, selected.currency)}</span>
               <button onClick={buy} disabled={!ready || buying}
