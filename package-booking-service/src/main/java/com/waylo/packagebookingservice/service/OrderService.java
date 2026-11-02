@@ -22,6 +22,9 @@ public interface OrderService {
 
     OrderResponse createFlightOrder(UUID actorUserId, com.waylo.packagebookingservice.dto.FlightOrderCreateRequest request);
 
+    /** PACKAGE-ORDER-CONTRACT.md: one order, N items of any vertical, compensation on a failed hold. */
+    OrderResponse createPackageOrder(UUID actorUserId, com.waylo.packagebookingservice.dto.PackageOrderCreateRequest request);
+
     OrderResponse getById(UUID actorUserId, UUID orderId);
 
     /** Owner only. QR payloads of the order's items. */

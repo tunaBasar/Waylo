@@ -111,6 +111,32 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
     }
 
+    /** Package order: same status and code as the cause, plus the failing item index. */
+    @ExceptionHandler(PackageItemFailedException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handlePackageItemFailed(PackageItemFailedException ex,
+                                                                                   HttpServletRequest request) {
+        RuntimeException c = (RuntimeException) ex.getCause();
+        ResponseEntity<ErrorResponse> r;
+        if (c instanceof HotelRejectedException e) r = handleHotelRejected(e, request);
+        else if (c instanceof CarRejectedException e) r = handleCarRejected(e, request);
+        else if (c instanceof FlightRejectedException e) r = handleFlightRejected(e, request);
+        else if (c instanceof BusRejectedException e) r = handleBusRejected(e, request);
+        else if (c instanceof BusinessRuleException e) r = handleBusinessRule(e, request);
+        else if (c instanceof PricingUnavailableException e) r = handlePricingUnavailable(e, request);
+        else if (c instanceof IllegalArgumentException e) r = handleIllegalArgument(e, request);
+        else if (c instanceof HotelUnavailableException || c instanceof feign.FeignException) r = handleHotelUnavailable(c, request);
+        else r = handleGeneric(c, request);
+        ErrorResponse b = r.getBody();
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("status", b.status());
+        body.put("error", b.error());
+        body.put("message", "Item " + ex.getItemIndex() + ": " + b.message());
+        body.put("path", b.path());
+        body.put("timestamp", b.timestamp());
+        body.put("itemIndex", ex.getItemIndex());
+        return ResponseEntity.status(r.getStatusCode()).body(body);
+    }
+
     @ExceptionHandler(VoucherException.class)
     public ResponseEntity<java.util.Map<String, Object>> handleVoucher(VoucherException ex, HttpServletRequest request) {
         log.warn("Voucher redemption refused [{}]", ex.getCode());

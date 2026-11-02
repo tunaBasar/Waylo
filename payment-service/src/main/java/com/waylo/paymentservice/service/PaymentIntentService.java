@@ -169,7 +169,8 @@ public class PaymentIntentService {
         intentRepository.saveAndFlush(intent);
 
         try {
-            orderClient.markPaid(intent.getOrderId());
+            OrderClient.Envelope<OrderClient.OrderDto> paid = orderClient.markPaid(intent.getOrderId());
+            refundFailedItems(intent, paid == null || paid.data() == null ? null : paid.data().refundItemIds());
         } catch (RuntimeException e) {
             try {
                 provider.cancel(result.providerPaymentId());
@@ -180,6 +181,30 @@ public class PaymentIntentService {
             throw e; // rolls the local transaction back: no escrow, no ledger, intent unchanged
         }
         return IntentResponse.from(intent);
+    }
+
+    /**
+     * Package orders (PACKAGE-ORDER-CONTRACT.md section 4): items whose hold confirm failed after capture are refunded
+     * from escrow right here, in the same transaction, the rest of the order stays paid.
+     */
+    private void refundFailedItems(PaymentIntent intent, List<UUID> orderItemIds) {
+        if (orderItemIds == null || orderItemIds.isEmpty()) return;
+        for (UUID orderItemId : orderItemIds) {
+            EscrowItem e = escrowRepository.findByOrderItemId(orderItemId)
+                    .orElseThrow(() -> new ResourceNotFoundException("EscrowItem", "orderItemId", orderItemId));
+            if (e.getStatus() != EscrowStatus.HELD) continue;
+            provider.refundItem(new PaymentProvider.RefundRequest(intent.getProviderPaymentId(), e.getProviderItemRef(),
+                    e.getChargedAmount(), e.getCurrency()));
+            ledgerService.recordRefund(e.getOrderId(), e.getOrderItemId(), e.getChargedAmount(), e.getCurrency(), intent.getId(),
+                    "refund to customer (hold confirm failed)");
+            e.setStatus(EscrowStatus.REFUNDED);
+            e.setSettlementReason("CANCEL_REFUND");
+            e.setRefundedAt(Instant.now());
+            escrowRepository.saveAndFlush(e);
+        }
+        intent.setStatus(EscrowService.deriveStatus(escrowRepository.findByPaymentIntentId(intent.getId()).stream()
+                .map(EscrowItem::getStatus).toList()));
+        intentRepository.saveAndFlush(intent);
     }
 
     @Transactional(readOnly = true)

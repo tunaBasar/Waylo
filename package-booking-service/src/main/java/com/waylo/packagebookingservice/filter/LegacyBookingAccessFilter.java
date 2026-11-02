@@ -44,6 +44,7 @@ public class LegacyBookingAccessFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
+        response.setHeader("Deprecation", "true"); // legacy API, use /api/orders (PACKAGE-ORDER-CONTRACT.md)
         String provided = request.getHeader("X-Internal-Token");
         if (provided != null && configuredToken.length > 0
                 && MessageDigest.isEqual(configuredToken, provided.getBytes(StandardCharsets.UTF_8))) {

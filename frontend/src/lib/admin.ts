@@ -27,7 +27,26 @@ export type SeatType = 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST';
 export const SEAT_TYPES: SeatType[] = ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST'];
 export type VehicleStatusTarget = 'AVAILABLE' | 'MAINTENANCE';
 
+export interface AdminOrderItem {
+  id: string; vertical: 'HOTEL' | 'CAR' | 'FLIGHT' | 'BUS'; description: string; netAmount: number;
+  promoCode: string | null; cancelOutcome: string | null; refundAmount: number | null;
+}
+export interface AdminOrder {
+  id: string; customerId: string; status: string; paymentState: 'UNPAID' | 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+  currency: string; totalAmount: number; createdAt: string; items: AdminOrderItem[];
+}
+export interface AdminOrderPage { items: AdminOrder[]; page: number; size: number; total: number }
+export interface AdminOrderFilter { status?: string; vertical?: string; from?: string; to?: string; page?: number; size?: number }
+
+export function adminOrdersQuery(f: AdminOrderFilter): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== '') q.set(k, String(v));
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
 export const adminApi = {
+  orders: (f: AdminOrderFilter = {}) => api.get<AdminOrderPage>(`/api/admin/orders${adminOrdersQuery(f)}`),
   organizations: (status: OrgStatus) => api.get<AdminOrganization[]>(`/api/admin/organizations?status=${status}`),
   approveOrganization: (id: string) => api.post<null>(`/api/admin/organizations/${enc(id)}/approve`, {}),
   suspendOrganization: (id: string, reason: string) => api.post<null>(`/api/admin/organizations/${enc(id)}/suspend`, { reason }),

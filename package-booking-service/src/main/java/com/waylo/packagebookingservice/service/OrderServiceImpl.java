@@ -288,6 +288,196 @@ public class OrderServiceImpl implements OrderService {
                 + ", koltuk " + hold.seatNumber();
     }
 
+    // ---- package (cart) order: PACKAGE-ORDER-CONTRACT.md ----
+
+    /** One taken hold plus what is needed to price it and to write its order item. */
+    private record Held(OrderItemVertical vertical, String pricingName, UUID supplierOrganizationId, BigDecimal gross,
+                        String currency, java.time.Instant expiresAt, UUID holdId, java.util.function.Consumer<OrderItem> fill) {}
+
+    @Override
+    public OrderResponse createPackageOrder(UUID actorUserId, com.waylo.packagebookingservice.dto.PackageOrderCreateRequest request) {
+        requireIdentity(actorUserId);
+        var items = request.items();
+        for (int i = 0; i < items.size(); i++) {
+            String missing = missingField(items.get(i));
+            if (missing != null) {
+                throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(i,
+                        new IllegalArgumentException("Missing field for " + items.get(i).vertical() + ": " + missing));
+            }
+        }
+        UUID orderId = UUID.randomUUID();
+        List<Held> holds = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < items.size(); i++) {
+                try {
+                    holds.add(takeHold(actorUserId, orderId, i, items.get(i)));
+                } catch (RuntimeException e) {
+                    throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(i, e);
+                }
+            }
+            String currency = holds.get(0).currency();
+            for (int i = 1; i < holds.size(); i++) {
+                if (!currency.equals(holds.get(i).currency())) {
+                    throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(i, new BusinessRuleException(
+                            "CURRENCY_MISMATCH", "Item currency " + holds.get(i).currency() + " does not match " + currency));
+                }
+            }
+            List<PricingApplier.Priced> priced = priceAll(actorUserId, orderId, request.promoCode(), holds);
+
+            Order order = new Order();
+            order.setId(orderId);
+            order.setCustomerId(actorUserId);
+            order.setCurrency(currency);
+            order.setNotes(request.notes());
+            order.setTotalAmount(priced.stream().map(PricingApplier.Priced::net).reduce(BigDecimal.ZERO, BigDecimal::add));
+            order.setStatus(OrderStatus.PENDING);
+            order.setHoldExpiresAt(holds.stream().map(Held::expiresAt).min(java.util.Comparator.naturalOrder()).orElse(null));
+            order = orderRepository.saveAndFlush(order);
+            List<OrderItem> saved = new java.util.ArrayList<>();
+            for (int i = 0; i < holds.size(); i++) {
+                Held h = holds.get(i);
+                OrderItem item = new OrderItem();
+                item.setOrderId(order.getId());
+                item.setVertical(h.vertical());
+                item.setSupplierOrganizationId(h.supplierOrganizationId());
+                item.setFulfillmentRef(h.holdId());
+                item.setQuantity(1);
+                item.setCurrency(h.currency());
+                h.fill().accept(item);
+                priced.get(i).applyTo(item);
+                saved.add(orderItemRepository.saveAndFlush(item));
+            }
+            eventPublisher.publishOrderCreated(new OrderCreatedEvent(
+                    order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+            return toResponse(order, saved);
+        } catch (RuntimeException e) {
+            pricingApplier.release(orderId);
+            for (Held h : holds) releaseHoldQuietly(h.vertical(), h.holdId());
+            throw e;
+        }
+    }
+
+    /** Promo applies once, on the first item that accepts it (PACKAGE-ORDER-CONTRACT.md section 3). */
+    private List<PricingApplier.Priced> priceAll(UUID customerId, UUID orderId, String promoCode, List<Held> holds) {
+        String promo = promoCode == null || promoCode.isBlank() ? null : promoCode.trim();
+        RuntimeException firstInvalid = null;
+        List<PricingApplier.Priced> out = new java.util.ArrayList<>();
+        for (int i = 0; i < holds.size(); i++) {
+            Held h = holds.get(i);
+            try {
+                PricingApplier.Priced p = pricingApplier.price(h.pricingName(), h.supplierOrganizationId(), h.gross(),
+                        h.currency(), customerId, promo, orderId);
+                if (promo != null) promo = null; // consumed: pricing-service allows one reservation per order
+                out.add(p);
+            } catch (BusinessRuleException e) {
+                if (promo == null || !"PROMO_CODE_INVALID".equals(e.getRuleCode())) {
+                    throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(i, e);
+                }
+                if (firstInvalid == null) firstInvalid = e;
+                out.add(pricingApplier.price(h.pricingName(), h.supplierOrganizationId(), h.gross(),
+                        h.currency(), customerId, null, orderId));
+            } catch (com.waylo.packagebookingservice.exception.PricingUnavailableException e) {
+                throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(i, e);
+            }
+        }
+        if (promo != null) {
+            throw new com.waylo.packagebookingservice.exception.PackageItemFailedException(0, firstInvalid);
+        }
+        return out;
+    }
+
+    private static String missingField(com.waylo.packagebookingservice.dto.PackageOrderCreateRequest.Item i) {
+        return switch (i.vertical()) {
+            case HOTEL -> i.quoteId() == null ? "quoteId" : null;
+            case CAR -> i.pickupBranchId() == null ? "pickupBranchId" : i.returnBranchId() == null ? "returnBranchId"
+                    : blank(i.category()) ? "category" : blank(i.transmission()) ? "transmission"
+                    : i.pickupAt() == null ? "pickupAt" : i.returnAt() == null ? "returnAt"
+                    : i.driverAge() == null ? "driverAge" : null;
+            case FLIGHT -> blank(i.offerId()) ? "offerId" : blank(i.passengerFirstName()) ? "passengerFirstName"
+                    : blank(i.passengerLastName()) ? "passengerLastName" : null;
+            case BUS -> i.tripId() == null ? "tripId" : i.fromSeq() == null ? "fromSeq" : i.toSeq() == null ? "toSeq"
+                    : i.passengers() == null || i.passengers().isEmpty() ? "passengers" : null;
+        };
+    }
+
+    private static boolean blank(String s) { return s == null || s.isBlank(); }
+
+    private Held takeHold(UUID user, UUID orderId, int index, com.waylo.packagebookingservice.dto.PackageOrderCreateRequest.Item r) {
+        String key = "pk-" + UUID.nameUUIDFromBytes((orderId + ":" + index).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        switch (r.vertical()) {
+            case HOTEL -> {
+                var hold = hotelHoldClient.hold(new HotelHoldClient.HoldRequest(r.quoteId(), key, user, orderId)).data();
+                return new Held(OrderItemVertical.HOTEL, "OTEL", hold.organizationId(), hold.totalAmount(), hold.currency(),
+                        hold.expiresAt(), hold.holdId(), item -> {
+                            item.setProductRef(hold.roomTypeId());
+                            item.setDescription(hold.checkIn() + "-" + hold.checkOut() + ", " + hold.nights() + " gece, "
+                                    + hold.rooms() + " oda");
+                            item.setCheckIn(hold.checkIn());
+                            item.setCheckOut(hold.checkOut());
+                            policyResolver.applyHotel(item, hold.cancellationPolicy());
+                        });
+            }
+            case CAR -> {
+                var hold = carHoldClient.hold(new CarHoldClient.HoldRequest(r.pickupBranchId(), r.returnBranchId(), r.category(),
+                        r.transmission(), r.pickupAt(), r.returnAt(), r.driverAge(), user, key, orderId)).data();
+                return new Held(OrderItemVertical.CAR, "ARAÇ", hold.organizationId(), hold.totalAmount(), hold.currency(),
+                        hold.expiresAt(), hold.holdId(), item -> {
+                            item.setProductRef(hold.pickupBranchId());
+                            String transmission = "AUTOMATIC".equalsIgnoreCase(hold.transmission()) ? "Otomatik" : "Manuel";
+                            item.setDescription(hold.exampleModel() + " (" + carCategoryLabel(hold.category()) + ", " + transmission
+                                    + "), " + hold.chargeableDays() + " gun");
+                            item.setPickupAt(hold.pickupAt());
+                            item.setReturnAt(hold.returnAt());
+                            policyResolver.applyConfigured(item);
+                        });
+            }
+            case BUS -> {
+                List<BusHoldClient.Passenger> passengers = r.passengers().stream()
+                        .map(p -> new BusHoldClient.Passenger(p.seatNo(), p.name().trim(), p.gender(), p.identityNumber())).toList();
+                var hold = busHoldClient.hold(new BusHoldClient.HoldRequest(r.tripId(), r.fromSeq(), r.toSeq(), passengers, user,
+                        key, orderId.toString())).data();
+                return new Held(OrderItemVertical.BUS, "OTOBÜS", hold.organizationId(), hold.totalAmount(), hold.currency(),
+                        hold.expiresAt(), hold.holdId(), item -> {
+                            item.setProductRef(hold.tripId());
+                            item.setDescription(busDescription(hold));
+                            item.setPickupAt(hold.boardingAt());
+                            item.setReturnAt(hold.arrivalAt());
+                            policyResolver.applyConfigured(item);
+                        });
+            }
+            case FLIGHT -> {
+                if (flightSellerOrganizationId == null) {
+                    throw new BusinessRuleException("FLIGHT_SELLER_NOT_CONFIGURED",
+                            "Flight sales are not open: no seller organization is configured");
+                }
+                String seat = blank(r.seatNumber()) ? null : r.seatNumber().trim().toUpperCase();
+                var hold = flightHoldClient.hold(new FlightHoldClient.HoldRequest(r.offerId(), seat, r.passengerFirstName().trim(),
+                        r.passengerLastName().trim(), user, key, orderId.toString())).data();
+                return new Held(OrderItemVertical.FLIGHT, "UÇUŞ", flightSellerOrganizationId, hold.totalAmount(), hold.currency(),
+                        hold.expiresAt(), hold.holdId(), item -> {
+                            item.setProductRef(UUID.nameUUIDFromBytes(("flight:" + hold.flightNumber()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                            item.setDescription(flightDescription(hold));
+                            applyFlight(item, hold);
+                            policyResolver.applyConfigured(item);
+                        });
+            }
+        }
+        throw new IllegalStateException("unreachable");
+    }
+
+    private void releaseHoldQuietly(OrderItemVertical vertical, UUID holdId) {
+        try {
+            switch (vertical) {
+                case HOTEL -> hotelHoldClient.release(holdId);
+                case CAR -> carHoldClient.release(holdId);
+                case BUS -> busHoldClient.release(holdId);
+                case FLIGHT -> flightHoldClient.release(holdId);
+            }
+        } catch (RuntimeException e) {
+            log.error("Could not release {} hold {}; expiry scheduler will reclaim it", vertical, holdId, e);
+        }
+    }
+
     @Override
     public OrderResponse create(UUID actorUserId, OrderCreateRequest request) {
         requireIdentity(actorUserId);
@@ -436,7 +626,10 @@ public class OrderServiceImpl implements OrderService {
         // (redeemed or no-show) so a rejected cancel never leaves some items already settled. If payment-service is down
         // this throws 503 and the order stays unchanged.
         boolean allRefunded = true;
+        java.util.Set<UUID> alreadySettled = new java.util.HashSet<>(); // refunded at confirm, hold already released
         if (order.getStatus() == OrderStatus.CONFIRMED) {
+            orderItemRepository.findByOrderId(order.getId()).stream().filter(i -> i.getCancelOutcome() != null)
+                    .forEach(i -> alreadySettled.add(i.getId()));
             List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
             for (OrderItem item : items) {
                 var preview = paymentEscrowClient.preview(item.getId(), policyOf(item)).data();
@@ -457,6 +650,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Release hotel holds: if hotel-service is down this throws 503 and the order stays unchanged.
         for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
+            if (alreadySettled.contains(item.getId())) continue;
             if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
                 try {
                     hotelHoldClient.release(item.getFulfillmentRef());
@@ -495,31 +689,50 @@ public class OrderServiceImpl implements OrderService {
         Order order = findOrThrow(orderId);
         List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
         if (order.getStatus() == OrderStatus.CONFIRMED) {
-            voucherService.createForItems(items); // idempotent
+            voucherService.createForItems(items.stream().filter(i -> !"REFUND".equals(i.getCancelOutcome())).toList()); // idempotent
             return toInternal(order, items);
         }
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessRuleException("ORDER_NOT_PAYABLE", "Order is " + order.getStatus() + ", it cannot be marked paid");
         }
-        // Hold confirm is idempotent in hotel-service. A rejection (expired/released hold) propagates as 422 and
-        // payment-service then cancels the provider payment and rolls back its escrow.
+        // Hold confirm is idempotent. Single item: a rejection propagates (422) and payment-service cancels the provider
+        // payment and rolls back. Package (N > 1): a failed item is refunded alone and the rest is kept
+        // (PACKAGE-ORDER-CONTRACT.md section 4); if every item fails the first error propagates and all is rolled back.
+        List<OrderItem> confirmed = new java.util.ArrayList<>();
+        RuntimeException firstFailure = null;
         for (OrderItem item : items) {
-            if (item.getVertical() == OrderItemVertical.HOTEL && item.getFulfillmentRef() != null) {
-                hotelHoldClient.confirm(item.getFulfillmentRef());
-            } else if (item.getVertical() == OrderItemVertical.CAR && item.getFulfillmentRef() != null) {
-                carHoldClient.confirm(item.getFulfillmentRef());
-            } else if (item.getVertical() == OrderItemVertical.BUS && item.getFulfillmentRef() != null) {
-                busHoldClient.confirm(item.getFulfillmentRef());
-            } else if (item.getVertical() == OrderItemVertical.FLIGHT && item.getFulfillmentRef() != null) {
+            try {
+                confirmHold(item);
+                confirmed.add(item);
+            } catch (RuntimeException e) {
+                if (items.size() == 1) throw e;
+                log.error("Confirm of {} hold {} failed after payment, item will be refunded", item.getVertical(), item.getFulfillmentRef(), e);
+                if (firstFailure == null) firstFailure = e;
+                item.setCancelOutcome("REFUND");
+                item.setRefundAmount(item.getNetAmount() != null ? item.getNetAmount() : item.getSubtotal());
+                orderItemRepository.save(item);
+                releaseHoldQuietly(item.getVertical(), item.getFulfillmentRef());
+            }
+        }
+        if (confirmed.isEmpty() && firstFailure != null) throw firstFailure;
+        order.setStatus(OrderStatus.CONFIRMED);
+        order = orderRepository.saveAndFlush(order);
+        voucherService.createForItems(confirmed);
+        return toInternal(order, items);
+    }
+
+    private void confirmHold(OrderItem item) {
+        if (item.getFulfillmentRef() == null) return;
+        switch (item.getVertical()) {
+            case HOTEL -> hotelHoldClient.confirm(item.getFulfillmentRef());
+            case CAR -> carHoldClient.confirm(item.getFulfillmentRef());
+            case BUS -> busHoldClient.confirm(item.getFulfillmentRef());
+            case FLIGHT -> {
                 // confirm issues the ticket (PNR + e-ticket number), copy them onto the item
                 applyFlight(item, flightHoldClient.confirm(item.getFulfillmentRef()).data());
                 orderItemRepository.save(item);
             }
         }
-        order.setStatus(OrderStatus.CONFIRMED);
-        order = orderRepository.saveAndFlush(order);
-        voucherService.createForItems(items);
-        return toInternal(order, items);
     }
 
     private InternalOrderResponse toInternal(Order order, List<OrderItem> items) {
@@ -529,7 +742,10 @@ public class OrderServiceImpl implements OrderService {
                         i.getSupplierOrganizationId(), i.getSubtotal(), i.getCurrency(),
                         i.getGrossAmount() != null ? i.getGrossAmount() : i.getSubtotal(),
                         i.getDiscountAmount() != null ? i.getDiscountAmount() : BigDecimal.ZERO,
-                        i.getDiscountFundedBy())).toList());
+                        i.getDiscountFundedBy())).toList(),
+                order.getStatus() == OrderStatus.CONFIRMED
+                        ? items.stream().filter(i -> "REFUND".equals(i.getCancelOutcome())).map(OrderItem::getId).toList()
+                        : List.of());
     }
 
     private void requireIdentity(UUID actorUserId) {

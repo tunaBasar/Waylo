@@ -75,6 +75,14 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(orderService.createFlightOrder(userId, request), "Order created"));
     }
 
+    @PostMapping("/package")
+    public ResponseEntity<ApiResponse<OrderResponse>> createPackage(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @Valid @RequestBody com.waylo.packagebookingservice.dto.PackageOrderCreateRequest request) {
+        if ("ADMIN".equals(role)) throw new AccessDeniedException("Platform administrators cannot place orders, use a customer account", AccessDeniedException.ADMIN_CANNOT_PURCHASE);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(orderService.createPackageOrder(userId, request), "Order created"));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<OrderResponse>> getById(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,

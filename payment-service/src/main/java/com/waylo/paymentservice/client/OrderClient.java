@@ -24,7 +24,11 @@ public interface OrderClient {
     record Envelope<T>(boolean success, T data, String message) {}
 
     record OrderDto(UUID id, UUID customerId, String status, String currency, BigDecimal totalAmount,
-                    List<OrderItemDto> items) {}
+                    List<OrderItemDto> items, List<UUID> refundItemIds) {
+        public OrderDto(UUID id, UUID customerId, String status, String currency, BigDecimal totalAmount, List<OrderItemDto> items) {
+            this(id, customerId, status, currency, totalAmount, items, List.of());
+        }
+    }
 
     /** amount is the item subtotal = net, what the customer pays. grossAmount is the supplier price (commission base). vertical is the package-booking vertical name. */
     record OrderItemDto(UUID orderItemId, String vertical, UUID supplierOrganizationId, BigDecimal amount, String currency,

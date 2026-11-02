@@ -17,7 +17,7 @@ const stats: Stat[] = [
   { key: 'flights', label: 'Ucuslar', icon: 'flight', href: '/admin/flights', load: () => len(adminApi.flights()) },
   { key: 'airports', label: 'Havalimanlari', icon: 'flight_takeoff', href: '/admin/airports', load: () => len(adminApi.airports()) },
   { key: 'vehicles', label: 'Araclar', icon: 'directions_car', href: '/admin/vehicles', load: () => len(adminApi.vehicles()) },
-  { key: 'bookings', label: 'Rezervasyonlar', icon: 'confirmation_number', href: '/admin/bookings', load: () => len(api.get<unknown[]>('/api/bookings')) },
+  { key: 'bookings', label: 'Rezervasyonlar', icon: 'confirmation_number', href: '/admin/bookings', load: () => adminApi.orders({ size: 1 }).then(r => r.data.total) },
   { key: 'customers', label: 'Musteriler', icon: 'group', href: '/admin/customers', load: () => len(api.get<unknown[]>('/api/customers')) },
 ];
 

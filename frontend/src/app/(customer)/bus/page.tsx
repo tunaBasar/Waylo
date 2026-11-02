@@ -1,5 +1,6 @@
 'use client';
 
+import { AddToCartButton } from '@/components/AddToCartButton';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -225,6 +226,14 @@ export default function BusPage() {
               <button onClick={buy} disabled={!ready || buying}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
                 {buying ? 'Isleniyor' : 'Satin al'}</button>
+              <AddToCartButton disabled={!ready || buying || !user} build={() => ({
+                vertical: 'BUS', label: `${selected.fromCity ?? ''} - ${selected.toCity ?? ''} koltuk ${picked.map(p => p.seatNo).join(', ')}`,
+                amount: total, currency: selected.currency,
+                request: {
+                  tripId: selected.tripId, fromSeq: selected.fromSeq, toSeq: selected.toSeq,
+                  passengers: picked.map(p => ({ seatNo: p.seatNo, name: p.name.trim(), gender: p.gender })),
+                },
+              })} />
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { AddToCartButton } from '@/components/AddToCartButton';
 import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -313,6 +314,14 @@ function VehiclesContent() {
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
                   {renting === `${offer.category}-${offer.transmission}` ? 'Kiralanıyor...' : 'Kirala'}
                 </button>
+                <span className="ml-2"><AddToCartButton disabled={renting !== null || !user} build={() => ({
+                  vertical: 'CAR', label: `${offer.exampleModel}, ${formatLocalDateTime(toLocalDateTime(pickupDate, pickupTime))} - ${formatLocalDateTime(toLocalDateTime(returnDate, returnTime))}`, amount: offer.totalAmount,
+                  currency: offer.currency, request: {
+                    pickupBranchId: offer.pickupBranchId, returnBranchId: offer.returnBranchId, category: offer.category,
+                    transmission: offer.transmission, pickupAt: toLocalDateTime(pickupDate, pickupTime),
+                    returnAt: toLocalDateTime(returnDate, returnTime), driverAge: Number(driverAge),
+                  },
+                })} /></span>
               </div>
             </div>
           ))}

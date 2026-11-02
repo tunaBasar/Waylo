@@ -21,6 +21,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     List<OrderItem> findByOrderId(UUID orderId);
 
+    List<OrderItem> findByOrderIdIn(java.util.Collection<UUID> orderIds);
+
     @Query(value = """
             select new com.waylo.packagebookingservice.dto.PartnerOrderItemResponse(
                 i.id, o.id, cast(o.status as string), o.createdAt, i.description,

@@ -1,5 +1,6 @@
 'use client';
 
+import { AddToCartButton } from '@/components/AddToCartButton';
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -293,9 +294,15 @@ function QuoteContent() {
             <PromoCodeField vertical="OTEL" grossAmount={quote.totalAmount} currency={quote.currency} code={promoCode} onCodeChange={setPromoCode} />
           </div>
           {bookingError && <p className="text-sm text-error mb-3">{bookingError}</p>}
-          <button onClick={bookQuote} disabled={booking || !user} className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50">
-            {booking ? 'Rezervasyon olusturuluyor...' : 'Rezervasyon yap'}
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={bookQuote} disabled={booking || !user} className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50">
+              {booking ? 'Rezervasyon olusturuluyor...' : 'Rezervasyon yap'}
+            </button>
+            <AddToCartButton disabled={!user} build={() => ({
+              vertical: 'HOTEL', label: `${hotelName || 'Otel'} - ${quote.roomTypeName}`, amount: quote.totalAmount,
+              currency: quote.currency, expiresAt: quote.expiresAt, request: { quoteId: quote.quoteId },
+            })} />
+          </div>
         </div>
       )}
 

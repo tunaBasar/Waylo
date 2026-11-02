@@ -1,5 +1,6 @@
 'use client';
 
+import { AddToCartButton } from '@/components/AddToCartButton';
 import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -137,6 +138,19 @@ function OfferContent() {
                 <button disabled={busy} className="w-full rounded-lg bg-tertiary px-4 py-2 text-sm font-medium text-on-tertiary disabled:opacity-60">
                   {busy ? 'Siparis olusturuluyor...' : 'Siparis Olustur ve Ode'}
                 </button>
+                <div className="mt-2">
+                  <AddToCartButton disabled={busy || !user} build={() => {
+                    if (!isValidPassengerName(firstName) || !isValidPassengerName(lastName)) {
+                      setError('Ad ve soyad yalnizca harf icermeli, kimlikteki gibi yazin.');
+                      return null;
+                    }
+                    return {
+                      vertical: 'FLIGHT', label: `${offer.flightNumber} ${firstName.trim()} ${lastName.trim()}`, amount: offer.totalAmount,
+                      currency: offer.currency, expiresAt: offer.expiresAt,
+                      request: { offerId: offer.offerId, ...(seat ? { seatNumber: seat } : {}), passengerFirstName: firstName.trim(), passengerLastName: lastName.trim() },
+                    };
+                  }} />
+                </div>
                 <p className="mt-2 text-xs text-on-surface-variant">Siparisten sonra odemeyi Siparislerim sayfasindan yaparsiniz.</p>
               </div>
             </form>

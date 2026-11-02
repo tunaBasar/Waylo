@@ -15,7 +15,7 @@ const nav: NavItem[] = [
   { href: '/admin/car-documents', label: 'Arac Belgeleri', icon: 'assignment_turned_in' },
   { href: '/admin/bus-documents', label: 'Otobus Belgeleri', icon: 'assignment_turned_in' },
   { href: '/admin/bus-terminals', label: 'Otobus Duraklari', icon: 'directions_bus' },
-  { href: '/admin/bookings', label: 'Rezervasyonlar', icon: 'confirmation_number' },
+  { href: '/admin/bookings', label: 'Siparisler', icon: 'confirmation_number' },
   { href: '/admin/customers', label: 'Musteriler', icon: 'group' },
   { href: '/admin/campaigns', label: 'Kampanyalar', icon: 'sell' },
   { href: '/admin/payments', label: 'Odemeler', icon: 'payments' },

@@ -13,6 +13,7 @@ const baseNav: NavItem[] = [
   { href: '/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/vehicles', label: 'Araclar', icon: 'directions_car' },
   { href: '/bus', label: 'Otobus', icon: 'directions_bus' },
+  { href: '/cart', label: 'Sepet', icon: 'shopping_cart' },
   { href: '/orders', label: 'Siparislerim', icon: 'receipt_long' },
   { href: '/rentals', label: 'Kiralamalarim', icon: 'car_rental' },
   { href: '/profile', label: 'Profil', icon: 'person' },
