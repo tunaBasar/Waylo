@@ -21,6 +21,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +32,8 @@ class NotificationServiceImplTest {
     private NotificationRepository repository;
     @Mock
     private NotificationMapper mapper;
+    @Mock
+    private EmailService emailService;
 
     private NotificationServiceImpl service;
 
@@ -38,7 +42,7 @@ class NotificationServiceImplTest {
     private final UUID bookingId = UUID.randomUUID();
 
     private NotificationServiceImpl newService() {
-        return new NotificationServiceImpl(repository, mapper);
+        return new NotificationServiceImpl(repository, mapper, emailService);
     }
 
     private Notification buildNotification(UUID id, NotificationStatus status) {
@@ -73,6 +77,8 @@ class NotificationServiceImplTest {
         when(repository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
         NotificationResponse response = mock(NotificationResponse.class);
         when(mapper.toResponse(any(Notification.class))).thenReturn(response);
+
+        when(emailService.deliver(eq("test@waylo.com"), eq("Subject"), anyString())).thenReturn(EmailService.Delivery.SENT);
 
         NotificationResponse result = service.send(request);
 
@@ -171,6 +177,8 @@ class NotificationServiceImplTest {
         when(repository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
         when(mapper.toResponse(any(Notification.class))).thenReturn(response);
 
+        when(emailService.deliver(eq("test@waylo.com"), eq("Subject"), anyString())).thenReturn(EmailService.Delivery.SENT);
+
         NotificationResponse result = service.retry(notificationId);
 
         assertThat(result).isEqualTo(response);
@@ -191,5 +199,59 @@ class NotificationServiceImplTest {
 
         assertThatThrownBy(() -> service.retry(notificationId))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+    // --- real delivery outcome ---
+
+    private Notification mapped(NotificationType type, String recipient) {
+        Notification n = new Notification();
+        n.setCustomerId(customerId);
+        n.setType(type);
+        n.setRecipient(recipient);
+        n.setSubject("Subject");
+        n.setBody("Line <1>\nLine 2");
+        return n;
+    }
+
+    private Notification sendAndCapture(NotificationType type, String recipient) {
+        service = newService();
+        NotificationRequest request = new NotificationRequest(customerId, bookingId, type, recipient, "Subject", "Body");
+        when(mapper.toEntity(request)).thenReturn(mapped(type, recipient));
+        when(repository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
+        service.send(request);
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(repository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void send_suppressedDomain_isRecordedAsSuppressedNotSent() {
+        when(emailService.deliver(anyString(), anyString(), anyString())).thenReturn(EmailService.Delivery.SUPPRESSED);
+        Notification saved = sendAndCapture(NotificationType.EMAIL, "user@example.test");
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.SUPPRESSED);
+        assertThat(saved.getSentAt()).isNull();
+    }
+
+    @Test
+    void send_smtpFailure_isRecordedAsFailed() {
+        when(emailService.deliver(anyString(), anyString(), anyString())).thenThrow(new RuntimeException("smtp down"));
+        Notification saved = sendAndCapture(NotificationType.EMAIL, "user@waylo.com");
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.FAILED);
+        assertThat(saved.getSentAt()).isNull();
+    }
+
+    @Test
+    void send_smsWithoutProvider_staysPending() {
+        Notification saved = sendAndCapture(NotificationType.SMS, "+900000000000");
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.PENDING);
+        org.mockito.Mockito.verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void send_htmlEscapesBody() {
+        when(emailService.deliver(anyString(), anyString(), anyString())).thenReturn(EmailService.Delivery.SENT);
+        sendAndCapture(NotificationType.EMAIL, "user@waylo.com");
+        ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
+        verify(emailService).deliver(eq("user@waylo.com"), eq("Subject"), html.capture());
+        assertThat(html.getValue()).contains("Line &lt;1&gt;<br>Line 2").doesNotContain("<1>");
     }
 }

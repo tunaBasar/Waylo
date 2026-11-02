@@ -23,6 +23,7 @@ import com.waylo.packagebookingservice.dto.VoucherResponse;
 import com.waylo.packagebookingservice.event.OrderCancelledEvent;
 import com.waylo.packagebookingservice.event.OrderCreatedEvent;
 import com.waylo.packagebookingservice.event.OrderEventPublisher;
+import com.waylo.packagebookingservice.event.OrderPaidEvent;
 import com.waylo.packagebookingservice.exception.AccessDeniedException;
 import com.waylo.packagebookingservice.exception.AuthenticationRequiredException;
 import com.waylo.packagebookingservice.exception.BusinessRuleException;
@@ -626,6 +627,7 @@ public class OrderServiceImpl implements OrderService {
         // (redeemed or no-show) so a rejected cancel never leaves some items already settled. If payment-service is down
         // this throws 503 and the order stays unchanged.
         boolean allRefunded = true;
+        boolean wasPaid = order.getStatus() == OrderStatus.CONFIRMED;
         java.util.Set<UUID> alreadySettled = new java.util.HashSet<>(); // refunded at confirm, hold already released
         if (order.getStatus() == OrderStatus.CONFIRMED) {
             orderItemRepository.findByOrderId(order.getId()).stream().filter(i -> i.getCancelOutcome() != null)
@@ -672,7 +674,10 @@ public class OrderServiceImpl implements OrderService {
         if (allRefunded) pricingApplier.release(order.getId()); // promo is consumed when nothing was refunded
         voucherService.voidForOrder(order.getId());
 
-        eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId()));
+        eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId(), wasPaid, order.getCurrency(),
+                orderItemRepository.findByOrderId(order.getId()).stream()
+                        .map(i -> i.getRefundAmount() == null || !"REFUND".equals(i.getCancelOutcome()) ? BigDecimal.ZERO : i.getRefundAmount())
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
 
         return toResponse(order, orderItemRepository.findByOrderId(order.getId()));
     }
@@ -728,7 +733,26 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.CONFIRMED);
         order = orderRepository.saveAndFlush(order);
         voucherService.createForItems(confirmed);
+        eventPublisher.publishOrderPaid(paidEvent(order, confirmed));
         return toInternal(order, items);
+    }
+
+    /** Customer facing summary of the confirmed items. No voucher code or QR payload is ever put on the bus. */
+    private OrderPaidEvent paidEvent(Order order, List<OrderItem> confirmed) {
+        List<OrderPaidEvent.Item> list = confirmed.stream().map(i -> {
+            String start = null, end = null;
+            switch (i.getVertical()) {
+                case HOTEL -> { start = String.valueOf(i.getCheckIn()); end = String.valueOf(i.getCheckOut()); }
+                case CAR, BUS -> { start = i.getPickupAt() == null ? null : i.getPickupAt().toString();
+                                   end = i.getReturnAt() == null ? null : i.getReturnAt().toString(); }
+                case FLIGHT -> start = i.getDepartureAt() == null ? null : i.getDepartureAt().toString();
+            }
+            if ("null".equals(start)) start = null;
+            if ("null".equals(end)) end = null;
+            return new OrderPaidEvent.Item(i.getVertical().name(), i.getDescription(), start, end, i.getSubtotal());
+        }).toList();
+        BigDecimal total = confirmed.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new OrderPaidEvent(order.getId(), order.getCustomerId(), order.getCurrency(), total, list);
     }
 
     private void confirmHold(OrderItem item) {

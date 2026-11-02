@@ -86,7 +86,7 @@ def main():
         if row:
             break
         time.sleep(1)
-    check('notification stored for the customer (SENT, item id)', row.startswith('SENT|' + item_id), 'none' if not row else 'mismatch')
+    check('notification stored for the customer (SUPPRESSED test domain, item id)', row.startswith('SUPPRESSED|' + item_id), 'none' if not row else 'mismatch')
     check('recipient is the customer email', row.endswith('|' + cust), 'mismatch')
 
     failed = [n for n, ok in t.results if not ok]

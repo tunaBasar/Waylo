@@ -2,9 +2,11 @@ package com.waylo.notificationservice.controller;
 
 import com.waylo.notificationservice.domain.NotificationStatus;
 import com.waylo.notificationservice.domain.NotificationType;
-import com.waylo.notificationservice.dto.ApiResponse;
 import com.waylo.notificationservice.dto.NotificationRequest;
 import com.waylo.notificationservice.dto.NotificationResponse;
+import com.waylo.notificationservice.exception.AccessDeniedException;
+import com.waylo.notificationservice.exception.AuthenticationRequiredException;
+import com.waylo.notificationservice.exception.ResourceNotFoundException;
 import com.waylo.notificationservice.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,13 +14,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -32,76 +34,118 @@ class NotificationControllerTest {
 
     private final UUID notificationId = UUID.randomUUID();
     private final UUID customerId = UUID.randomUUID();
+    private final UUID other = UUID.randomUUID();
+    private final UUID admin = UUID.randomUUID();
     private final UUID bookingId = UUID.randomUUID();
 
-    private NotificationResponse buildResponse() {
-        return new NotificationResponse(notificationId, customerId, bookingId, NotificationType.EMAIL,
-                "test@waylo.com", "Subject", "Body", NotificationStatus.SENT, 0, Instant.now(), Instant.now(), Instant.now());
+    private NotificationResponse resp(UUID owner) {
+        return new NotificationResponse(notificationId, owner, bookingId, NotificationType.EMAIL,
+                "test@example.test", "Subject", "Body", NotificationStatus.SENT, 0, Instant.now(), Instant.now(), Instant.now());
     }
 
-    @Test
-    void send_returns201() {
-        NotificationRequest request = new NotificationRequest(customerId, bookingId, NotificationType.EMAIL,
-                "test@waylo.com", "Subject", "Body");
-        NotificationResponse response = buildResponse();
-        when(notificationService.send(any(NotificationRequest.class))).thenReturn(response);
-
-        ResponseEntity<ApiResponse<NotificationResponse>> result = controller.send(request);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(result.getBody().data()).isEqualTo(response);
+    private NotificationRequest req() {
+        return new NotificationRequest(customerId, bookingId, NotificationType.EMAIL, "t@example.test", "S", "B");
     }
 
-    @Test
-    void getById_returns200() {
-        NotificationResponse response = buildResponse();
-        when(notificationService.getById(notificationId)).thenReturn(response);
-
-        ResponseEntity<ApiResponse<NotificationResponse>> result = controller.getById(notificationId);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody().data()).isEqualTo(response);
+    // send
+    @Test void send_admin_201() {
+        when(notificationService.send(any())).thenReturn(resp(customerId));
+        assertThat(controller.send(admin.toString(), "ADMIN", req()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+    @Test void send_customer_403() {
+        assertThatThrownBy(() -> controller.send(customerId.toString(), "CUSTOMER", req())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(notificationService);
+    }
+    @Test void send_anonymous_401() {
+        assertThatThrownBy(() -> controller.send(null, null, req())).isInstanceOf(AuthenticationRequiredException.class);
     }
 
-    @Test
-    void getAll_returns200() {
-        when(notificationService.getAll()).thenReturn(List.of(buildResponse()));
-
-        ResponseEntity<ApiResponse<List<NotificationResponse>>> result = controller.getAll();
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody().data()).hasSize(1);
+    // getAll
+    @Test void getAll_admin_ok() {
+        when(notificationService.getAll()).thenReturn(List.of(resp(customerId)));
+        assertThat(controller.getAll(admin.toString(), "ADMIN").getBody().data()).hasSize(1);
+    }
+    @Test void getAll_customer_403() {
+        assertThatThrownBy(() -> controller.getAll(customerId.toString(), "CUSTOMER")).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void getAll_anonymous_401() {
+        assertThatThrownBy(() -> controller.getAll(null, null)).isInstanceOf(AuthenticationRequiredException.class);
+    }
+    @Test void getAll_malformedUserId_401() {
+        assertThatThrownBy(() -> controller.getAll("not-a-uuid", "ADMIN")).isInstanceOf(AuthenticationRequiredException.class);
     }
 
-    @Test
-    void getByCustomerId_returns200() {
-        when(notificationService.getByCustomerId(customerId)).thenReturn(List.of(buildResponse()));
-
-        ResponseEntity<ApiResponse<List<NotificationResponse>>> result = controller.getByCustomerId(customerId);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    // me
+    @Test void me_returnsOwnOnly() {
+        when(notificationService.getByCustomerId(customerId)).thenReturn(List.of(resp(customerId)));
+        assertThat(controller.mine(customerId.toString(), "CUSTOMER").getBody().data()).hasSize(1);
         verify(notificationService).getByCustomerId(customerId);
     }
-
-    @Test
-    void getByBookingId_returns200() {
-        when(notificationService.getByBookingId(bookingId)).thenReturn(List.of(buildResponse()));
-
-        ResponseEntity<ApiResponse<List<NotificationResponse>>> result = controller.getByBookingId(bookingId);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(notificationService).getByBookingId(bookingId);
+    @Test void me_anonymous_401() {
+        assertThatThrownBy(() -> controller.mine(null, null)).isInstanceOf(AuthenticationRequiredException.class);
     }
 
-    @Test
-    void retry_returns200() {
-        NotificationResponse retried = new NotificationResponse(notificationId, customerId, bookingId, NotificationType.EMAIL,
-                "test@waylo.com", "Subject", "Body", NotificationStatus.SENT, 1, Instant.now(), Instant.now(), Instant.now());
-        when(notificationService.retry(notificationId)).thenReturn(retried);
+    // getById
+    @Test void getById_owner_ok() {
+        when(notificationService.getById(notificationId)).thenReturn(resp(customerId));
+        assertThat(controller.getById(customerId.toString(), "CUSTOMER", notificationId).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+    @Test void getById_foreignCustomer_404() {
+        when(notificationService.getById(notificationId)).thenReturn(resp(customerId));
+        assertThatThrownBy(() -> controller.getById(other.toString(), "CUSTOMER", notificationId))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+    @Test void getById_admin_ok() {
+        when(notificationService.getById(notificationId)).thenReturn(resp(customerId));
+        assertThat(controller.getById(admin.toString(), "ADMIN", notificationId).getBody().data().customerId()).isEqualTo(customerId);
+    }
+    @Test void getById_anonymous_401() {
+        assertThatThrownBy(() -> controller.getById(null, null, notificationId)).isInstanceOf(AuthenticationRequiredException.class);
+    }
 
-        ResponseEntity<ApiResponse<NotificationResponse>> result = controller.retry(notificationId);
+    // by customer
+    @Test void byCustomer_self_ok() {
+        when(notificationService.getByCustomerId(customerId)).thenReturn(List.of(resp(customerId)));
+        assertThat(controller.getByCustomerId(customerId.toString(), "CUSTOMER", customerId).getBody().data()).hasSize(1);
+    }
+    @Test void byCustomer_other_403() {
+        assertThatThrownBy(() -> controller.getByCustomerId(other.toString(), "CUSTOMER", customerId))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(notificationService);
+    }
+    @Test void byCustomer_admin_ok() {
+        when(notificationService.getByCustomerId(customerId)).thenReturn(List.of(resp(customerId)));
+        assertThat(controller.getByCustomerId(admin.toString(), "ADMIN", customerId).getBody().data()).hasSize(1);
+    }
+    @Test void byCustomer_anonymous_401() {
+        assertThatThrownBy(() -> controller.getByCustomerId(null, null, customerId)).isInstanceOf(AuthenticationRequiredException.class);
+    }
 
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody().data().retryCount()).isEqualTo(1);
+    // by booking
+    @Test void byBooking_customerSeesOnlyOwn() {
+        when(notificationService.getByBookingId(bookingId)).thenReturn(List.of(resp(customerId), resp(other)));
+        List<NotificationResponse> r = controller.getByBookingId(customerId.toString(), "CUSTOMER", bookingId).getBody().data();
+        assertThat(r).hasSize(1);
+        assertThat(r.get(0).customerId()).isEqualTo(customerId);
+    }
+    @Test void byBooking_adminSeesAll() {
+        when(notificationService.getByBookingId(bookingId)).thenReturn(List.of(resp(customerId), resp(other)));
+        assertThat(controller.getByBookingId(admin.toString(), "ADMIN", bookingId).getBody().data()).hasSize(2);
+    }
+    @Test void byBooking_anonymous_401() {
+        assertThatThrownBy(() -> controller.getByBookingId(null, null, bookingId)).isInstanceOf(AuthenticationRequiredException.class);
+    }
+
+    // retry
+    @Test void retry_admin_ok() {
+        when(notificationService.retry(notificationId)).thenReturn(resp(customerId));
+        assertThat(controller.retry(admin.toString(), "ADMIN", notificationId).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+    @Test void retry_customerEvenOwner_403() {
+        assertThatThrownBy(() -> controller.retry(customerId.toString(), "CUSTOMER", notificationId)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(notificationService);
+    }
+    @Test void retry_anonymous_401() {
+        assertThatThrownBy(() -> controller.retry(null, null, notificationId)).isInstanceOf(AuthenticationRequiredException.class);
     }
 }

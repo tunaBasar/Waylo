@@ -18,6 +18,10 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
+/**
+ * LEGACY: consumes booking-events of the old PackageBooking model. The Order model publishes order-events
+ * (see OrderEventListener). Kept so old messages still work, nothing breaks when no legacy events arrive.
+ */
 @Component
 public class BookingEventListener {
 

@@ -9,6 +9,7 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   SENT: { label: 'Gonderildi', class: 'bg-secondary-container text-on-secondary-container' },
   PENDING: { label: 'Beklemede', class: 'bg-primary-fixed text-primary' },
   FAILED: { label: 'Basarisiz', class: 'bg-error-container text-on-error-container' },
+  SUPPRESSED: { label: 'Gonderilmedi (test adresi)', class: 'bg-surface-container text-on-surface-variant' },
   RETRYING: { label: 'Tekrar', class: 'bg-tertiary-fixed text-on-tertiary-fixed-variant' },
 };
 const typeIcons: Record<string, string> = { EMAIL: 'mail', SMS: 'sms', PUSH: 'notifications_active' };

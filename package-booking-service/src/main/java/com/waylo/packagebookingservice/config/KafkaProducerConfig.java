@@ -30,6 +30,7 @@ public class KafkaProducerConfig {
             "bookingCreated:com.waylo.packagebookingservice.event.BookingCreatedEvent,"
           + "bookingCancelled:com.waylo.packagebookingservice.event.BookingCancelledEvent,"
           + "orderCreated:com.waylo.packagebookingservice.event.OrderCreatedEvent,"
+          + "orderPaid:com.waylo.packagebookingservice.event.OrderPaidEvent,"
           + "orderCancelled:com.waylo.packagebookingservice.event.OrderCancelledEvent,"
           + "orderItemRedeemed:com.waylo.packagebookingservice.event.OrderItemRedeemedEvent";
 

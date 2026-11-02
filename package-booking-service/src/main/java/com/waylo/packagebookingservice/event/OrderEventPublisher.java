@@ -20,6 +20,11 @@ public class OrderEventPublisher {
         kafkaTemplate.send(KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
     }
 
+    public void publishOrderPaid(OrderPaidEvent event) {
+        log.info("Publishing OrderPaidEvent: orderId={}", event.getOrderId());
+        kafkaTemplate.send(KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+    }
+
     public void publishOrderCancelled(OrderCancelledEvent event) {
         log.info("Publishing OrderCancelledEvent: orderId={}", event.getOrderId());
         kafkaTemplate.send(KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);

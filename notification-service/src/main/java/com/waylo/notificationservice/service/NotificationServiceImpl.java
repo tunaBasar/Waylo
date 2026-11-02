@@ -25,21 +25,47 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository repository;
     private final NotificationMapper mapper;
+    private final EmailService emailService;
 
-    public NotificationServiceImpl(NotificationRepository repository, NotificationMapper mapper) {
+    public NotificationServiceImpl(NotificationRepository repository, NotificationMapper mapper, EmailService emailService) {
         this.repository = repository;
         this.mapper = mapper;
+        this.emailService = emailService;
+    }
+
+    /**
+     * Records the real delivery outcome. EMAIL goes through {@link EmailService#deliver}: SENT only when SMTP accepted it,
+     * SUPPRESSED for reserved/test domains, FAILED on SMTP error (retry can try again). SMS and PUSH have no provider yet,
+     * so they stay PENDING instead of claiming to be sent.
+     */
+    private void attempt(Notification notification) {
+        if (notification.getType() != NotificationType.EMAIL) {
+            notification.setStatus(NotificationStatus.PENDING);
+            return;
+        }
+        try {
+            String html = "<p>" + escape(notification.getBody()).replace("\n", "<br>") + "</p>";
+            EmailService.Delivery d = emailService.deliver(notification.getRecipient(), notification.getSubject(), html);
+            notification.setStatus(d == EmailService.Delivery.SENT ? NotificationStatus.SENT : NotificationStatus.SUPPRESSED);
+            if (d == EmailService.Delivery.SENT) notification.setSentAt(Instant.now());
+        } catch (RuntimeException ex) {
+            log.warn("Notification delivery failed: id={}, reason={}", notification.getId(), ex.getMessage());
+            notification.setStatus(NotificationStatus.FAILED);
+        }
+    }
+
+    static String escape(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     @Override
     public NotificationResponse send(NotificationRequest request) {
         Notification notification = mapper.toEntity(request);
-        // Mock: mark as sent immediately
-        notification.setStatus(NotificationStatus.SENT);
-        notification.setSentAt(Instant.now());
+        attempt(notification);
         notification = repository.save(notification);
-        log.info("Notification sent: id={}, type={}, recipient={}",
-                notification.getId(), notification.getType(), notification.getRecipient());
+        log.info("Notification recorded: id={}, type={}, status={}",
+                notification.getId(), notification.getType(), notification.getStatus());
         return mapper.toResponse(notification);
     }
 
@@ -66,13 +92,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public NotificationResponse retry(UUID id) {
         Notification notification = findOrThrow(id);
-        notification.setStatus(NotificationStatus.RETRYING);
         notification.setRetryCount(notification.getRetryCount() + 1);
-        // Mock: mark as sent after retry
-        notification.setStatus(NotificationStatus.SENT);
-        notification.setSentAt(Instant.now());
+        attempt(notification);
         notification = repository.save(notification);
-        log.info("Notification retried: id={}, retryCount={}", notification.getId(), notification.getRetryCount());
+        log.info("Notification retried: id={}, retryCount={}, status={}", notification.getId(), notification.getRetryCount(), notification.getStatus());
         return mapper.toResponse(notification);
     }
 

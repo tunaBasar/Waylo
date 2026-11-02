@@ -41,6 +41,7 @@ public class KafkaConsumerConfig {
             "bookingCreated:com.waylo.crmservice.event.BookingCreatedEvent,"
           + "bookingCancelled:com.waylo.crmservice.event.BookingCancelledEvent,"
           + "orderCreated:com.waylo.crmservice.event.OrderEvent,"
+          + "orderPaid:com.waylo.crmservice.event.OrderEvent,"
           + "orderCancelled:com.waylo.crmservice.event.OrderEvent,"
           + "orderItemRedeemed:com.waylo.crmservice.event.OrderEvent";
 

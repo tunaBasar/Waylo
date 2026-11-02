@@ -84,6 +84,11 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlMail(to, subject, htmlContent);
     }
 
+    @Override
+    public Delivery deliver(String to, String subject, String htmlContent) {
+        return sendHtmlMail(to, subject, htmlContent) ? Delivery.SENT : Delivery.SUPPRESSED;
+    }
+
     private boolean sendHtmlMail(String to, String subject, String htmlContent) {
         String domain = mailDomain(to);
         if (domain == null) {
