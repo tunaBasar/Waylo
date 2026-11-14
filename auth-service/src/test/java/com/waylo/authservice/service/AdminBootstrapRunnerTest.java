@@ -86,9 +86,61 @@ class AdminBootstrapRunnerTest {
         verifyNoInteractions(repo);
     }
 
+    private User verifiedUser(boolean verified) {
+        User u = new User();
+        u.setEmail("a@b.com");
+        u.setRole(UserRole.USER);
+        u.setEmailVerified(verified);
+        return u;
+    }
+
     @Test
-    void onlyOneVarSetDoesNothing() {
+    void emailOnlyPromotesVerifiedUserWhenNoAdminExists() {
+        User u = verifiedUser(true);
+        when(repo.countByRole(UserRole.ADMIN)).thenReturn(0L);
+        when(repo.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(u));
+
+        runner(" A@B.com ", "").run(null);
+
+        assertEquals(UserRole.ADMIN, u.getRole());
+        verify(repo).save(u);
+    }
+
+    @Test
+    void emailOnlyDoesNothingWhenAdminAlreadyExists() {
+        when(repo.countByRole(UserRole.ADMIN)).thenReturn(1L);
+
         runner("a@b.com", "").run(null);
+
+        verify(repo, never()).save(any());
+        verify(repo, never()).findByEmailIgnoreCase(any());
+    }
+
+    @Test
+    void emailOnlyDoesNothingForUnverifiedUser() {
+        User u = verifiedUser(false);
+        when(repo.countByRole(UserRole.ADMIN)).thenReturn(0L);
+        when(repo.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(u));
+
+        runner("a@b.com", "").run(null);
+
+        assertEquals(UserRole.USER, u.getRole());
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void emailOnlyDoesNotCreateMissingUser() {
+        when(repo.countByRole(UserRole.ADMIN)).thenReturn(0L);
+        when(repo.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.empty());
+
+        runner("a@b.com", "").run(null);
+
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void nothingSetOrPasswordOnlyDoesNothing() {
+        runner("", "").run(null);
         runner("", "secret12345").run(null);
 
         verifyNoInteractions(repo);

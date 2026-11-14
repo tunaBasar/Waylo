@@ -1,10 +1,10 @@
 # Infra review: api-gateway, config-service, discovery-service, compose
 
-Fixed in this pass: gateway `gateway` actuator endpoint removed, order-create and voucher-redeem rate limits, `%00` rejected, infra ports bound to 127.0.0.1. Everything below is open.
+Fixed in this pass: gateway `gateway` actuator endpoint removed, order-create and voucher-redeem rate limits, `%00` rejected, infra ports bound to 127.0.0.1. Since then (2026-11-14): Eureka and config-service HTTP basic auth, env-driven CORS. Items marked ~~struck~~ are fixed.
 
 ## Prioritized open items
 
-1. **Eureka and config-service have no authentication** (medium, network-only).
+1. ~~**Eureka and config-service have no authentication**~~ FIXED 2026-11-14: spring-security HTTP basic on both (`/actuator/health` permitted), creds from EUREKA_USER/EUREKA_PASSWORD and CONFIG_USER/CONFIG_PASSWORD, all clients updated, compose uses dev-only `:-dev-...` defaults (set real values in .env for any shared deployment). Unauthenticated `/eureka/apps` and `/application/default` return 401. Original finding:
    `discovery-service/src/main/resources/application.yml:1-21` and `config-service/src/main/resources/application.yml:1-20` have no security starter. Anyone on the docker network can register a fake instance (traffic hijack via `lb://`) or read `/application/default`. Now bound to localhost on the host, so only containers reach them.
    Fix: Spring Security basic auth on both, creds via `:?` env, update every `defaultZone` and config import. Open decision: do now or accept network isolation for MVP.
 2. ~~Config-service health `show-details: always`~~ fixed by coordinator (`when-authorized`).
@@ -12,7 +12,7 @@ Fixed in this pass: gateway `gateway` actuator endpoint removed, order-create an
 4. Real Gmail address as default for MAIL_USERNAME removed by coordinator (compose + notification application.yml now default empty; .env keeps the value). Still open: `notification-service application.yml` `from:` address is the same mailbox (user decision: keep or use a domain sender).
 5. **0.0.0.0 bindings**: `docker-compose.yml:152` (gateway 8080) and frontend `:706` (3000). Intended per brief. Postgres/redis/pgadmin/config/eureka were changed to 127.0.0.1 in the file but take effect only when those containers are next recreated (not restarted now, per rules).
 6. Rate limit fails open when Redis is down (`AuthRateLimitFilter.java` onErrorResume). Deliberate. Limits are per IP, fixed window, in-gateway only: new order/voucher limits (30/min/IP each) are tunable via `waylo.gateway.order-create-per-minute` and `voucher-redeem-per-minute`. Per-user limits are not implemented.
-7. CORS: single origin `http://localhost:3000` with credentials (`api-gateway application.yml` globalcors), `allowed-headers: "*"`. Fine for dev, must be set per environment for prod (currently hardcoded, not env-driven).
+7. ~~CORS hardcoded~~ FIXED 2026-11-14: origins from `WAYLO_CORS_ORIGINS` (comma list, default `http://localhost:3000,http://localhost:8081`), credentials kept. Remaining: `allowed-headers: "*"` and a real prod origin list must be set per environment.
 8. Gateway path check rejects any `;`, `//`, `%2e`, `%2f`, `%5c`, `\`, `%00`. Note this also rejects legitimate encoded slashes in IDs. Acceptable.
 9. Eureka self-preservation is disabled (`discovery-service application.yml:16`): good for dev, evicts instances on network blips in prod. Dashboard `/` is open (200) on localhost only.
 10. `/api/admin/**` and `/api/organizations/**` catch-all routes go to auth-service; authorization is by downstream role checks, gateway only verifies token. `/api/admin/orders` etc. have specific routes first. Verified spoofed ADMIN header without token yields 401.

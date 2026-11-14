@@ -106,6 +106,9 @@ services:
       - "127.0.0.1:8888:8888"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
+      # DEV defaults only: set real values in .env for any shared/prod deployment
+      CONFIG_USER: "${CONFIG_USER:-config}"
+      CONFIG_PASSWORD: "${CONFIG_PASSWORD:-dev-config-password}"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health"]
       interval: 10s
@@ -127,7 +130,10 @@ services:
       - "127.0.0.1:8761:8761"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      # DEV defaults only: set real values in .env for any shared/prod deployment
+      EUREKA_USER: "${EUREKA_USER:-eureka}"
+      EUREKA_PASSWORD: "${EUREKA_PASSWORD:-dev-eureka-password}"
     depends_on:
       config-service:
         condition: service_healthy
@@ -152,10 +158,11 @@ services:
       - "8080:8080"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
       SPRING_DATA_REDIS_HOST: redis
+      WAYLO_CORS_ORIGINS: "${WAYLO_CORS_ORIGINS:-http://localhost:3000,http://localhost:8081}"
     depends_on:
       discovery-service:
         condition: service_healthy
@@ -182,8 +189,8 @@ services:
       - "127.0.0.1:${FLIGHT_SERVICE_PORT:-18081}:8081"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/flight_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -219,8 +226,8 @@ services:
       - "127.0.0.1:8082:8082"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/flight_seat_inventory_db"
       SPRING_DATASOURCE_USERNAME: waylo
@@ -257,8 +264,8 @@ services:
       - "127.0.0.1:8083:8083"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/hotel_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -295,8 +302,8 @@ services:
       - "127.0.0.1:8084:8084"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/car_rental_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -338,8 +345,8 @@ services:
       - "127.0.0.1:8096:8096"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/bus_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -378,8 +385,8 @@ services:
       VOUCHER_SECRET: "${VOUCHER_SECRET:?VOUCHER_SECRET must be set in .env}"
       FLIGHT_SELLER_ORGANIZATION_ID: "${FLIGHT_SELLER_ORGANIZATION_ID:-}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/package_booking_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -416,8 +423,8 @@ services:
     environment:
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/pricing_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -455,8 +462,8 @@ services:
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       WAYLO_PAYMENTS_PROVIDER: "${WAYLO_PAYMENTS_PROVIDER:-TEST}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/payment_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -492,8 +499,8 @@ services:
       - "127.0.0.1:${CRM_SERVICE_PORT:-18088}:8088"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/crm_db"
       SPRING_DATASOURCE_USERNAME: waylo
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
@@ -531,8 +538,8 @@ services:
       - "127.0.0.1:8089:8089"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/checkin_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -570,8 +577,8 @@ services:
     environment:
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/notification_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -606,8 +613,8 @@ services:
       - "127.0.0.1:8092:8092"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/auth_db"
       SPRING_DATASOURCE_USERNAME: waylo
@@ -646,8 +653,8 @@ services:
     environment:
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env}"
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8761/eureka/"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:-dev-eureka-password}@discovery-service:8761/eureka/"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/saga_db"
       SPRING_DATASOURCE_USERNAME: waylo
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
@@ -683,7 +690,7 @@ services:
       - "127.0.0.1:8095:8095"
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx128m"
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://config-service:8888"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:-dev-config-password}@config-service:8888"
     depends_on:
       api-gateway:
         condition: service_healthy

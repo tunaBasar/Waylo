@@ -15,6 +15,6 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
 
     List<Branch> findByIdIn(Collection<UUID> ids);
 
-    @Query("select b from Branch b where b.active = true and (:city is null or lower(b.city) = lower(:city)) order by b.city, b.name")
+    @Query("select b from Branch b where b.active = true and (cast(:city as string) is null or lower(b.city) = lower(cast(:city as string))) order by b.city, b.name")
     List<Branch> findActive(@Param("city") String city);
 }

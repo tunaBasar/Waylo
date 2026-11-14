@@ -15,7 +15,10 @@ import java.util.Locale;
 import com.waylo.authservice.validation.PasswordPolicy;
 import java.util.Optional;
 
-/** Ensures a platform admin exists from WAYLO_BOOTSTRAP_ADMIN_EMAIL / _PASSWORD. Idempotent. */
+/**
+ * Platform admin bootstrap. EMAIL only: promotes that existing, email-verified user if no ADMIN exists yet.
+ * EMAIL + PASSWORD (dev/seed): creates or promotes that user. Idempotent.
+ */
 @Component
 public class AdminBootstrapRunner implements ApplicationRunner {
 
@@ -42,8 +45,12 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         if (!hasEmail && !hasPassword) {
             return;
         }
+        if (hasEmail && !hasPassword) {
+            promoteExistingIfNoAdmin(email.trim().toLowerCase(Locale.ROOT));
+            return;
+        }
         if (hasEmail != hasPassword) {
-            log.warn("Bootstrap admin skipped: both WAYLO_BOOTSTRAP_ADMIN_EMAIL and WAYLO_BOOTSTRAP_ADMIN_PASSWORD must be set");
+            log.warn("Bootstrap admin skipped: WAYLO_BOOTSTRAP_ADMIN_PASSWORD set without WAYLO_BOOTSTRAP_ADMIN_EMAIL");
             return;
         }
         String normalized = email.trim().toLowerCase(Locale.ROOT);
@@ -75,6 +82,30 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             log.info("Bootstrap admin ensured: {} {}", outcome, normalized);
         } catch (RuntimeException e) {
             log.error("Bootstrap admin failed for {}: {}", normalized, e.getClass().getSimpleName());
+        }
+    }
+
+    /** Email-only mode: once, promote an existing email-verified user when the platform has no ADMIN. */
+    private void promoteExistingIfNoAdmin(String normalized) {
+        try {
+            if (userRepository.countByRole(UserRole.ADMIN) > 0) {
+                return;
+            }
+            Optional<User> existing = userRepository.findByEmailIgnoreCase(normalized);
+            if (existing.isEmpty()) {
+                log.warn("Bootstrap admin skipped: no user registered with the configured email");
+                return;
+            }
+            User user = existing.get();
+            if (!user.isEmailVerified()) {
+                log.warn("Bootstrap admin skipped: configured user has not verified their email");
+                return;
+            }
+            user.setRole(UserRole.ADMIN);
+            userRepository.save(user);
+            log.info("AUDIT bootstrap admin: promoted user {} (id={}) to ADMIN", normalized, user.getId());
+        } catch (RuntimeException e) {
+            log.error("Bootstrap admin promotion failed: {}", e.getClass().getSimpleName());
         }
     }
 }

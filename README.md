@@ -40,6 +40,10 @@ Başlatmanın tamamlanması için `docker compose up -d --build --wait --wait-ti
 
 Frontend şu an tarayıcıdan `localhost:8080` adresine bağlanır. Bu kurulum yerel geliştirme içindir, uzaktan erişim/production deployment için API adresi ve güvenlik ayarları ayrıca yapılandırılmalıdır.
 
+## İlk platform ADMIN (bootstrap)
+
+`.env` içinde `WAYLO_BOOTSTRAP_ADMIN_EMAIL` tanımlıysa (PASSWORD olmadan) auth-service açılışında, sistemde hiç ADMIN yoksa bu e-postaya sahip mevcut ve e-postası doğrulanmış kullanıcı bir kez ADMIN yapılır ve denetim satırı loglanır. ADMIN zaten varsa hiçbir şey yapmaz. Kullanıcı önce normal kayıt olup e-postasını doğrulamalıdır. (EMAIL + PASSWORD birlikte verilirse dev/seed modu: kullanıcı yoksa oluşturulur.)
+
 ## SMTP
 
 Proje kökünde, Git tarafından dışlanan `.env` dosyasını oluşturun (`.env.example` örnektir):

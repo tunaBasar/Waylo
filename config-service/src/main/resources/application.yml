@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: config-service
+  security:
+    user:
+      name: ${CONFIG_USER:config}
+      password: ${CONFIG_PASSWORD}
   profiles:
     active: native
   cloud:

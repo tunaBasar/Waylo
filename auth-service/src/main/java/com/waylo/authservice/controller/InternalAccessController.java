@@ -4,6 +4,8 @@ import com.waylo.authservice.domain.Permission;
 import com.waylo.authservice.dto.AccessDecision;
 import com.waylo.authservice.service.AccessService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,5 +43,11 @@ public class InternalAccessController {
 
         AccessDecision decision = accessService.check(userId, organizationId, hotelId, permission);
         return ResponseEntity.ok(decision);
+    }
+
+    /** Invalid UUID or unknown Permission value: client error, not 403. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Void> handleBadParam(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest().build();
     }
 }
