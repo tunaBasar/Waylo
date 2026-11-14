@@ -70,9 +70,7 @@ public class VoucherRedemptionService {
             throw new VoucherException("TOO_MANY_ATTEMPTS", HttpStatus.TOO_MANY_REQUESTS);
         }
         try {
-            RedeemResponse response = tx.execute(status -> doRedeem(userId, orgId, payload));
-            publishRedeemed(response);
-            return response;
+            return tx.execute(status -> doRedeem(userId, orgId, payload));
         } catch (VoucherException e) {
             limiter.recordFailure(orgId);
             throw e;
@@ -109,6 +107,9 @@ public class VoucherRedemptionService {
         v.setRedeemedByUserId(userId);
         voucherRepository.saveAndFlush(v);
 
+        // Outbox row joins this transaction: it commits with the redemption and rolls back with it. Written before the
+        // remote escrow release so an outbox failure rolls back before money moves.
+        publishRedeemed(item);
         // Any failure here (503 payment unavailable, 422 escrow state) propagates and rolls the voucher back to ACTIVE.
         PaymentEscrowClient.EscrowDto escrow = paymentEscrowClient.release(item.getId()).data();
         log.info("Voucher {} redeemed by org {}", v.getId(), orgId);
@@ -116,20 +117,13 @@ public class VoucherRedemptionService {
                 escrow == null ? null : escrow.supplierAmount(), escrow == null ? item.getCurrency() : escrow.currency(), now);
     }
 
-    /** After commit, fail-soft: a Kafka problem must never undo a committed redemption. */
-    private void publishRedeemed(RedeemResponse r) {
-        try {
-            OrderItem item = orderItemRepository.findById(r.orderItemId()).orElse(null);
-            if (item == null) return;
-            var order = orderRepository.findById(item.getOrderId()).orElse(null);
-            if (order == null) return;
-            java.math.BigDecimal amount = item.getGrossAmount() != null ? item.getGrossAmount()
-                    : item.getUnitAmount().multiply(java.math.BigDecimal.valueOf(item.getQuantity()));
-            eventPublisher.publishOrderItemRedeemed(new OrderItemRedeemedEvent(
-                    order.getId(), item.getId(), order.getCustomerId(), item.getCurrency(), amount));
-        } catch (RuntimeException e) {
-            log.warn("ORDER_ITEM_REDEEMED publish failed for item {}: {}", r.orderItemId(), e.getMessage());
-        }
+    private void publishRedeemed(OrderItem item) {
+        var order = orderRepository.findById(item.getOrderId()).orElse(null);
+        if (order == null) return;
+        java.math.BigDecimal amount = item.getGrossAmount() != null ? item.getGrossAmount()
+                : item.getUnitAmount().multiply(java.math.BigDecimal.valueOf(item.getQuantity()));
+        eventPublisher.publishOrderItemRedeemed(new OrderItemRedeemedEvent(
+                order.getId(), item.getId(), order.getCustomerId(), item.getCurrency(), amount));
     }
 
     private static VoucherException invalid() {

@@ -130,7 +130,7 @@ class VoucherRedemptionServiceTest {
     }
 
     @Test
-    void redeem_publishesOrderItemRedeemed_afterCommit_andPublishFailureDoesNotFailRedeem() {
+    void redeem_queuesOrderItemRedeemedOutboxEvent_inRedeemTransaction() {
         UUID orderId = UUID.randomUUID(), customer = UUID.randomUUID();
         item.setOrderId(orderId);
         var order = new com.waylo.packagebookingservice.domain.Order();
@@ -144,9 +144,6 @@ class VoucherRedemptionServiceTest {
         assertThat(cap.getValue().getOrderItemId()).isEqualTo(item.getId());
         assertThat(cap.getValue().getAmount()).isEqualByComparingTo("100.00");
         assertThat(cap.getValue().getEventType()).isEqualTo("ORDER_ITEM_REDEEMED");
-        doThrow(new RuntimeException("kafka down")).when(publisher).publishOrderItemRedeemed(any());
-        voucher.setStatus(VoucherStatus.ACTIVE);
-        assertThat(service.redeem(user, org, payload).amountReleased()).isEqualByComparingTo("90.00");
     }
 
     @Test

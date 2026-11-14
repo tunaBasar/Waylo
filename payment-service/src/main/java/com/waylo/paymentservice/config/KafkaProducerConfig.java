@@ -26,7 +26,7 @@ public class KafkaProducerConfig {
      * Must stay in sync with the TYPE_MAPPINGS token names used by every consumer
      * (notification-service).
      */
-    private static final String TYPE_MAPPINGS =
+    public static final String TYPE_MAPPINGS =
             "paymentCompleted:com.waylo.paymentservice.event.PaymentCompletedEvent,"
           + "paymentRefunded:com.waylo.paymentservice.event.PaymentRefundedEvent";
 
@@ -46,5 +46,20 @@ public class KafkaProducerConfig {
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
+    }
+
+    /** Raw string producer used by OutboxRelay: the payload is already serialized JSON stored in outbox_event. */
+    @Bean
+    public KafkaTemplate<String, String> outboxKafkaTemplate() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 3000);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 8000);
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 4000);
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(props));
     }
 }
