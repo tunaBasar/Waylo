@@ -1,5 +1,6 @@
 package com.waylo.hotelservice.service;
 
+import com.waylo.hotelservice.client.ActiveOrganizationIdsCache;
 import com.waylo.hotelservice.client.AuthAccessClient;
 import com.waylo.hotelservice.domain.Hotel;
 import com.waylo.hotelservice.dto.HotelMapper;
@@ -39,7 +40,6 @@ class HotelServiceImplTest {
     @Mock
     private AuthAccessClient authAccessClient;
 
-    @InjectMocks
     private HotelServiceImpl hotelService;
 
     private final UUID testId = UUID.randomUUID();
@@ -47,6 +47,7 @@ class HotelServiceImplTest {
 
     @BeforeEach
     void setUpDefaultActiveOrg() {
+        hotelService = new HotelServiceImpl(hotelRepository, hotelMapper, new ActiveOrganizationIdsCache(authAccessClient, 0));
         // Default: the test hotel's org is active, so existing getAll/search tests (which build
         // hotels with orgId via buildHotel) keep passing without each test stubbing this.
         when(authAccessClient.activeOrganizationIds()).thenReturn(List.of(orgId));

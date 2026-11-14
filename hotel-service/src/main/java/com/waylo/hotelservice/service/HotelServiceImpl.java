@@ -1,6 +1,6 @@
 package com.waylo.hotelservice.service;
 
-import com.waylo.hotelservice.client.AuthAccessClient;
+import com.waylo.hotelservice.client.ActiveOrganizationIdsCache;
 import com.waylo.hotelservice.domain.Hotel;
 import com.waylo.hotelservice.dto.HotelMapper;
 import com.waylo.hotelservice.dto.HotelRequest;
@@ -27,12 +27,12 @@ public class HotelServiceImpl implements HotelService {
 
     private final HotelRepository hotelRepository;
     private final HotelMapper hotelMapper;
-    private final AuthAccessClient authAccessClient;
+    private final ActiveOrganizationIdsCache activeOrganizations;
 
-    public HotelServiceImpl(HotelRepository hotelRepository, HotelMapper hotelMapper, AuthAccessClient authAccessClient) {
+    public HotelServiceImpl(HotelRepository hotelRepository, HotelMapper hotelMapper, ActiveOrganizationIdsCache activeOrganizations) {
         this.hotelRepository = hotelRepository;
         this.hotelMapper = hotelMapper;
-        this.authAccessClient = authAccessClient;
+        this.activeOrganizations = activeOrganizations;
     }
 
     @Override
@@ -179,7 +179,7 @@ public class HotelServiceImpl implements HotelService {
 
         List<UUID> activeOrgIdList;
         try {
-            activeOrgIdList = authAccessClient.activeOrganizationIds();
+            activeOrgIdList = activeOrganizations.get();
         } catch (RuntimeException e) {
             log.warn("Failed to fetch active organization ids for public hotel projection, hiding organization-owned hotels: {}", e.getMessage());
             activeOrgIdList = null;
