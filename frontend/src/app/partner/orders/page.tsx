@@ -18,8 +18,11 @@ function statusTone(s: PartnerOrderStatus): 'success' | 'warning' | 'error' | 'n
   return s === 'CONFIRMED' ? 'success' : s === 'PENDING' ? 'warning' : 'error';
 }
 
+// Hotel stays are date-only (YYYY-MM-DD). formatDate would parse them as UTC midnight and print a fake local time.
+const formatDay = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+
 function dates(i: PartnerOrderItem): string | null {
-  if (i.checkIn && i.checkOut) return `${formatDate(i.checkIn)} - ${formatDate(i.checkOut)}`;
+  if (i.checkIn && i.checkOut) return `${formatDay(i.checkIn)} - ${formatDay(i.checkOut)}`;
   if (i.pickupAt && i.returnAt) return `${formatDate(i.pickupAt)} - ${formatDate(i.returnAt)}`;
   return null;
 }
