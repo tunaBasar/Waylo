@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setSessionExpiredListener, type AuthData, type Profile } from '@/api';
+import { defaultPushDeps, registerForPush, unregisterFromPush } from '@/features/push/registration';
 
 interface AuthState {
   user: Profile | null;
@@ -45,12 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const d = await api.publicPost<AuthData>('/api/auth/login', { email, password });
     await api.tokens.set({ token: d.token, refreshToken: d.refreshToken });
     await refreshProfile();
+    void registerForPush(defaultPushDeps);
   }, [refreshProfile]);
 
   const register = useCallback(async (body: { firstName: string; lastName: string; email: string; password: string }) =>
     api.publicPost<{ email: string }>('/api/auth/register', body), []);
 
   const logout = useCallback(async () => {
+    await unregisterFromPush(defaultPushDeps); // needs the session, so before tokens are cleared
     const t = await api.tokens.get();
     if (t) api.publicPost('/api/auth/logout', { refreshToken: t.refreshToken }).catch(() => {});
     await api.tokens.clear();

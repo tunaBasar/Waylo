@@ -585,6 +585,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_MAIL_USERNAME: "${MAIL_USERNAME:-}"
       SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      EXPO_PUSH_ENABLED: "${EXPO_PUSH_ENABLED:-false}"
     depends_on:
       discovery-service:
         condition: service_healthy

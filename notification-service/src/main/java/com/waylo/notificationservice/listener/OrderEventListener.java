@@ -65,6 +65,9 @@ public class OrderEventListener {
             notificationService.send(new NotificationRequest(e.getCustomerId(), e.getOrderId(),
                     NotificationType.EMAIL, recipient, subject, body));
         }
+        // PUSH row is always recorded (SUPPRESSED when push is disabled or the user has no device), short text only
+        notificationService.send(new NotificationRequest(e.getCustomerId(), e.getOrderId(),
+                NotificationType.PUSH, e.getCustomerId().toString(), subject, body.split("\n", 2)[0]));
         processedEventRepository.save(new ProcessedEvent(e.getEventId(), GROUP));
     }
 

@@ -34,6 +34,10 @@ class NotificationServiceImplTest {
     private NotificationMapper mapper;
     @Mock
     private EmailService emailService;
+    @Mock
+    private PushSender pushSender;
+    @Mock
+    private com.waylo.notificationservice.repository.DeviceTokenRepository deviceTokens;
 
     private NotificationServiceImpl service;
 
@@ -42,7 +46,7 @@ class NotificationServiceImplTest {
     private final UUID bookingId = UUID.randomUUID();
 
     private NotificationServiceImpl newService() {
-        return new NotificationServiceImpl(repository, mapper, emailService);
+        return new NotificationServiceImpl(repository, mapper, emailService, pushSender, deviceTokens);
     }
 
     private Notification buildNotification(UUID id, NotificationStatus status) {
@@ -253,5 +257,44 @@ class NotificationServiceImplTest {
         ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
         verify(emailService).deliver(eq("user@waylo.com"), eq("Subject"), html.capture());
         assertThat(html.getValue()).contains("Line &lt;1&gt;<br>Line 2").doesNotContain("<1>");
+    }
+
+    @Test
+    void push_disabled_isSuppressed() {
+        when(pushSender.isEnabled()).thenReturn(false);
+        Notification saved = sendAndCapture(NotificationType.PUSH, customerId.toString());
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.SUPPRESSED);
+        verify(pushSender, never()).send(any(), any(), any());
+    }
+
+    @Test
+    void push_enabledNoDevices_isSuppressed() {
+        when(pushSender.isEnabled()).thenReturn(true);
+        when(deviceTokens.findByUserId(customerId)).thenReturn(List.of());
+        Notification saved = sendAndCapture(NotificationType.PUSH, customerId.toString());
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.SUPPRESSED);
+    }
+
+    @Test
+    void push_enabled_sendsAndRemovesInvalidTokens() {
+        when(pushSender.isEnabled()).thenReturn(true);
+        com.waylo.notificationservice.domain.DeviceToken good = new com.waylo.notificationservice.domain.DeviceToken(customerId, "ExponentPushToken[good]", "ios");
+        com.waylo.notificationservice.domain.DeviceToken bad = new com.waylo.notificationservice.domain.DeviceToken(customerId, "ExponentPushToken[bad]", "ios");
+        when(deviceTokens.findByUserId(customerId)).thenReturn(List.of(good, bad));
+        when(pushSender.send(any(), any(), any())).thenReturn(java.util.Set.of("ExponentPushToken[bad]"));
+        when(deviceTokens.findByTokenIn(java.util.Set.of("ExponentPushToken[bad]"))).thenReturn(List.of(bad));
+        Notification saved = sendAndCapture(NotificationType.PUSH, customerId.toString());
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.SENT);
+        assertThat(saved.getSentAt()).isNotNull();
+        verify(deviceTokens).deleteAll(List.of(bad));
+    }
+
+    @Test
+    void push_transportFailure_isFailed() {
+        when(pushSender.isEnabled()).thenReturn(true);
+        when(deviceTokens.findByUserId(customerId)).thenReturn(List.of(new com.waylo.notificationservice.domain.DeviceToken(customerId, "t", "ios")));
+        when(pushSender.send(any(), any(), any())).thenThrow(new RuntimeException("expo down"));
+        Notification saved = sendAndCapture(NotificationType.PUSH, customerId.toString());
+        assertThat(saved.getStatus()).isEqualTo(NotificationStatus.FAILED);
     }
 }

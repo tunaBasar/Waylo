@@ -1,5 +1,6 @@
 package com.waylo.notificationservice.service;
 
+import com.waylo.notificationservice.domain.DeviceToken;
 import com.waylo.notificationservice.domain.Notification;
 import com.waylo.notificationservice.domain.NotificationStatus;
 import com.waylo.notificationservice.domain.NotificationType;
@@ -7,6 +8,7 @@ import com.waylo.notificationservice.dto.NotificationMapper;
 import com.waylo.notificationservice.dto.NotificationRequest;
 import com.waylo.notificationservice.dto.NotificationResponse;
 import com.waylo.notificationservice.exception.ResourceNotFoundException;
+import com.waylo.notificationservice.repository.DeviceTokenRepository;
 import com.waylo.notificationservice.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -26,19 +29,28 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository repository;
     private final NotificationMapper mapper;
     private final EmailService emailService;
+    private final PushSender pushSender;
+    private final DeviceTokenRepository deviceTokens;
 
-    public NotificationServiceImpl(NotificationRepository repository, NotificationMapper mapper, EmailService emailService) {
+    public NotificationServiceImpl(NotificationRepository repository, NotificationMapper mapper, EmailService emailService,
+                                   PushSender pushSender, DeviceTokenRepository deviceTokens) {
         this.repository = repository;
         this.mapper = mapper;
         this.emailService = emailService;
+        this.pushSender = pushSender;
+        this.deviceTokens = deviceTokens;
     }
 
     /**
      * Records the real delivery outcome. EMAIL goes through {@link EmailService#deliver}: SENT only when SMTP accepted it,
-     * SUPPRESSED for reserved/test domains, FAILED on SMTP error (retry can try again). SMS and PUSH have no provider yet,
+     * SUPPRESSED for reserved/test domains, FAILED on SMTP error (retry can try again). PUSH goes through {@link PushSender}. SMS has no provider yet,
      * so they stay PENDING instead of claiming to be sent.
      */
     private void attempt(Notification notification) {
+        if (notification.getType() == NotificationType.PUSH) {
+            attemptPush(notification);
+            return;
+        }
         if (notification.getType() != NotificationType.EMAIL) {
             notification.setStatus(NotificationStatus.PENDING);
             return;
@@ -50,6 +62,28 @@ public class NotificationServiceImpl implements NotificationService {
             if (d == EmailService.Delivery.SENT) notification.setSentAt(Instant.now());
         } catch (RuntimeException ex) {
             log.warn("Notification delivery failed: id={}, reason={}", notification.getId(), ex.getMessage());
+            notification.setStatus(NotificationStatus.FAILED);
+        }
+    }
+
+    /** PUSH: SUPPRESSED when the provider is disabled or the customer has no device, FAILED on transport error. */
+    private void attemptPush(Notification notification) {
+        if (!pushSender.isEnabled()) {
+            notification.setStatus(NotificationStatus.SUPPRESSED);
+            return;
+        }
+        try {
+            List<String> tokens = deviceTokens.findByUserId(notification.getCustomerId()).stream().map(DeviceToken::getToken).toList();
+            if (tokens.isEmpty()) {
+                notification.setStatus(NotificationStatus.SUPPRESSED);
+                return;
+            }
+            Set<String> invalid = pushSender.send(tokens, notification.getSubject(), notification.getBody());
+            if (!invalid.isEmpty()) deviceTokens.deleteAll(deviceTokens.findByTokenIn(invalid));
+            notification.setStatus(NotificationStatus.SENT);
+            notification.setSentAt(Instant.now());
+        } catch (RuntimeException ex) {
+            log.warn("Push delivery failed: id={}, reason={}", notification.getId(), ex.getMessage());
             notification.setStatus(NotificationStatus.FAILED);
         }
     }

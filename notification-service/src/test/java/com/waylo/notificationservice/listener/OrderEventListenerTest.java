@@ -60,8 +60,11 @@ class OrderEventListenerTest {
         listener().handleOrderEvent(rec(e), ack);
 
         ArgumentCaptor<NotificationRequest> c = ArgumentCaptor.forClass(NotificationRequest.class);
-        verify(notifications).send(c.capture());
-        NotificationRequest r = c.getValue();
+        verify(notifications, times(2)).send(c.capture());
+        NotificationRequest r = c.getAllValues().get(0);
+        NotificationRequest push = c.getAllValues().get(1);
+        assertThat(push.type()).isEqualTo(com.waylo.notificationservice.domain.NotificationType.PUSH);
+        assertThat(push.customerId()).isEqualTo(customerId);
         assertThat(r.customerId()).isEqualTo(customerId);
         assertThat(r.bookingId()).isEqualTo(orderId);
         assertThat(r.recipient()).isEqualTo("c@example.test");
@@ -81,8 +84,8 @@ class OrderEventListenerTest {
         listener().handleOrderEvent(rec(e), ack);
 
         ArgumentCaptor<NotificationRequest> c = ArgumentCaptor.forClass(NotificationRequest.class);
-        verify(notifications).send(c.capture());
-        assertThat(c.getValue().body()).contains("İade tutarı: 1234.50 TL");
+        verify(notifications, times(2)).send(c.capture());
+        assertThat(c.getAllValues().get(0).body()).contains("İade tutarı: 1234.50 TL");
     }
 
     @Test
@@ -95,8 +98,8 @@ class OrderEventListenerTest {
         listener().handleOrderEvent(rec(e), ack);
 
         ArgumentCaptor<NotificationRequest> c = ArgumentCaptor.forClass(NotificationRequest.class);
-        verify(notifications).send(c.capture());
-        assertThat(c.getValue().body()).contains("iade yapılmayacaktır");
+        verify(notifications, times(2)).send(c.capture());
+        assertThat(c.getAllValues().get(0).body()).contains("iade yapılmayacaktır");
     }
 
     @Test
@@ -127,7 +130,8 @@ class OrderEventListenerTest {
     void crmDown_failSoft_stillAcks() {
         when(crm.getById(customerId)).thenThrow(new RuntimeException("down"));
         listener().handleOrderEvent(rec(event("ORDER_PAID")), ack);
-        verify(notifications, never()).send(any());
+        // only the PUSH row (no CRM needed) is recorded, no EMAIL
+        verify(notifications, times(1)).send(any());
         verify(ack).acknowledge();
     }
 
