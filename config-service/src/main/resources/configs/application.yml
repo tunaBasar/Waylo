@@ -12,7 +12,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # prometheus is scraped on each service's own port; api-gateway excludes it (port 8080 is public)
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: when-authorized

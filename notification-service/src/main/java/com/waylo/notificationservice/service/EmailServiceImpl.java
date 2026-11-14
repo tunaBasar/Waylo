@@ -80,6 +80,18 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public void sendEmailChangeNotice(String to, String name) {
+        Context ctx = new Context();
+        ctx.setVariable("name", name);
+        ctx.setVariable("year", java.time.Year.now().getValue());
+
+        String html = templateEngine.process("email-change-notice", ctx);
+        if (sendHtmlMail(to, "Waylo: e-posta degisikligi istendi", html)) {
+            log.info("Email change notice sent to {}", to);
+        }
+    }
+
+    @Override
     public void sendGenericEmail(String to, String subject, String htmlContent) {
         sendHtmlMail(to, subject, htmlContent);
     }

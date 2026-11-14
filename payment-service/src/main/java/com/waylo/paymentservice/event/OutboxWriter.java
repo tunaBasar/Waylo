@@ -1,8 +1,10 @@
 package com.waylo.paymentservice.event;
 
 import com.waylo.paymentservice.config.KafkaProducerConfig;
+import com.waylo.observability.RequestId;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.stereotype.Component;
@@ -36,9 +38,9 @@ public class OutboxWriter {
         byte[] json = serializer.serialize(topic, headers, event);
         Header typeId = headers.lastHeader("__TypeId__");
         String typeToken = typeId == null ? "" : new String(typeId.value(), StandardCharsets.UTF_8);
-        jdbc.update("INSERT INTO outbox_event (id, aggregate_type, aggregate_id, topic, event_key, type_id, payload) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        jdbc.update("INSERT INTO outbox_event (id, aggregate_type, aggregate_id, topic, event_key, type_id, payload, request_id) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), aggregateType, aggregateId, topic, key, typeToken,
-                new String(json, StandardCharsets.UTF_8));
+                new String(json, StandardCharsets.UTF_8), MDC.get(RequestId.MDC_KEY));
     }
 }

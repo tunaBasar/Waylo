@@ -33,12 +33,15 @@ class OutboxTest {
         OutboxWriter writer = new OutboxWriter(jdbc);
         PaymentEventPublisher publisher = new PaymentEventPublisher(writer);
         UUID orderId = UUID.randomUUID();
+        org.slf4j.MDC.put("requestId", "req-1");
         publisher.publishPaymentCompleted(new PaymentCompletedEvent(orderId, UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("10.00"), "ref"));
 
         ArgumentCaptor<Object> args = ArgumentCaptor.forClass(Object.class);
+        org.slf4j.MDC.clear();
         verify(jdbc).update(contains("INSERT INTO outbox_event"), args.capture(), args.capture(), args.capture(),
-                args.capture(), args.capture(), args.capture(), args.capture());
+                args.capture(), args.capture(), args.capture(), args.capture(), args.capture());
         List<Object> v = args.getAllValues();
+        assertThat(v.get(7)).isEqualTo("req-1");
         assertThat(v.get(1)).isEqualTo("PAYMENT");
         assertThat(v.get(2)).isEqualTo(orderId.toString());
         assertThat(v.get(3)).isEqualTo("payment-events");
@@ -66,6 +69,7 @@ class OutboxTest {
         assertThat(rec.getValue().topic()).isEqualTo("payment-events");
         assertThat(rec.getValue().key()).isEqualTo("k1");
         assertThat(new String(rec.getValue().headers().lastHeader("__TypeId__").value())).isEqualTo("orderPaid");
+        assertThat(new String(rec.getValue().headers().lastHeader("X-Request-Id").value())).isEqualTo("req-1");
         verify(jdbc).update(contains("published_at = now()"), eq(id));
     }
 
@@ -88,6 +92,6 @@ class OutboxTest {
 
     private static Map<String, Object> row(UUID id, int attempts) {
         return Map.of("id", id, "topic", "payment-events", "event_key", "k1", "type_id", "orderPaid",
-                "payload", "{}", "attempts", attempts);
+                "payload", "{}", "attempts", attempts, "request_id", "req-1");
     }
 }

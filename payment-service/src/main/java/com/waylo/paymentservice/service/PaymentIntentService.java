@@ -20,6 +20,7 @@ import com.waylo.paymentservice.provider.PaymentProvider;
 import com.waylo.paymentservice.repository.EscrowItemRepository;
 import com.waylo.paymentservice.repository.PaymentIntentRepository;
 import com.waylo.paymentservice.repository.SupplierPayoutAccountRepository;
+import com.waylo.observability.BusinessMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -135,6 +136,7 @@ public class PaymentIntentService {
         if (!result.success()) {
             intent.setStatus(PaymentIntentStatus.FAILED);
             intent.setFailureCode(result.failureCode());
+            BusinessMetrics.increment("waylo.payments", "outcome", "failed");
             return IntentResponse.from(intentRepository.saveAndFlush(intent));
         }
 
@@ -180,6 +182,7 @@ public class PaymentIntentService {
             }
             throw e; // rolls the local transaction back: no escrow, no ledger, intent unchanged
         }
+        BusinessMetrics.increment("waylo.payments", "outcome", "confirmed");
         return IntentResponse.from(intent);
     }
 

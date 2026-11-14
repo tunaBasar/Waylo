@@ -101,6 +101,8 @@ management:
     web:
       exposure:
         include: health,info
+        # 8080 is the public port: metrics must not be reachable here (shared config includes prometheus)
+        exclude: prometheus,metrics
   endpoint:
     health:
       show-details: when-authorized

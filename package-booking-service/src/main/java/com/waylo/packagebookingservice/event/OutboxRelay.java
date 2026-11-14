@@ -1,5 +1,6 @@
 package com.waylo.packagebookingservice.event;
 
+import com.waylo.observability.RequestId;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 public class OutboxRelay {
 
     static final String CLAIM_SQL =
-            "SELECT o.id, o.topic, o.event_key, o.type_id, o.payload, o.attempts FROM outbox_event o "
+            "SELECT o.id, o.topic, o.event_key, o.type_id, o.payload, o.attempts, o.request_id FROM outbox_event o "
           + "WHERE o.published_at IS NULL AND o.next_attempt_at <= now() "
           + "AND NOT EXISTS (SELECT 1 FROM outbox_event p WHERE p.aggregate_id = o.aggregate_id "
           + "AND p.published_at IS NULL AND p.created_at < o.created_at) "
@@ -61,6 +62,10 @@ public class OutboxRelay {
                 String typeId = (String) row.get("type_id");
                 if (typeId != null && !typeId.isEmpty()) {
                     record.headers().add("__TypeId__", typeId.getBytes(StandardCharsets.UTF_8));
+                }
+                String requestId = (String) row.get("request_id");
+                if (requestId != null) {
+                    record.headers().add(RequestId.HEADER, requestId.getBytes(StandardCharsets.UTF_8));
                 }
                 kafkaTemplate.send(record).get(sendTimeoutMs, TimeUnit.MILLISECONDS);
                 jdbc.update("UPDATE outbox_event SET published_at = now(), last_error = NULL WHERE id = ?", id);

@@ -1,5 +1,6 @@
 package com.waylo.packagebookingservice.event;
 
+import com.waylo.observability.BusinessMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -18,16 +19,19 @@ public class OrderEventPublisher {
     public void publishOrderCreated(OrderCreatedEvent event) {
         log.info("Queueing OrderCreatedEvent: {}", event.getOrderId());
         outbox.write("ORDER", event.getOrderId().toString(), KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+        BusinessMetrics.increment("waylo.orders", "event", "created");
     }
 
     public void publishOrderPaid(OrderPaidEvent event) {
         log.info("Queueing OrderPaidEvent: {}", event.getOrderId());
         outbox.write("ORDER", event.getOrderId().toString(), KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+        BusinessMetrics.increment("waylo.orders", "event", "paid");
     }
 
     public void publishOrderCancelled(OrderCancelledEvent event) {
         log.info("Queueing OrderCancelledEvent: {}", event.getOrderId());
         outbox.write("ORDER", event.getOrderId().toString(), KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+        BusinessMetrics.increment("waylo.orders", "event", "cancelled");
     }
 
     public void publishOrderItemRedeemed(OrderItemRedeemedEvent event) {

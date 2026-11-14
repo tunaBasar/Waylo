@@ -1,5 +1,6 @@
 package com.waylo.notificationservice.service;
 
+import com.waylo.observability.BusinessMetrics;
 import com.waylo.notificationservice.domain.DeviceToken;
 import com.waylo.notificationservice.domain.Notification;
 import com.waylo.notificationservice.domain.NotificationStatus;
@@ -47,6 +48,12 @@ public class NotificationServiceImpl implements NotificationService {
      * so they stay PENDING instead of claiming to be sent.
      */
     private void attempt(Notification notification) {
+        deliver(notification);
+        BusinessMetrics.increment("waylo.notifications", "channel", String.valueOf(notification.getType()),
+                "status", String.valueOf(notification.getStatus()));
+    }
+
+    private void deliver(Notification notification) {
         if (notification.getType() == NotificationType.PUSH) {
             attemptPush(notification);
             return;

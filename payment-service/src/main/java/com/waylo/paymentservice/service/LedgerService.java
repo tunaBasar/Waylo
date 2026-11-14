@@ -1,5 +1,6 @@
 package com.waylo.paymentservice.service;
 
+import com.waylo.observability.BusinessMetrics;
 import com.waylo.paymentservice.domain.LedgerAccount;
 import com.waylo.paymentservice.domain.LedgerEntry;
 import com.waylo.paymentservice.repository.LedgerEntryRepository;
@@ -73,6 +74,7 @@ public class LedgerService {
                 Leg.debit(LedgerAccount.CUSTOMER_FUNDS_HELD, gross),
                 Leg.credit(LedgerAccount.CUSTOMER_REFUND, gross));
         write(orderId, orderItemId, currency, correlationId, description, legs);
+        BusinessMetrics.increment("waylo.payment.refunds");
     }
 
     @Transactional(readOnly = true)

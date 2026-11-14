@@ -34,6 +34,8 @@ public class AuthEventListener {
                         event.getEmail(), event.getName(), event.getToken());
                 case "WELCOME" -> emailService.sendWelcomeEmail(
                         event.getEmail(), event.getName());
+                case "EMAIL_CHANGE_REQUESTED" -> emailService.sendEmailChangeNotice(
+                        event.getEmail(), event.getName());
                 case "USER_DELETED", "PROFILE_UPDATED", "USER_UPDATED" -> log.debug("Ignoring non-email auth event: {}", event.getEventType());
                 default -> log.warn("Unknown auth event type: {}", event.getEventType());
             }

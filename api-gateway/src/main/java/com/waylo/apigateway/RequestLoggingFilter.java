@@ -23,17 +23,15 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
         Instant start = Instant.now();
         String method = request.getMethod().name();
         String path = request.getURI().getPath();
-        String requestId = request.getId();
-
-        log.info(">>> {} {} [requestId={}]", method, path, requestId);
+        RequestIdFilter.withMdc(exchange, () -> log.info(">>> {} {}", method, path));
 
         return chain.filter(exchange).then(Mono.fromRunnable(() -> {
             long duration = java.time.Duration.between(start, Instant.now()).toMillis();
             int status = exchange.getResponse().getStatusCode() != null
                     ? exchange.getResponse().getStatusCode().value()
                     : 0;
-            log.info("<<< {} {} [requestId={}] status={} duration={}ms",
-                    method, path, requestId, status, duration);
+            RequestIdFilter.withMdc(exchange, () -> log.info("<<< {} {} status={} duration={}ms",
+                    method, path, status, duration));
         }));
     }
 
