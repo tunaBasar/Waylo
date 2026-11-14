@@ -104,6 +104,10 @@ const hotelNav: NavItem[] = [
   { href: '/partner/room-types', label: 'Oda tipleri', icon: 'bed' },
   { href: '/partner/rate-plans', label: 'Fiyat planlari', icon: 'sell' },
   { href: '/partner/calendar', label: 'Takvim', icon: 'calendar_month' },
+  { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
+  { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
+  { href: '/partner/reviews', label: 'Yorumlar', icon: 'reviews' },
+  { href: '/partner/team', label: 'Ekip', icon: 'group' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
@@ -116,6 +120,8 @@ const carNav: NavItem[] = [
   { href: '/partner/car/one-way', label: 'Tek yon', icon: 'swap_horiz' },
   { href: '/partner/car/documents', label: 'Belgeler', icon: 'description' },
   { href: '/partner/car/rentals', label: 'Kiralamalar', icon: 'receipt_long' },
+  { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
+  { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
@@ -124,6 +130,8 @@ const busNav: NavItem[] = [
   { href: '/partner/bus/trips', label: 'Seferler', icon: 'route' },
   { href: '/partner/bus/documents', label: 'Belgeler', icon: 'description' },
   { href: '/partner/bus/bookings', label: 'Biletler', icon: 'confirmation_number' },
+  { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
+  { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 

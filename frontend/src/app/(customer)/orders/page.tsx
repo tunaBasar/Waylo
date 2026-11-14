@@ -6,6 +6,8 @@ import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 import { policyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
+import { reviewApi, type ReviewableItem } from '@/lib/reviews';
+import { ReviewForm } from '@/components/ReviewForm';
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -298,7 +300,7 @@ function FlightCheckinPanel({ item, checkin, onDone }: { item: OrderItem; checki
   );
 }
 
-function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }) {
+function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order; onChanged: () => void; reviewable: ReviewableItem[]; onReviewed: () => void }) {
   const [testMode, setTestMode] = useState(false);
   const [checkins, setCheckins] = useState<FlightCheckin[]>([]);
   const loadCheckins = useCallback(() => {
@@ -348,6 +350,9 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
               )}
             </>
           )}
+          {item.vertical === 'HOTEL' && reviewable.filter(r => r.orderItemId === item.id).map(r => (
+            <ReviewForm key={r.orderItemId} item={r} onDone={onReviewed} />
+          ))}
           {item.vertical === 'CAR' && item.pickupAt && item.returnAt && (
             <p>Alis: {formatOffsetDateTime(item.pickupAt)} - Teslim: {formatOffsetDateTime(item.returnAt)}</p>
           )}
@@ -371,6 +376,11 @@ function OrdersContent() {
   const createdId = searchParams.get('created');
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [reviewable, setReviewable] = useState<ReviewableItem[]>([]);
+  const loadReviewable = useCallback(() => {
+    reviewApi.reviewable().then(r => setReviewable(r.data)).catch(() => setReviewable([]));
+  }, []);
+  useEffect(() => { loadReviewable(); }, [loadReviewable]);
 
   const load = useCallback(() => {
     api.get<Order[]>('/api/orders').then(response => setOrders(response.data)).catch((err: unknown) => {
@@ -389,7 +399,7 @@ function OrdersContent() {
         <p className="text-sm text-on-surface-variant">Siparis bulunamadi</p>
       ) : (
         <div className="space-y-3">
-          {orders.map(order => <OrderCard key={order.id} order={order} onChanged={load} />)}
+          {orders.map(order => <OrderCard key={order.id} order={order} onChanged={load} reviewable={reviewable} onReviewed={loadReviewable} />)}
         </div>
       )}
     </div>

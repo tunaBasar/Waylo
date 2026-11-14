@@ -22,4 +22,8 @@ public interface EscrowItemRepository extends JpaRepository<EscrowItem, UUID> {
     List<EscrowItem> findByPaymentIntentId(UUID paymentIntentId);
 
     List<EscrowItem> findByOrderId(UUID orderId);
+
+    @Query("select e from EscrowItem e where e.supplierOrganizationId = :orgId and e.heldAt >= :fromTs and e.heldAt < :toTs order by e.heldAt desc")
+    List<EscrowItem> findForSupplier(@Param("orgId") UUID orgId, @Param("fromTs") java.time.Instant fromTs,
+                                     @Param("toTs") java.time.Instant toTs);
 }

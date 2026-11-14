@@ -46,7 +46,7 @@ spring:
             - id: hotel-service
               uri: lb://hotel-service
               predicates:
-                - Path=/api/hotels/**,/api/rooms/**,/api/quotes/**
+                - Path=/api/hotels/**,/api/rooms/**,/api/quotes/**,/api/me/hotel-reviews,/api/me/reviewable-hotel-items,/api/partner/organizations/*/hotel-reviews,/api/partner/organizations/*/hotel-reviews/**,/api/admin/hotel-reviews,/api/admin/hotel-reviews/**
             - id: car-rental-service
               uri: lb://car-rental-service
               predicates:
@@ -66,7 +66,7 @@ spring:
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/payments/**,/api/admin/commission-rates,/api/admin/ledger,/api/admin/supplier-accounts,/api/admin/supplier-accounts/**
+                - Path=/api/payments/**,/api/partner/organizations/*/earnings,/api/admin/commission-rates,/api/admin/ledger,/api/admin/supplier-accounts,/api/admin/supplier-accounts/**
             - id: crm-service
               uri: lb://crm-service
               predicates:

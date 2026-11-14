@@ -7,6 +7,7 @@ import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
 import com.waylo.hotelservice.service.HotelSearchService;
+import com.waylo.hotelservice.service.ReviewService;
 import org.springframework.format.annotation.DateTimeFormat;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -33,8 +34,11 @@ public class HotelController {
     private final HotelService hotelService;
     private final HotelAccessGuard accessGuard;
     private final HotelSearchService hotelSearchService;
+    private final ReviewService reviewService;
 
-    public HotelController(HotelService hotelService, HotelAccessGuard accessGuard, HotelSearchService hotelSearchService) {
+    public HotelController(HotelService hotelService, HotelAccessGuard accessGuard, HotelSearchService hotelSearchService,
+                           ReviewService reviewService) {
+        this.reviewService = reviewService;
         this.hotelService = hotelService;
         this.accessGuard = accessGuard;
         this.hotelSearchService = hotelSearchService;
@@ -57,7 +61,7 @@ public class HotelController {
             // Unpublished hotels are invisible to everyone but the owning organization's members and ADMIN.
             throw new ResourceNotFoundException("Hotel", "id", id);
         }
-        return ResponseEntity.ok(ApiResponse.of(response));
+        return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(response)));
     }
 
     @GetMapping
@@ -73,7 +77,7 @@ public class HotelController {
         } else {
             hotels = hotelService.getPublicByOrganization(organizationId);
         }
-        return ResponseEntity.ok(ApiResponse.of(hotels));
+        return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(hotels)));
     }
 
     @GetMapping("/search")
@@ -87,10 +91,10 @@ public class HotelController {
             @RequestParam(defaultValue = "1") int adults,
             @RequestParam(required = false) List<Integer> childrenAges) {
         if (checkIn == null && checkOut == null) {
-            return ResponseEntity.ok(ApiResponse.of(hotelService.search(city, country, minStars)));
+            return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(hotelService.search(city, country, minStars))));
         }
-        return ResponseEntity.ok(ApiResponse.of(hotelSearchService.search(
-                city, country, minStars, checkIn, checkOut, rooms, adults, childrenAges)));
+        return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(hotelSearchService.search(
+                city, country, minStars, checkIn, checkOut, rooms, adults, childrenAges))));
     }
 
     @PutMapping("/{id}")

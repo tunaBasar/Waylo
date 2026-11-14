@@ -9,6 +9,8 @@ import org.mapstruct.MappingTarget;
 public interface HotelMapper {
 
     @Mapping(target = "roomCount", expression = "java(hotel.getRooms() != null ? hotel.getRooms().size() : 0)")
+    @Mapping(target = "averageScore", ignore = true)
+    @Mapping(target = "reviewCount", ignore = true)
     HotelResponse toResponse(Hotel hotel);
 
     @Mapping(target = "id", ignore = true)

@@ -51,6 +51,8 @@ export interface Hotel {
   roomCount: number;
   createdAt: string;
   updatedAt: string;
+  averageScore?: number | null;
+  reviewCount?: number;
 }
 
 export interface Room {

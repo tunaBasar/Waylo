@@ -13,6 +13,8 @@ import type { StayQuery, AvailableOffer } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
 import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
 import { useAuth } from '@/lib/auth';
+import { HotelReviews } from '@/components/HotelReviews';
+import { scoreLabel } from '@/lib/reviews';
 
 function ErrorState({ message }: { message: string }) {
   return (
@@ -378,6 +380,11 @@ function HotelsDetailContent() {
             <h2 className="text-xl font-semibold text-on-surface">{hotel.name}</h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-warning">{stars}</span>
+              {!!hotel.reviewCount && hotel.averageScore != null && (
+                <span className="text-xs font-semibold text-on-surface" data-testid="hotel-score">
+                  {scoreLabel(hotel.averageScore)} / 5 ({hotel.reviewCount})
+                </span>
+              )}
               <span className="text-xs text-on-surface-variant">
                 {[hotel.city, hotel.country].filter(Boolean).join(', ')}
               </span>
@@ -394,6 +401,8 @@ function HotelsDetailContent() {
           <p className="text-sm text-on-surface-variant leading-relaxed">{hotel.description}</p>
         )}
       </div>
+
+      <HotelReviews hotelId={hotel.id} />
 
       {/* Stay form */}
       <StayForm

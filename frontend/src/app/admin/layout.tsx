@@ -21,6 +21,7 @@ const nav: NavItem[] = [
   { href: '/admin/payments', label: 'Odemeler', icon: 'payments' },
   { href: '/admin/notifications', label: 'Bildirimler', icon: 'notifications' },
   { href: '/admin/checkins', label: 'Check-in', icon: 'check_circle' },
+  { href: '/admin/reviews', label: 'Degerlendirmeler', icon: 'reviews' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

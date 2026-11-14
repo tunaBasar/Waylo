@@ -267,7 +267,87 @@ export interface Order {
 
 const enc = encodeURIComponent;
 
+// ---------- team (auth-service) ----------
+
+export interface TeamMember {
+  userId: string;
+  email: string;
+  name: string;
+  role: PartnerRole;
+  scopeType: ScopeType;
+  scopeId: string;
+  grantId: string;
+  createdAt: string;
+}
+
+// ---------- partner orders (package-booking-service) ----------
+
+export type PartnerOrderStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'FAILED';
+export type VoucherStatus = 'ACTIVE' | 'REDEEMED' | 'VOID' | 'NO_SHOW';
+
+export interface PartnerOrderItem {
+  orderItemId: string;
+  orderId: string;
+  orderStatus: PartnerOrderStatus;
+  orderCreatedAt: string;
+  description: string;
+  amount: Money;
+  currency: string;
+  fulfillmentRef: string | null;
+  pickupAt: string | null;
+  returnAt: string | null;
+  vertical: 'HOTEL' | 'FLIGHT' | 'CAR' | 'BUS' | string;
+  checkIn: IsoDate | null;
+  checkOut: IsoDate | null;
+  passengerFirstName: string | null;
+  passengerLastName: string | null;
+  voucherStatus: VoucherStatus | null;
+  cancelOutcome: string | null;
+  refundAmount: Money | null;
+}
+
+export interface PartnerOrderPage {
+  items: PartnerOrderItem[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+// ---------- partner earnings (payment-service) ----------
+
+export type EscrowState = 'HELD' | 'RELEASED' | 'REFUNDED';
+
+export interface EarningsRow {
+  orderItemId: string;
+  vertical: string;
+  gross: Money;
+  commission: Money;
+  partnerNet: Money;
+  escrowState: EscrowState;
+  heldAt: string | null;
+  releasedAt: string | null;
+}
+
+export interface PartnerEarnings {
+  currency: string;
+  totals: { held: Money; released: Money; refunded: Money };
+  items: EarningsRow[];
+}
+
+function qs(params: Record<string, string | number | undefined>): string {
+  const parts = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
 export const partnerApi = {
+  members: (organizationId: string) =>
+    api.get<TeamMember[]>(`/api/organizations/${enc(organizationId)}/members`),
+  orders: (organizationId: string, f: { status?: string; from?: string; to?: string; page?: number; size?: number }) =>
+    api.get<PartnerOrderPage>(`/api/partner/organizations/${enc(organizationId)}/order-items${qs(f)}`),
+  earnings: (organizationId: string, f: { from?: string; to?: string }) =>
+    api.get<PartnerEarnings>(`/api/partner/organizations/${enc(organizationId)}/earnings${qs(f)}`),
   // organizations and memberships
   myMemberships: () => api.get<Membership[]>('/api/me/memberships'),
   createOrganization: (body: CreateOrganizationRequest) =>
@@ -358,6 +438,26 @@ export const ROLE_LABEL: Record<PartnerRole, string> = {
   HOTEL_OWNER: 'Otel sahibi',
   HOTEL_MANAGER: 'Otel yoneticisi',
   HOTEL_STAFF: 'Otel personeli',
+};
+
+export const ORDER_STATUS_LABEL: Record<PartnerOrderStatus, string> = {
+  PENDING: 'Beklemede',
+  CONFIRMED: 'Onaylandi',
+  CANCELLED: 'Iptal',
+  FAILED: 'Basarisiz',
+};
+
+export const VOUCHER_STATUS_LABEL: Record<VoucherStatus, string> = {
+  ACTIVE: 'Kullanilmadi',
+  REDEEMED: 'Kullanildi',
+  VOID: 'Gecersiz',
+  NO_SHOW: 'Gelmedi',
+};
+
+export const ESCROW_STATE_LABEL: Record<EscrowState, string> = {
+  HELD: 'Bekletiliyor',
+  RELEASED: 'Serbest birakildi',
+  REFUNDED: 'Iade edildi',
 };
 
 export const MEAL_PLAN_LABEL: Record<MealPlan, string> = {

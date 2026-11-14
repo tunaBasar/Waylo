@@ -10,6 +10,7 @@ import com.waylo.authservice.domain.OrganizationStatus;
 import com.waylo.authservice.domain.RoleAssignment;
 import com.waylo.authservice.domain.ScopeType;
 import com.waylo.authservice.domain.User;
+import com.waylo.authservice.dto.MemberResponse;
 import com.waylo.authservice.dto.RoleGrantRequest;
 import com.waylo.authservice.dto.RoleGrantResult;
 import com.waylo.authservice.repository.OrganizationMembershipRepository;
@@ -110,7 +111,7 @@ public class RoleGrantService {
 
         // Rule 5: target user
         User target = userRepository.findByEmail(req.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "kullanici bulunamadi"));
 
         // Find or create membership for target
         Optional<OrganizationMembership> targetMemberOpt =
@@ -141,6 +142,29 @@ public class RoleGrantService {
         membershipRepository.save(targetMember);
 
         return new RoleGrantResult(assignment.getId(), target.getId(), req.role(), ScopeType.HOTEL, req.hotelId());
+    }
+
+    private static final Set<Role> MEMBER_VIEW_ROLES = EnumSet.of(Role.ORGANIZATION_OWNER, Role.HOTEL_OWNER, Role.HOTEL_MANAGER);
+
+    /** Owner/manager only. Returns one row per role grant, no PII beyond email and name. */
+    @Transactional(readOnly = true)
+    public List<MemberResponse> listMembers(UUID actorId, UUID organizationId) {
+        Optional<OrganizationMembership> actorMember =
+                membershipRepository.findByUserIdAndOrganizationId(actorId, organizationId);
+        if (actorMember.isEmpty() || actorMember.get().getStatus() != MembershipStatus.ACTIVE
+                || roleAssignmentRepository.findByMembershipId(actorMember.get().getId()).stream()
+                        .noneMatch(a -> MEMBER_VIEW_ROLES.contains(a.getRole()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to view members");
+        }
+        return roleAssignmentRepository.findAllByOrganization(organizationId).stream()
+                .map(a -> {
+                    User u = a.getMembership().getUser();
+                    String name = ((u.getFirstName() == null ? "" : u.getFirstName()) + " "
+                            + (u.getLastName() == null ? "" : u.getLastName())).trim();
+                    return new MemberResponse(u.getId(), u.getEmail(), name, a.getRole(), a.getScopeType(),
+                            a.getScopeId(), a.getId(), a.getCreatedAt());
+                })
+                .toList();
     }
 
     @Transactional

@@ -4,6 +4,8 @@ import com.waylo.packagebookingservice.domain.Order;
 import com.waylo.packagebookingservice.domain.OrderItem;
 import com.waylo.packagebookingservice.dto.ApiResponse;
 import com.waylo.packagebookingservice.dto.InternalOrderItemResponse;
+import com.waylo.packagebookingservice.dto.ReviewEligibilityResponse;
+import com.waylo.packagebookingservice.service.ReviewEligibilityService;
 import com.waylo.packagebookingservice.exception.ResourceNotFoundException;
 import com.waylo.packagebookingservice.repository.OrderItemRepository;
 import com.waylo.packagebookingservice.repository.OrderRepository;
@@ -13,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Service-to-service only (X-Internal-Token enforced by InternalTokenFilter). Read model for checkin-service. */
@@ -25,9 +29,12 @@ public class InternalOrderItemController {
     private final OrderItemRepository itemRepository;
     private final OrderRepository orderRepository;
     private final VoucherRepository voucherRepository;
+    private final ReviewEligibilityService reviewEligibilityService;
 
     public InternalOrderItemController(OrderItemRepository itemRepository, OrderRepository orderRepository,
-                                       VoucherRepository voucherRepository) {
+                                       VoucherRepository voucherRepository,
+                                       ReviewEligibilityService reviewEligibilityService) {
+        this.reviewEligibilityService = reviewEligibilityService;
         this.itemRepository = itemRepository;
         this.orderRepository = orderRepository;
         this.voucherRepository = voucherRepository;
@@ -45,5 +52,18 @@ public class InternalOrderItemController {
                 order.getStatus().name(), item.getVertical().name(), item.getCancelOutcome(), item.getSupplier(),
                 item.getFlightNumber(), item.getDepartureAt(), item.getSeatNumber(), item.getPnr(),
                 item.getPassengerFirstName(), item.getPassengerLastName(), voucher)));
+    }
+
+    /** Hotel review eligibility (RM-29) of one item for the given customer. */
+    @GetMapping("/{orderItemId}/review-eligibility")
+    public ResponseEntity<ApiResponse<ReviewEligibilityResponse>> reviewEligibility(@PathVariable UUID orderItemId,
+                                                                                    @RequestParam UUID customerId) {
+        return ResponseEntity.ok(ApiResponse.of(reviewEligibilityService.check(orderItemId, customerId)));
+    }
+
+    /** All hotel items of the customer that currently pass the review rule (hotel-service removes already reviewed ones). */
+    @GetMapping("/review-eligible")
+    public ResponseEntity<ApiResponse<List<ReviewEligibilityResponse>>> reviewEligible(@RequestParam UUID customerId) {
+        return ResponseEntity.ok(ApiResponse.of(reviewEligibilityService.listEligible(customerId)));
     }
 }

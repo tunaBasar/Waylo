@@ -16,5 +16,13 @@ public record PartnerOrderItemResponse(
         String currency,
         UUID fulfillmentRef,
         LocalDateTime pickupAt,
-        LocalDateTime returnAt
+        LocalDateTime returnAt,
+        String vertical,
+        java.time.LocalDate checkIn,
+        java.time.LocalDate checkOut,
+        String passengerFirstName,
+        String passengerLastName,
+        String voucherStatus,
+        String cancelOutcome,
+        BigDecimal refundAmount
 ) {}

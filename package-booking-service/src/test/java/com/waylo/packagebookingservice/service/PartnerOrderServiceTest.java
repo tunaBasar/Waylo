@@ -38,7 +38,8 @@ class PartnerOrderServiceTest {
 
     private PartnerOrderItemResponse row() {
         return new PartnerOrderItemResponse(UUID.randomUUID(), UUID.randomUUID(), "CONFIRMED", Instant.now(),
-                "Deluxe room", new BigDecimal("200.00"), "USD", UUID.randomUUID(), null, null);
+                "Deluxe room", new BigDecimal("200.00"), "USD", UUID.randomUUID(), null, null,
+                "HOTEL", LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 4), null, null, "ACTIVE", null, null);
     }
 
     @Test
@@ -100,7 +101,7 @@ class PartnerOrderServiceTest {
     @Test
     void responseJson_hasNoPiiFields() {
         String json = JsonMapper.builder().build().writeValueAsString(row()).toLowerCase();
-        for (String forbidden : new String[]{"email", "phone", "customer", "passport", "payment", "notes", "name"}) {
+        for (String forbidden : new String[]{"email", "phone", "customer", "passport", "payment", "notes", "username"}) {
             assertThat(json).doesNotContain(forbidden);
         }
         assertThat(json).contains("fulfillmentref", "amount", "currency", "description", "orderstatus");

@@ -345,6 +345,7 @@ class RoleGrantServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> roleGrantService.grantRole(ACTOR_ID, ORGANIZATION_ID, req));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals("kullanici bulunamadi", ex.getReason());
     }
 
     @Test
@@ -461,5 +462,43 @@ class RoleGrantServiceTest {
 
         // Assert
         assertEquals(Role.HOTEL_STAFF, result.role());
+    }
+
+    @Test
+    void listMembers_owner_returnsRowsWithoutExtraPii() throws Exception {
+        RoleAssignment ownerAssign = createActorOrgOwnerAssignment(actorMembership);
+        actor.setFirstName("Ada");
+        actor.setLastName("Lovelace");
+        when(membershipRepository.findByUserIdAndOrganizationId(ACTOR_ID, ORGANIZATION_ID))
+                .thenReturn(Optional.of(actorMembership));
+        when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(ownerAssign));
+        when(roleAssignmentRepository.findAllByOrganization(ORGANIZATION_ID)).thenReturn(List.of(ownerAssign));
+
+        var rows = roleGrantService.listMembers(ACTOR_ID, ORGANIZATION_ID);
+
+        assertEquals(1, rows.size());
+        assertEquals(ACTOR_ID, rows.get(0).userId());
+        assertEquals("Ada Lovelace", rows.get(0).name());
+        assertEquals(Role.ORGANIZATION_OWNER, rows.get(0).role());
+    }
+
+    @Test
+    void listMembers_staff_forbidden() throws Exception {
+        RoleAssignment staff = new RoleAssignment(actorMembership, Role.HOTEL_STAFF, ScopeType.HOTEL, HOTEL_ID);
+        when(membershipRepository.findByUserIdAndOrganizationId(ACTOR_ID, ORGANIZATION_ID))
+                .thenReturn(Optional.of(actorMembership));
+        when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(staff));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> roleGrantService.listMembers(ACTOR_ID, ORGANIZATION_ID));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+    }
+
+    @Test
+    void listMembers_nonMember_forbidden() {
+        when(membershipRepository.findByUserIdAndOrganizationId(ACTOR_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> roleGrantService.listMembers(ACTOR_ID, ORGANIZATION_ID));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
     }
 }

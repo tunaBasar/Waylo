@@ -1,0 +1,8 @@
+# Temporary override for scripts/test-loyalty.py (loyalty ENABLED). Never part of the default stack.
+services:
+  crm-service:
+    environment:
+      CRM_LOYALTY_POINTS_PER_TRY: "1"
+      CRM_LOYALTY_TIER_SILVER: "3100"
+      CRM_LOYALTY_TIER_GOLD: "3300"
+      CRM_LOYALTY_TIER_PLATINUM: "100000"

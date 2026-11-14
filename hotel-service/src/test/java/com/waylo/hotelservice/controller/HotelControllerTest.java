@@ -35,6 +35,8 @@ class HotelControllerTest {
     private final HotelService hotelService = mock(HotelService.class);
     private final HotelAccessGuard accessGuard = mock(HotelAccessGuard.class);
     private final HotelRepository hotelRepository = mock(HotelRepository.class);
+    private final com.waylo.hotelservice.service.ReviewService reviewService =
+            mock(com.waylo.hotelservice.service.ReviewService.class, inv -> inv.getArguments()[0]);
     @InjectMocks
     private HotelController controller;
 
