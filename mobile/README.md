@@ -18,7 +18,7 @@ Backend must be reachable through the API gateway (`./boot.sh start`, gateway on
   `EXPO_PUBLIC_API_URL=http://192.168.1.20:8080 npm start`
 
 Web preview (`npm run web`) is a browser, so the gateway CORS allow-list must include the dev origin
-(today only `http://localhost:3000`). Native builds are not affected by CORS.
+(the gateway default `WAYLO_CORS_ORIGINS` now includes `http://localhost:3000` and `http://localhost:8081`). Native builds are not affected by CORS.
 
 ## Checks
 ```bash
@@ -35,4 +35,9 @@ bus, cart, orders, profile), `src/app` (expo-router screens), `src/components` (
 ## Notes
 - Payment is the sandbox flow (TEST_OK / TEST_DECLINE). Success is shown only when the backend order status is CONFIRMED.
 - Bus is read-only and hidden when `/api/bus-sales-status` says disabled.
-- Cart is in memory (lost on app restart). Prices/stock are always fetched online.
+- Cart persists in AsyncStorage (`waylo.cart.v1`, cart only; tokens stay in SecureStore and are never written to AsyncStorage). Prices/stock are always fetched online and re-priced by the server at checkout.
+- Dates use a real picker (`DateField`: system picker on native, browser date input on web). Dates are local calendar values, never via toISOString.
+- Hotel search has rooms, adults and children with ages like the web. Car search has separate pickup and return branches (different = one-way).
+- Reviews (`/reviews`, hotel detail rating + list), online check-in for FLIGHT items on the order screen (window per CHECKIN-CONTRACT, voucher QR is the boarding credential), profile edit, change password (keeps the session with the fresh token pair), settings (logout, delete account), notifications (`GET /api/notifications/me`).
+- Web preview has no SecureStore backend: the session is not kept across a browser reload (by design, no tokens in localStorage).
+- Jest: `jest.setup.js` mocks AsyncStorage globally.

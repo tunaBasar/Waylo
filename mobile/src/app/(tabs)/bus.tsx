@@ -4,13 +4,15 @@ import type { TripOffer } from '@/api';
 import { busApi } from '@/features/bus/api';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, Field, Muted, Screen, Title } from '@/components/ui';
+import { DateField } from '@/components/DateField';
+import { addDays, isoDate } from '@/features/dates';
 import { fmtLocal, money } from '@/features/format';
 
 export default function Bus() {
   const status = useAsync(() => busApi.salesStatus(), []);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(() => addDays(new Date(), 7));
   const [q, setQ] = useState<{ from: string; to: string; date: string } | null>(null);
   const trips = useAsync(() => busApi.search(q!.from, q!.to, q!.date), [q], q !== null && status.data?.enabled === true);
   return (
@@ -22,8 +24,8 @@ export default function Bus() {
           <>
             <Field label="Nereden (sehir)" value={from} onChangeText={setFrom} autoCapitalize="words" />
             <Field label="Nereye (sehir)" value={to} onChangeText={setTo} autoCapitalize="words" />
-            <Field label="Tarih (YYYY-AA-GG)" value={date} onChangeText={setDate} />
-            <Button title="Ara" disabled={!from || !to || !date} onPress={() => setQ({ from: from.trim(), to: to.trim(), date })} />
+            <DateField label="Tarih" value={date} minimumDate={new Date()} onChange={setDate} />
+            <Button title="Ara" disabled={!from || !to} onPress={() => setQ({ from: from.trim(), to: to.trim(), date: isoDate(date) })} />
             {q && (
               <AsyncView<TripOffer[]> state={trips} isEmpty={(d) => d.length === 0} emptyText="Sefer bulunamadi.">
                 {(list) => list.map((t) => (

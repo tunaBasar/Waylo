@@ -36,6 +36,8 @@ export interface Hotel {
   address: string;
   starRating: number;
   description: string | null;
+  averageScore?: number | null;
+  reviewCount?: number | null;
 }
 
 export interface StayQuery {
@@ -151,6 +153,10 @@ export interface OrderItem {
   cancelFreeHoursBefore?: number | null;
   cancelOutcome?: string | null;
   refundAmount?: number | null;
+  flight?: {
+    departureAt?: string | null; supplier?: string | null; flightNumber: string;
+    passengerFirstName: string; passengerLastName: string; seatNumber: string | null; pnr: string | null; ticketNumber: string | null;
+  } | null;
 }
 
 export interface Order {
@@ -165,6 +171,7 @@ export interface Order {
 
 export interface Voucher {
   voucherId: string;
+  orderItemId?: string;
   description: string;
   payload: string | null;
   status: 'ACTIVE' | 'REDEEMED' | 'VOID' | 'NO_SHOW';

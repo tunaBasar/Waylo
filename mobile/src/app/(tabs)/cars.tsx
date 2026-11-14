@@ -4,7 +4,9 @@ import type { Branch, CarOffer } from '@/api';
 import { carsApi } from '@/features/cars/api';
 import { useAsync } from '@/features/useAsync';
 import { useCart } from '@/features/cart/CartContext';
-import { AsyncView, Button, Card, Field, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { DateField } from '@/components/DateField';
+import { addDays, isoLocalDateTime, validateRentalTimes } from '@/features/dates';
 import { money } from '@/features/format';
 
 type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; returnAt: string; driverAge: number };
@@ -13,12 +15,23 @@ export default function Cars() {
   const cart = useCart();
   const branches = useAsync(() => carsApi.branches(), []);
   const [pickup, setPickup] = useState<string | null>(null);
-  const [pDate, setPDate] = useState('');
-  const [rDate, setRDate] = useState('');
+  const [ret, setRet] = useState<string | null>(null);
+  const [pAt, setPAt] = useState(() => { const d = addDays(new Date(), 7); d.setHours(10, 0, 0, 0); return d; });
+  const [rAt, setRAt] = useState(() => { const d = addDays(new Date(), 10); d.setHours(10, 0, 0, 0); return d; });
   const [age, setAge] = useState('30');
   const [q, setQ] = useState<Q | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const offers = useAsync(() => carsApi.offers(q!), [q], q !== null);
+  const returnId = ret ?? pickup;
+
+  function search() {
+    const err = validateRentalTimes(pAt, rAt);
+    const ageN = parseInt(age, 10) || 0;
+    setFormError(err ?? (ageN < 18 ? 'Surucu yasi en az 18 olmali.' : null));
+    if (err || ageN < 18) return;
+    setQ({ pickupBranchId: pickup!, returnBranchId: returnId!, pickupAt: isoLocalDateTime(pAt), returnAt: isoLocalDateTime(rAt), driverAge: ageN });
+  }
 
   return (
     <Screen>
@@ -26,19 +39,22 @@ export default function Cars() {
       <AsyncView<Branch[]> state={branches} isEmpty={(d) => d.length === 0} emptyText="Su an kiralama subesi yok.">
         {(list) => (
           <>
-            <Muted>Sube (alis ve teslim ayni)</Muted>
+            <Muted>Alis subesi</Muted>
             {list.map((b) => (
               <Button key={b.id} kind={pickup === b.id ? 'primary' : 'secondary'} title={`${b.name} · ${b.city}`} onPress={() => setPickup(b.id)} />
+            ))}
+            <Muted>Teslim subesi (farkli sube secerseniz tek yon kiralama, ek ucret olabilir)</Muted>
+            {list.map((b) => (
+              <Button key={`r-${b.id}`} kind={returnId === b.id ? 'primary' : 'secondary'} title={`${b.name} · ${b.city}`} onPress={() => setRet(b.id)} />
             ))}
           </>
         )}
       </AsyncView>
-      <Field label="Alis (YYYY-AA-GGTSS:DD)" value={pDate} onChangeText={setPDate} placeholder="2026-12-01T10:00" />
-      <Field label="Teslim (YYYY-AA-GGTSS:DD)" value={rDate} onChangeText={setRDate} placeholder="2026-12-04T10:00" />
+      <DateField label="Alis" mode="datetime" value={pAt} minimumDate={new Date()} onChange={(d) => { setPAt(d); if (rAt <= d) setRAt(addDays(d, 1)); }} />
+      <DateField label="Teslim" mode="datetime" value={rAt} minimumDate={pAt} onChange={setRAt} />
       <Field label="Surucu yasi" value={age} onChangeText={setAge} keyboardType="number-pad" />
-      <Button title="Ara" disabled={!pickup || !pDate || !rDate} onPress={() => setQ({
-        pickupBranchId: pickup!, returnBranchId: pickup!, pickupAt: `${pDate}:00`, returnAt: `${rDate}:00`, driverAge: parseInt(age, 10) || 0,
-      })} />
+      <ErrorBanner message={formError} />
+      <Button title="Ara" disabled={!pickup || !returnId} onPress={search} />
       {q && (
         <AsyncView<CarOffer[]> state={offers} isEmpty={(d) => d.length === 0} emptyText="Bu tarihlerde arac bulunamadi.">
           {(list) => list.map((o, i) => (

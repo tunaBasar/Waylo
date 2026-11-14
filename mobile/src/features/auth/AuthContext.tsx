@@ -10,6 +10,10 @@ interface AuthState {
   logout(): Promise<void>;
   forgotPassword(email: string): Promise<void>;
   refreshProfile(): Promise<void>;
+  /** Store a fresh token pair (after password change the server revokes other sessions). */
+  applyAuth(d: { token: string; refreshToken: string }): Promise<void>;
+  /** Local sign-out without calling the server (account deleted). */
+  clearSession(): Promise<void>;
 }
 
 const Ctx = createContext<AuthState | null>(null);
@@ -53,13 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const applyAuth = useCallback(async (d: { token: string; refreshToken: string }) => {
+    await api.tokens.set({ token: d.token, refreshToken: d.refreshToken });
+  }, []);
+  const clearSession = useCallback(async () => { await api.tokens.clear(); setUser(null); }, []);
+
   const forgotPassword = useCallback(async (email: string) => {
     await api.publicPost('/api/auth/forgot-password', { email });
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, forgotPassword, refreshProfile }),
-    [user, loading, login, register, logout, forgotPassword, refreshProfile],
+    () => ({ user, loading, login, register, logout, forgotPassword, refreshProfile, applyAuth, clearSession }),
+    [user, loading, login, register, logout, forgotPassword, refreshProfile, applyAuth, clearSession],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

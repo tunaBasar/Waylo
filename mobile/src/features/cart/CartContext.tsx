@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { loadCart, saveCart } from './storage';
 import type { CartItem } from '@/api';
 
 const MAX_ITEMS = 10;
@@ -13,9 +14,21 @@ interface CartState {
 
 const Ctx = createContext<CartState | null>(null);
 
-/** In-memory cart. Prices shown are the offers the user saw, the server re-prices at checkout. */
+/** Cart persisted in AsyncStorage (never tokens). Prices shown are the offers the user saw, the server re-prices at checkout. */
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const hydrated = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    loadCart().then((saved) => {
+      if (!alive) return;
+      // merge: anything added before hydration finished wins
+      setItems((cur) => (cur.length ? [...saved, ...cur].slice(0, MAX_ITEMS) : saved));
+      hydrated.current = true;
+    });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => { if (hydrated.current) void saveCart(items); }, [items]);
   const add = useCallback((item: Omit<CartItem, 'id'>) => {
     let ok = false;
     setItems((cur) => {

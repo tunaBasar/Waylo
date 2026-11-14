@@ -14,6 +14,9 @@ function Routes() {
         <Stack.Screen name="flight/[id]" options={{ title: 'Ucus teklifi' }} />
         <Stack.Screen name="cart" options={{ title: 'Sepet' }} />
         <Stack.Screen name="order/[id]" options={{ title: 'Siparis' }} />
+        <Stack.Screen name="reviews" options={{ title: 'Yorumlar' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Bildirimler' }} />
+        <Stack.Screen name="settings" options={{ title: 'Ayarlar' }} />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)/login" options={{ title: 'Giris' }} />

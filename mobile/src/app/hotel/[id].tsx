@@ -6,6 +6,7 @@ import { hotelsApi } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
 import { money } from '@/features/format';
+import { reviewsApi, scoreLabel, type HotelReviewPage } from '@/features/reviews/api';
 import { ApiError } from '@/api';
 import { checkoutErrorMessage } from '@/features/orders/api';
 
@@ -16,6 +17,7 @@ export default function HotelDetail() {
   const stay = { checkIn: p.checkIn, checkOut: p.checkOut, rooms: Number(p.rooms) || 1, adults: Number(p.adults) || 1, childrenAges: ages };
   const hotel = useAsync(() => hotelsApi.get(p.id), [p.id]);
   const avail = useAsync(() => hotelsApi.availability(p.id, stay), [p.id, p.checkIn, p.checkOut]);
+  const reviews = useAsync(() => reviewsApi.list(p.id), [p.id]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export default function HotelDetail() {
   return (
     <Screen>
       <AsyncView<Hotel> state={hotel} emptyText="Otel bulunamadi.">
-        {(h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}</>)}
+        {(h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}{h.reviewCount && h.averageScore != null ? <Text style={{ fontWeight: '700' }}>{`${scoreLabel(h.averageScore)} / 5 (${h.reviewCount} yorum)`}</Text> : null}</>)}
       </AsyncView>
       <ErrorBanner message={error} />
       <AsyncView<Availability> state={avail} isEmpty={(a) => a.offers.length === 0} emptyText="Bu tarihlerde musait oda yok.">
@@ -47,6 +49,17 @@ export default function HotelDetail() {
             </Card>
           );
         })}
+      </AsyncView>
+      <Title>Yorumlar</Title>
+      <AsyncView<HotelReviewPage> state={reviews} isEmpty={(r) => r.items.length === 0} emptyText="Henuz yorum yok.">
+        {(r) => r.items.map((v) => (
+          <Card key={v.id}>
+            <Text style={{ fontWeight: '700' }}>{`${v.score} / 5`}</Text>
+            {v.text ? <Text>{v.text}</Text> : null}
+            {v.partnerResponse ? <Muted>{`Otel yaniti: ${v.partnerResponse}`}</Muted> : null}
+            <Muted>{new Date(v.createdAt).toLocaleDateString('tr-TR')}</Muted>
+          </Card>
+        ))}
       </AsyncView>
     </Screen>
   );
