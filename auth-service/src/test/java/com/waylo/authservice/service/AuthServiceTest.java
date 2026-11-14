@@ -5,7 +5,6 @@ import com.waylo.authservice.domain.User;
 import com.waylo.authservice.dto.*;
 import com.waylo.authservice.exception.DuplicateRegistrationException;
 import com.waylo.authservice.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,7 +35,7 @@ class AuthServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtUtil jwtUtil;
-    @Mock private KafkaTemplate<String, String> kafkaTemplate;
+    @Mock private AccountEventPublisher eventPublisher;
     @Mock private RefreshTokenService refreshTokenService;
 
     private AuthService authService;
@@ -46,7 +44,7 @@ class AuthServiceTest {
     void setUp() {
         authService = new AuthService(
                 userRepository, passwordEncoder, jwtUtil,
-                kafkaTemplate, new ObjectMapper(), refreshTokenService
+                eventPublisher, refreshTokenService
         );
         ReflectionTestUtils.setField(authService, "verificationExpirationHours", 24);
         ReflectionTestUtils.setField(authService, "resetExpirationHours", 1);

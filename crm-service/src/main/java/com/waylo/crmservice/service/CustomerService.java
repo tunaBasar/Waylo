@@ -19,6 +19,9 @@ public interface CustomerService {
     CustomerResponse addLoyaltyPoints(UUID id, int points);
     CustomerResponse upgradeTier(UUID id, CustomerTier tier);
 
-    /** Ensures a CRM customer exists for an auth user (id = userId). Returns true if created now. */
+    /**
+     * Ensures a CRM customer exists for an auth user (id = userId): creates it, or links an existing unlinked customer
+     * with the same email by re-keying it to userId. Returns true if created or linked now.
+     */
     boolean ensureCustomerForUser(UUID userId, String fullName, String email);
 }

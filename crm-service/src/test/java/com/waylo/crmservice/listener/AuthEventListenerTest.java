@@ -189,4 +189,57 @@ class AuthEventListenerTest {
         verifyNoInteractions(repository);
         verify(ack).acknowledge();
     }
+
+    @Test
+    void manualCustomerWithSameEmail_isLinkedInsteadOfWarn() {
+        when(repository.insertIfAbsent(any(), anyString(), anyString(), anyString())).thenReturn(0);
+        when(repository.linkByEmail(userId, "ada@waylo.test")).thenReturn(1);
+
+        listener().handleAuthEvent(rec(json("VERIFICATION", "Ada Lovelace", "Ada@Waylo.test")), ack);
+
+        verify(repository).linkByEmail(userId, "ada@waylo.test");
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    void alreadyLinked_linkIsNoop_idempotent() {
+        when(repository.insertIfAbsent(any(), anyString(), anyString(), anyString())).thenReturn(0);
+        when(repository.linkByEmail(userId, "ada@waylo.test")).thenReturn(0);
+        when(repository.existsById(userId)).thenReturn(true);
+
+        listener().handleAuthEvent(rec(json("WELCOME", "Ada Lovelace", "ada@waylo.test")), ack);
+        listener().handleAuthEvent(rec(json("WELCOME", "Ada Lovelace", "ada@waylo.test")), ack);
+
+        verify(repository, times(2)).linkByEmail(userId, "ada@waylo.test");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void userUpdated_withoutLinkedCustomer_linksManualCustomerByEmail() {
+        when(repository.findById(userId)).thenReturn(java.util.Optional.empty());
+        when(idempotency.tryAcquire("e2")).thenReturn(true);
+        when(repository.linkByEmail(userId, "ada@waylo.test")).thenReturn(1);
+        String msg = "{\"eventType\":\"USER_UPDATED\",\"eventId\":\"e2\",\"userId\":\"" + userId
+                + "\",\"name\":\"Ada Lovelace\",\"email\":\"ada@waylo.test\"}";
+
+        listener().handleAuthEvent(rec(msg), ack);
+
+        verify(repository).linkByEmail(userId, "ada@waylo.test");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void userUpdated_newEmailOwnedByOtherCustomer_keepsOldEmail() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        c.setId(userId);
+        com.waylo.crmservice.domain.Customer other = customer();
+        other.setId(UUID.randomUUID());
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        when(repository.findByEmail("x@waylo.test")).thenReturn(java.util.Optional.of(other));
+
+        listener().handleAuthEvent(rec(json("PROFILE_UPDATED", "Ada L", "x@waylo.test")), ack);
+
+        org.junit.jupiter.api.Assertions.assertEquals("ada@waylo.test", c.getEmail());
+        verify(repository).save(c);
+    }
 }

@@ -53,6 +53,9 @@ public class User {
 
     private LocalDateTime deletedAt;
 
+    /** New address awaiting confirmation via the verification token (email change flow). */
+    private String pendingEmail;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -96,6 +99,9 @@ public class User {
     public void setLockedUntil(LocalDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
     public LocalDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public String getPendingEmail() { return pendingEmail; }
+    public void setPendingEmail(String pendingEmail) { this.pendingEmail = pendingEmail; }
 
     public String getFullName() { return firstName + " " + lastName; }
 }

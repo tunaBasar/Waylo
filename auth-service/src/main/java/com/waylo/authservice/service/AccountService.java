@@ -12,9 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import java.time.LocalDateTime;
-import org.springframework.context.ApplicationEventPublisher;
 import com.waylo.authservice.domain.UserRole;
 import com.waylo.authservice.domain.OrganizationStatus;
 import com.waylo.authservice.domain.MembershipStatus;
@@ -31,12 +32,15 @@ public class AccountService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RefreshTokenService refreshTokenService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AccountEventPublisher eventPublisher;
     private final OrganizationMembershipRepository membershipRepository;
     private final RoleAssignmentRepository roleAssignmentRepository;
 
+    @Value("${waylo.verification.expiration-hours:24}")
+    private int verificationExpirationHours = 24;
+
     public AccountService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                          JwtUtil jwtUtil, RefreshTokenService refreshTokenService, ApplicationEventPublisher eventPublisher,
+                          JwtUtil jwtUtil, RefreshTokenService refreshTokenService, AccountEventPublisher eventPublisher,
                           OrganizationMembershipRepository membershipRepository, RoleAssignmentRepository roleAssignmentRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -64,8 +68,8 @@ public class AccountService {
         user.setFirstName(req.firstName().trim());
         user.setLastName(req.lastName().trim());
         userRepository.save(user);
-        // auth-service has no phone field and no email-change flow yet; name is the only mutable profile data.
-        if (changed) eventPublisher.publishEvent(new AuthEvent("USER_UPDATED", user.getId(), user.getEmail(), user.getFullName(), null));
+        // auth-service has no phone field; email changes go through requestEmailChange + the verification link.
+        if (changed) eventPublisher.publish(new AuthEvent("USER_UPDATED", user.getId(), user.getEmail(), user.getFullName(), null));
         return UserProfileResponse.from(user);
     }
 
@@ -97,7 +101,32 @@ public class AccountService {
         user.setRole(UserRole.USER); user.setDeletedAt(LocalDateTime.now());
         membershipRepository.findByUserId(userId).forEach(m -> m.setStatus(MembershipStatus.REVOKED));
         userRepository.save(user); refreshTokenService.revokeAll(userId);
-        eventPublisher.publishEvent(new AuthEvent("USER_DELETED", userId, null, null, null));
+        eventPublisher.publish(new AuthEvent("USER_DELETED", userId, null, null, null));
+    }
+
+    /**
+     * Starts an email change: the new address gets a verification link (same token columns and VERIFICATION mail as
+     * registration), the old address gets an EMAIL_CHANGE_REQUESTED notice. Nothing changes until the link is opened
+     * (AuthService.verifyEmail), so the old email keeps working meanwhile.
+     */
+    @Transactional
+    public void requestEmailChange(UUID userId, String newEmailRaw, String currentPassword) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Kimlik dogrulanamadi"));
+        if (user.getDeletedAt() != null) throw new ResponseStatusException(UNAUTHORIZED, "Kimlik dogrulanamadi");
+        if (!passwordEncoder.matches(currentPassword, user.getPassword()))
+            throw new ResponseStatusException(BAD_REQUEST, "Mevcut sifre hatali");
+        if (!user.isEmailVerified()) throw new ResponseStatusException(FORBIDDEN, AuthService.EMAIL_NOT_VERIFIED_MESSAGE);
+        String newEmail = newEmailRaw.trim().toLowerCase(Locale.ROOT);
+        if (newEmail.equals(user.getEmail()))
+            throw new ResponseStatusException(BAD_REQUEST, "Yeni e-posta mevcut adresinizden farkli olmali");
+        if (userRepository.existsByEmailIgnoreCase(newEmail))
+            throw new ResponseStatusException(CONFLICT, "Bu e-posta adresi zaten kullaniliyor");
+        user.setPendingEmail(newEmail);
+        user.setVerificationToken(UUID.randomUUID().toString());
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(verificationExpirationHours));
+        userRepository.save(user);
+        eventPublisher.publish(new AuthEvent("VERIFICATION", userId, newEmail, user.getFullName(), user.getVerificationToken()));
+        eventPublisher.publish(new AuthEvent("EMAIL_CHANGE_REQUESTED", userId, user.getEmail(), user.getFullName(), null));
     }
 
     public record AuthEvent(String eventType, UUID userId, String email, String name, String token) {}

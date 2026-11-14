@@ -31,4 +31,14 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
             nativeQuery = true)
     int insertIfAbsent(@Param("id") UUID id, @Param("firstName") String firstName,
                        @Param("lastName") String lastName, @Param("email") String email);
+
+    /**
+     * Links a manually created customer (same email, different id) to an auth user by re-keying it to the auth userId.
+     * customers.id has no foreign keys inside crm_db, so the row keeps its tier, points, phone and passport. Only runs
+     * when no customer with id = userId exists yet, so it is idempotent and never merges two rows.
+     */
+    @Modifying
+    @Query(value = "UPDATE customers SET id = :userId, updated_at = NOW() WHERE lower(email) = :email AND active = TRUE "
+            + "AND id <> :userId AND NOT EXISTS (SELECT 1 FROM customers c WHERE c.id = :userId)", nativeQuery = true)
+    int linkByEmail(@Param("userId") UUID userId, @Param("email") String email);
 }

@@ -1,23 +1,42 @@
 package com.waylo.authservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.waylo.authservice.event.OutboxWriter;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionalEventListener;
-import org.springframework.transaction.event.TransactionPhase;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
+/**
+ * Records auth-events in the transactional outbox. Must be called inside the business transaction. The value is the
+ * JSON text of the payload (a plain string on the wire), unchanged for existing consumers.
+ */
 @Component
 public class AccountEventPublisher {
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutboxWriter outboxWriter;
     private final ObjectMapper objectMapper;
-    public AccountEventPublisher(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) { this.kafkaTemplate = kafkaTemplate; this.objectMapper = objectMapper; }
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publish(AccountService.AuthEvent event) throws Exception {
-        Map<String, Object> payload = new HashMap<>(); payload.put("eventType", event.eventType()); payload.put("userId", event.userId().toString()); payload.put("eventId", java.util.UUID.randomUUID().toString());
-        if (event.email() != null) payload.put("email", event.email()); if (event.name() != null) payload.put("name", event.name()); if (event.token() != null) payload.put("token", event.token());
-        kafkaTemplate.send("auth-events", event.userId().toString(), objectMapper.writeValueAsString(payload));
+
+    public AccountEventPublisher(OutboxWriter outboxWriter, ObjectMapper objectMapper) {
+        this.outboxWriter = outboxWriter;
+        this.objectMapper = objectMapper;
+    }
+
+    public void publish(AccountService.AuthEvent event) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("eventType", event.eventType());
+        payload.put("userId", event.userId().toString());
+        payload.put("eventId", UUID.randomUUID().toString());
+        if (event.email() != null) payload.put("email", event.email());
+        if (event.name() != null) payload.put("name", event.name());
+        if (event.token() != null) payload.put("token", event.token());
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Cannot serialize auth event", e);
+        }
+        outboxWriter.write("USER", event.userId().toString(), "auth-events", event.userId().toString(), json);
     }
 }

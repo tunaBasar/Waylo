@@ -71,7 +71,24 @@ public class AuthEventListener {
             if ("PROFILE_UPDATED".equals(eventType) || "USER_UPDATED".equals(eventType)) {
                 String eventId = node.path("eventId").asText(null);
                 if (eventId != null && !idempotencyService.tryAcquire(eventId)) return;
-                customerRepository.findById(userId).filter(c -> c.isActive()).ifPresent(c -> { String[] n = node.path("name").asText("").trim().split("\\s+", 2); c.setFirstName(n.length > 0 ? n[0] : ""); c.setLastName(n.length > 1 ? n[1] : ""); if (email != null) c.setEmail(email); customerRepository.save(c); });
+                var existing = customerRepository.findById(userId);
+                if (existing.isEmpty() && email != null && !email.isBlank()) {
+                    // No linked customer: link a manual CRM record with the same email (update events never create).
+                    if (customerRepository.linkByEmail(userId, email.trim().toLowerCase()) > 0)
+                        log.info("[CRM] USER_UPDATED ile mevcut musteri baglandi - customerId={}", userId);
+                    return;
+                }
+                existing.filter(c -> c.isActive()).ifPresent(c -> {
+                    String[] n = node.path("name").asText("").trim().split("\\s+", 2);
+                    c.setFirstName(n.length > 0 ? n[0] : ""); c.setLastName(n.length > 1 ? n[1] : "");
+                    if (email != null) {
+                        String normalized = email.trim().toLowerCase();
+                        boolean takenByOther = customerRepository.findByEmail(normalized).filter(o -> !userId.equals(o.getId())).isPresent();
+                        if (takenByOther) log.warn("[CRM] Yeni e-posta baska bir musteride kayitli, e-posta guncellenmedi - userId={}", userId);
+                        else c.setEmail(normalized);
+                    }
+                    customerRepository.save(c);
+                });
                 return;
             }
             if (email == null || email.isBlank()) {
@@ -80,7 +97,7 @@ public class AuthEventListener {
             }
             boolean created = customerService.ensureCustomerForUser(userId, node.path("name").asText(""), email);
             if (created) {
-                log.info("[CRM] Auth kullanicisi icin musteri olusturuldu - customerId={}", userId);
+                log.info("[CRM] Auth kullanicisi icin musteri olusturuldu veya mevcut musteriye baglandi - customerId={}", userId);
             } else if (!customerRepository.existsById(userId)) {
                 log.warn("[CRM] Musteri olusturulamadi, e-posta baska bir musteride kayitli - userId={}", userId);
             }

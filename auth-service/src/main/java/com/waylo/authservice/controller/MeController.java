@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 import com.waylo.authservice.dto.DeleteAccountRequest;
+import com.waylo.authservice.dto.ChangeEmailRequest;
 
 @RestController
 @RequestMapping("/api/me")
@@ -51,6 +52,14 @@ public class MeController {
             @Valid @RequestBody ChangePasswordRequest req) {
         AuthResponse authResponse = accountService.changePassword(userId, req);
         return ResponseEntity.ok(ApiResponse.success("Sifre guncellendi", authResponse));
+    }
+
+    @PostMapping("/email")
+    public ResponseEntity<ApiResponse<Void>> requestEmailChange(@RequestHeader("X-User-Id") UUID userId,
+                                                                @Valid @RequestBody ChangeEmailRequest req) {
+        accountService.requestEmailChange(userId, req.newEmail(), req.currentPassword());
+        return ResponseEntity.accepted().body(ApiResponse.success(
+                "Yeni adresinize dogrulama linki gonderildi. Degisiklik link onaylaninca gecerli olur."));
     }
 
     @DeleteMapping

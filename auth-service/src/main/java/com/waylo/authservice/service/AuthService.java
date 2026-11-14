@@ -5,19 +5,15 @@ import com.waylo.authservice.domain.User;
 import com.waylo.authservice.dto.*;
 import com.waylo.authservice.exception.DuplicateRegistrationException;
 import com.waylo.authservice.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -34,8 +30,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final AccountEventPublisher eventPublisher;
     private final RefreshTokenService refreshTokenService;
 
     @Value("${waylo.verification.expiration-hours}")
@@ -51,13 +46,12 @@ public class AuthService {
     private int lockMinutes;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil, KafkaTemplate<String, String> kafkaTemplate,
-                       ObjectMapper objectMapper, RefreshTokenService refreshTokenService) {
+                       JwtUtil jwtUtil, AccountEventPublisher eventPublisher,
+                       RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
         this.refreshTokenService = refreshTokenService;
     }
 
@@ -175,6 +169,10 @@ public class AuthService {
             return ApiResponse.error("Dogrulama linkinin suresi dolmus. Yeni link isteyiniz.");
         }
 
+        if (user.getPendingEmail() != null) {
+            return confirmEmailChange(user);
+        }
+
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         user.setVerificationTokenExpiry(null);
@@ -185,6 +183,28 @@ public class AuthService {
 
         log.info("Email verified for user: {}", user.getEmail());
         return ApiResponse.success("E-posta basariyla dogrulandi!");
+    }
+
+    /**
+     * Email change confirmation (the link was sent to the new address). Switches the email, revokes every refresh token
+     * so all sessions must log in again with the new address, and emits USER_UPDATED so crm-service follows.
+     */
+    private ApiResponse<Void> confirmEmailChange(User user) {
+        String newEmail = user.getPendingEmail();
+        user.setPendingEmail(null);
+        user.setVerificationToken(null);
+        user.setVerificationTokenExpiry(null);
+        if (userRepository.existsByEmailIgnoreCase(newEmail)) {
+            userRepository.save(user);
+            return ApiResponse.error("Bu e-posta adresi zaten kullaniliyor");
+        }
+        user.setEmail(newEmail);
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        refreshTokenService.revokeAll(user.getId());
+        publishAuthEvent("USER_UPDATED", user, null);
+        log.info("Email changed for user {}", user.getId());
+        return ApiResponse.success("E-posta adresiniz guncellendi. Lutfen yeni adresinizle giris yapin.");
     }
 
     // ------------------------------------------------------------------
@@ -313,22 +333,10 @@ public class AuthService {
         return ApiResponse.success("Cikis yapildi");
     }
 
+    /** Written to the transactional outbox, so the event commits (or rolls back) with the user change. */
     private void publishAuthEvent(String eventType, User user, String token) {
-        try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("eventType", eventType);
-            event.put("userId", user.getId().toString());
-            event.put("email", user.getEmail());
-            event.put("name", user.getFullName());
-            if (token != null) {
-                event.put("token", token);
-            }
-
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send("auth-events", user.getId().toString(), json);
-            log.info("Published auth event: type={}, email={}", eventType, user.getEmail());
-        } catch (Exception e) {
-            log.error("Failed to publish auth event: {}", e.getMessage());
-        }
+        eventPublisher.publish(new AccountService.AuthEvent(
+                eventType, user.getId(), user.getEmail(), user.getFullName(), token));
+        log.info("Queued auth event: type={}, userId={}", eventType, user.getId());
     }
 }

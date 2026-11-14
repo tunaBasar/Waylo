@@ -96,7 +96,10 @@ public class CustomerServiceImpl implements CustomerService {
         int split = name.lastIndexOf(' ');
         String firstName = split > 0 ? name.substring(0, split).trim() : name;
         String lastName = split > 0 ? name.substring(split + 1).trim() : "";
-        return repository.insertIfAbsent(userId, firstName, lastName, email.trim().toLowerCase()) > 0;
+        String normalized = email.trim().toLowerCase();
+        if (repository.insertIfAbsent(userId, firstName, lastName, normalized) > 0) return true;
+        // Insert skipped: either the link already exists, or a manually created customer owns this email.
+        return repository.linkByEmail(userId, normalized) > 0;
     }
 
     private Customer findOrThrow(UUID id) {

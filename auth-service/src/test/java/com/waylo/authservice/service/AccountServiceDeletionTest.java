@@ -9,7 +9,6 @@ import com.waylo.authservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -30,7 +29,7 @@ class AccountServiceDeletionTest {
     private UserRepository userRepository;
     private PasswordEncoder encoder;
     private RefreshTokenService refreshTokenService;
-    private ApplicationEventPublisher publisher;
+    private AccountEventPublisher publisher;
     private OrganizationMembershipRepository membershipRepository;
     private RoleAssignmentRepository roleRepository;
     private AccountService service;
@@ -41,7 +40,7 @@ class AccountServiceDeletionTest {
         userRepository = mock(UserRepository.class);
         encoder = mock(PasswordEncoder.class);
         refreshTokenService = mock(RefreshTokenService.class);
-        publisher = mock(ApplicationEventPublisher.class);
+        publisher = mock(AccountEventPublisher.class);
         membershipRepository = mock(OrganizationMembershipRepository.class);
         roleRepository = mock(RoleAssignmentRepository.class);
         service = new AccountService(userRepository, encoder, mock(JwtUtil.class), refreshTokenService,
@@ -79,7 +78,7 @@ class AccountServiceDeletionTest {
     private void assertNoSideEffects(OrganizationMembership m) {
         verify(userRepository, never()).save(any());
         verify(refreshTokenService, never()).revokeAll(any());
-        verify(publisher, never()).publishEvent(any(Object.class));
+        verify(publisher, never()).publish(any());
         assertEquals("a@b.com", user.getEmail());
         assertNull(user.getDeletedAt());
         if (m != null) assertEquals(MembershipStatus.ACTIVE, m.getStatus());
@@ -127,8 +126,8 @@ class AccountServiceDeletionTest {
         assertEquals(MembershipStatus.REVOKED, m.getStatus());
         verify(userRepository).save(user);
         verify(refreshTokenService).revokeAll(userId);
-        ArgumentCaptor<Object> cap = ArgumentCaptor.forClass(Object.class);
-        verify(publisher).publishEvent(cap.capture());
+        ArgumentCaptor<AccountService.AuthEvent> cap = ArgumentCaptor.forClass(AccountService.AuthEvent.class);
+        verify(publisher).publish(cap.capture());
         AccountService.AuthEvent ev = (AccountService.AuthEvent) cap.getValue();
         assertEquals("USER_DELETED", ev.eventType());
         assertEquals(userId, ev.userId());
@@ -153,8 +152,8 @@ class AccountServiceDeletionTest {
     @Test
     void updateProfile_publishesUserUpdated() {
         service.updateProfile(userId, new UpdateProfileRequest(" Grace ", " Hopper "));
-        ArgumentCaptor<Object> cap = ArgumentCaptor.forClass(Object.class);
-        verify(publisher).publishEvent(cap.capture());
+        ArgumentCaptor<AccountService.AuthEvent> cap = ArgumentCaptor.forClass(AccountService.AuthEvent.class);
+        verify(publisher).publish(cap.capture());
         AccountService.AuthEvent ev = (AccountService.AuthEvent) cap.getValue();
         assertEquals("USER_UPDATED", ev.eventType());
         assertEquals("a@b.com", ev.email());
@@ -164,7 +163,7 @@ class AccountServiceDeletionTest {
     @Test
     void updateProfile_unchangedName_publishesNothing() {
         service.updateProfile(userId, new UpdateProfileRequest("Ada", "Lovelace"));
-        verify(publisher, never()).publishEvent(any(Object.class));
+        verify(publisher, never()).publish(any());
     }
 
     @Test
@@ -172,6 +171,6 @@ class AccountServiceDeletionTest {
         user.setDeletedAt(java.time.LocalDateTime.now());
         assertThrows(ResponseStatusException.class,
                 () -> service.updateProfile(userId, new UpdateProfileRequest("A", "B")));
-        verify(publisher, never()).publishEvent(any(Object.class));
+        verify(publisher, never()).publish(any());
     }
 }
