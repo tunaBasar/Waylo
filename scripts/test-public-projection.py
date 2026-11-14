@@ -92,12 +92,14 @@ def main():
     ok(s == 201, f"Create hotel under PENDING org 201 got {s}")
     hotel_id = d["data"]["id"]
 
-    # Direct GET by id: unfiltered, visible even while org is PENDING (internal lookup contract)
-    s, d = req("GET", f"/api/hotels/{hotel_id}")
-    ok(s == 200 and d["data"]["id"] == hotel_id, "GET by id unfiltered while org PENDING")
+    # Direct GET by id: owner sees the unpublished hotel, anonymous callers do not (unpublished hidden since 4025805)
+    s, d = req("GET", f"/api/hotels/{hotel_id}", token=token)
+    ok(s == 200 and d["data"]["id"] == hotel_id, "GET by id visible to owner while org PENDING")
+    s, _ = req("GET", f"/api/hotels/{hotel_id}")
+    ok(s == 404, f"GET by id hidden from anonymous while org PENDING got {s}")
 
     # Partner management view scoped by organizationId: unfiltered, visible while PENDING
-    s, d = req("GET", f"/api/hotels?organizationId={org_id}")
+    s, d = req("GET", f"/api/hotels?organizationId={org_id}", token=token)
     ok(s == 200 and any(h["id"] == hotel_id for h in d["data"]), "organizationId-scoped list unfiltered while PENDING")
 
     # Public unscoped list: hotel of a PENDING org must NOT appear
@@ -119,7 +121,7 @@ def main():
     s, d = req("GET", "/api/hotels")
     ok(not any(h["id"] == hotel_id for h in d["data"]), "Public list excludes deactivated hotel")
 
-    s, d = req("GET", f"/api/hotels?organizationId={org_id}")
+    s, d = req("GET", f"/api/hotels?organizationId={org_id}", token=token)
     ok(any(h["id"] == hotel_id for h in d["data"]), "organizationId-scoped list still shows deactivated hotel")
 
     print(f"PASS: {P}  FAIL: {F}")

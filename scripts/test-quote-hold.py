@@ -76,7 +76,7 @@ def register():
 def data(method, path, body=None, token=None, direct=False, internal_token=None):
     status, result = request(method, path, body, token, internal_token, direct)
     check(status in (200, 201) and result.get('success'), f'{method} {path.split("?")[0]} succeeds')
-    return result['data']
+    return result.get('data')
 
 
 owner_id, owner = register()
