@@ -7,6 +7,7 @@ Calls /internal endpoints directly on 127.0.0.1-bound service ports:
   - token signed for another audience -> 401
   - expired token, tampered token, caller not in the allowlist, issuer signing with another service's key -> rejected
   - valid token from an allowed caller -> accepted
+  - the same token used twice -> second call 401 (replay protection)
 Mode is read from WAYLO_SERVICE_AUTH_MODE in .env. Keys are read from .env and never printed. Standard library + cryptography.
 """
 import base64
@@ -85,6 +86,12 @@ def main():
     ok(passed(s), f'valid token from allowed caller checkin-service -> passes auth ({s})')
     s = call(PB, UNKNOWN_ITEM, tok('hotel-service', 'package-booking-service'))
     ok(passed(s), f'valid token from allowed caller hotel-service -> passes auth ({s})')
+
+    # Replay: the same token used twice, the second call must be rejected (jti remembered until exp + skew).
+    replay = tok('checkin-service', 'package-booking-service')
+    first = call(PB, UNKNOWN_ITEM, replay)
+    second = call(PB, UNKNOWN_ITEM, replay)
+    ok(passed(first) and second == 401, f'same token used twice: first passes ({first}), replay -> 401 ({second})')
 
     # Second service: auth-service /internal/organizations (hotel-service allowed, payment-service not).
     s = call(AUTH, '/internal/organizations/active-ids', tok('hotel-service', 'auth-service'))
