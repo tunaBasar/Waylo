@@ -30,7 +30,7 @@ Proje kökündeki `.env` dosyasında `POSTGRES_PASSWORD` ve `PGADMIN_PASSWORD` d
 
 ### Servisler arası kimlik (X-Service-Token)
 
-Her servis kendi Ed25519 anahtarıyla imzalı kısa ömürlü bir token (JWT, `iss`=çağıran, `aud`=hedef, `exp`<=60 sn, `jti`) gönderir; alıcı servis imzayı çağıranın açık anahtarıyla, `aud` alanını ve `/internal/**` route grubu başına izinli çağıran listesini (`waylo.service-auth.routes`, her servisin `application.yml` dosyasında) doğrular. Ortak kod: `service-auth-common` modülü.
+Her servis kendi Ed25519 anahtarıyla imzalı kısa ömürlü bir token (JWT, `iss`=çağıran, `aud`=hedef, `exp`<=60 sn, `jti`) gönderir; alıcı servis imzayı çağıranın açık anahtarıyla, `aud` alanını ve `/internal/**` route grubu başına izinli çağıran listesini (`waylo.service-auth.routes`, her servisin `application.yml` dosyasında) doğrular. Ortak kod: `service-auth-common` modülü. Token tek kullanımlıktır: kabul edilen `(iss, jti)` süresi dolana kadar hatırlanır ve aynı token ikinci kez gelirse 401 döner (bellek içi, servis örneği başına).
 
 İlk kurulumda (ve yeni servis eklendiğinde) anahtarları üretin; anahtarlar `.env` dosyasına yazılır (gitignore'da), ekrana basılmaz, mevcut anahtarlar korunur:
 
