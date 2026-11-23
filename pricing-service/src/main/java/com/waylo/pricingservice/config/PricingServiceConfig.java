@@ -1,7 +1,6 @@
 package com.waylo.pricingservice.config;
 
 import com.waylo.pricingservice.filter.AdminRoleFilter;
-import com.waylo.pricingservice.filter.InternalTokenFilter;
 import com.waylo.pricingservice.repository.CampaignRepository;
 import com.waylo.pricingservice.repository.PromoCodeRepository;
 import com.waylo.pricingservice.repository.PromoReservationRepository;
@@ -44,5 +43,5 @@ public class PricingServiceConfig {
         return new AdminService(campaignRepo, promoCodeRepo, taxRateRepo);
     }
 
-    // InternalTokenFilter and AdminRoleFilter are @Component beans, auto-discovered.
+    // AdminRoleFilter is a @Component bean, auto-discovered. /internal is guarded by service-auth-common.
 }

@@ -11,7 +11,7 @@ import java.util.UUID;
 
 /**
  * Internal service-to-service endpoints (§3).
- * Protected by InternalTokenFilter.
+ * Protected by service-auth-common ServiceAuthFilter.
  */
 @RestController
 @RequestMapping("/internal/pricing")

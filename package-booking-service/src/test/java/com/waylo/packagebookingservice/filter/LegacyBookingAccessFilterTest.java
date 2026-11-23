@@ -1,5 +1,6 @@
 package com.waylo.packagebookingservice.filter;
 
+import com.waylo.serviceauth.ServiceAuthFilter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -15,12 +16,12 @@ import static org.mockito.Mockito.verify;
 class LegacyBookingAccessFilterTest {
 
     private static final String TOKEN = "t".repeat(40);
-    private final LegacyBookingAccessFilter filter = new LegacyBookingAccessFilter(TOKEN);
+    private final LegacyBookingAccessFilter filter = new LegacyBookingAccessFilter();
 
     private MockHttpServletResponse run(String method, String path, String token, String userId, String role,
                                         boolean expectPass) throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest(method, path);
-        if (token != null) req.addHeader("X-Internal-Token", token);
+        if (TOKEN.equals(token)) req.setAttribute(ServiceAuthFilter.CALLER_ATTRIBUTE, "package-booking-saga-orchestrator"); // set by service-auth-common
         if (userId != null) req.addHeader("X-User-Id", userId);
         if (role != null) req.addHeader("X-User-Role", role);
         MockHttpServletResponse res = new MockHttpServletResponse();

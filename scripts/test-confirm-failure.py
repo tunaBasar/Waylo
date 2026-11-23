@@ -13,6 +13,8 @@ import secrets
 import sys
 import time
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -67,7 +69,7 @@ def main():
     check('offer found', offer is not None, r)
 
     SEATS = 'http://127.0.0.1:8082'
-    tok = {'X-Internal-Token': car.env_value('INTERNAL_API_TOKEN')}
+    tok = service_token.SignedHeaders('package-booking-service', 'flight-seat-inventory-service')
     car_item = {'vertical': 'CAR', 'pickupBranchId': branch, 'returnBranchId': branch, 'category': 'ECONOMY',
                 'transmission': 'MANUAL', 'pickupAt': pickup_at, 'returnAt': return_at, 'driverAge': 30}
 

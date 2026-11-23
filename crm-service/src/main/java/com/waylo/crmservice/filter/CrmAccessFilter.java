@@ -4,27 +4,20 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
+import com.waylo.serviceauth.ServiceAuthFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 
 /**
  * Edge access rules for customer PII (the gateway verifies the JWT and sets X-User-Id / X-User-Role).
  * ADMIN: everything. Any other authenticated user: only GET /api/customers/me. Service-to-service
- * (notification-service e-mail lookup): GET with a valid X-Internal-Token. Everything else: 401/403.
+ * (notification-service e-mail lookup): GET with a verified X-Service-Token (service-auth-common). Everything else: 401/403.
  */
 @Component
 public class CrmAccessFilter extends OncePerRequestFilter {
-
-    private final byte[] internalToken;
-
-    public CrmAccessFilter(@Value("${waylo.internal.token:}") String internalToken) {
-        this.internalToken = internalToken == null ? new byte[0] : internalToken.getBytes(StandardCharsets.UTF_8);
-    }
 
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
@@ -35,9 +28,8 @@ public class CrmAccessFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String token = request.getHeader("X-Internal-Token");
-        if (token != null && internalToken.length > 0 && "GET".equals(request.getMethod())
-                && MessageDigest.isEqual(internalToken, token.getBytes(StandardCharsets.UTF_8))) {
+        // Caller verified (signature, audience, allowlist) by service-auth-common's ServiceAuthFilter.
+        if (ServiceAuthFilter.isServiceCall(request) && "GET".equals(request.getMethod())) {
             chain.doFilter(request, response);
             return;
         }

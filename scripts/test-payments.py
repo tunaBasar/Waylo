@@ -17,6 +17,8 @@ import urllib.request
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 BASE = 'http://localhost:8080'
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -73,13 +75,14 @@ def psql(db, sql):
 
 
 def internal(path):
-    """Call a service-internal endpoint from inside the docker network with the internal token."""
-    token = env_value('INTERNAL_API_TOKEN')
-    cmd = ['docker', 'exec', 'waylo-payment-service', 'sh', '-c',
-           f'wget -qO- --header="X-Internal-Token: $INTERNAL_API_TOKEN" --post-data="" '
-           f'"http://localhost:8087{path}" 2>&1; echo " EXIT=$?"']
-    del token  # the container already has it in its env; never pass secrets on argv
-    return subprocess.run(cmd, capture_output=True, text=True).stdout
+    """POST a payment-service internal endpoint directly (127.0.0.1:8087) as package-booking-service (signed token)."""
+    r = urllib.request.Request('http://127.0.0.1:8087' + path, data=b'', method='POST',
+                               headers=service_token.headers('package-booking-service', 'payment-service'))
+    try:
+        with urllib.request.urlopen(r, timeout=15) as resp:
+            return resp.read().decode() + ' EXIT=0'
+    except urllib.error.HTTPError as e:
+        return f'HTTP {e.code} EXIT=1'
 
 
 def register(prefix):

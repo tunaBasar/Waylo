@@ -5,31 +5,27 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
+import com.waylo.serviceauth.ServiceAuthFilter;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Edge rules: internal paths need X-Internal-Token, partner and customer paths need a valid X-User-Id,
+ * Edge rules: internal paths need a verified X-Service-Token (service-auth-common), partner and customer paths need a valid X-User-Id,
  * admin paths need X-User-Role ADMIN. Catalogue paths (/api/bus-terminals, /api/bus-trips) are public.
  */
 @Component
 public class BusAccessFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
-    private final String internalToken;
-
-    public BusAccessFilter(ObjectMapper objectMapper, @Value("${waylo.internal.token}") String internalToken) {
+    public BusAccessFilter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
-        this.internalToken = internalToken;
     }
 
     @Override
@@ -37,10 +33,8 @@ public class BusAccessFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String path = request.getRequestURI();
         if (under(path, "/internal")) {
-            String provided = request.getHeader("X-Internal-Token");
-            if (internalToken == null || internalToken.isBlank() || provided == null
-                    || !MessageDigest.isEqual(provided.getBytes(StandardCharsets.UTF_8),
-                    internalToken.getBytes(StandardCharsets.UTF_8))) {
+            // Verified (signature, audience, caller allowlist) by service-auth-common's ServiceAuthFilter; defence in depth.
+            if (!ServiceAuthFilter.isServiceCall(request)) {
                 send(response, 401, "UNAUTHORIZED", "Unauthorized internal request", path);
                 return;
             }

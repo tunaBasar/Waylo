@@ -22,6 +22,8 @@ import subprocess
 import sys
 import time
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('car_order_helpers', HERE / 'test-car-order.py')
@@ -83,7 +85,7 @@ def pay(order_id, token):
 
 def release_escrow(order_item_id):
     s, _, _ = call('POST', f'/internal/escrow-items/{order_item_id}/release', None, base=PAYMENT_INTERNAL,
-                   headers={'X-Internal-Token': INTERNAL_TOKEN})
+                   headers=service_token.headers('package-booking-service', 'payment-service'))
     return s == 200
 
 

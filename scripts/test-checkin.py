@@ -12,6 +12,8 @@ import secrets
 import sys
 import urllib.request
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('tfo', HERE / 'test-flight-order.py')
@@ -115,7 +117,7 @@ def main():
     check('customer cannot list admin (403)', s == 403, s)
     s, _ = call('GET', f'/internal/orders/items/{item_in}', base='http://127.0.0.1:8085')
     check('internal endpoint needs token (401)', s == 401, s)
-    s, b = call('GET', f'/internal/orders/items/{item_in}', base='http://127.0.0.1:8085', headers={'X-Internal-Token': internal})
+    s, b = call('GET', f'/internal/orders/items/{item_in}', base='http://127.0.0.1:8085', headers=service_token.headers('checkin-service', 'package-booking-service'))
     check('internal endpoint with token 200', s == 200 and data((s, b)).get('vertical') == 'FLIGHT', s)
     req = urllib.request.Request('http://127.0.0.1:8089/api/checkins', headers={'X-User-Id': str(uuid.uuid4())})
     with urllib.request.urlopen(req, timeout=15) as r:

@@ -19,7 +19,7 @@ import java.util.UUID;
  * Internal endpoint for domain services to build a public-projection filter
  * (e.g. hotel-service hiding hotels of a PENDING/SUSPENDED organization from
  * unauthenticated browse/search). NOT routed by the API gateway; protected by
- * InternalTokenFilter (X-Internal-Token), same as /internal/access.
+ * service-auth-common ServiceAuthFilter (X-Service-Token), same as /internal/access.
  */
 @RestController
 @RequestMapping("/internal/organizations")
@@ -41,7 +41,7 @@ public class InternalOrganizationController {
 
     /**
      * Return a public-facing projection of one organization by ID.
-     * Protected by InternalTokenFilter (X-Internal-Token).
+     * Protected by service-auth-common ServiceAuthFilter (X-Service-Token).
      */
     @GetMapping("/{id}")
     public InternalOrganizationDetail getOrganization(@PathVariable UUID id) {

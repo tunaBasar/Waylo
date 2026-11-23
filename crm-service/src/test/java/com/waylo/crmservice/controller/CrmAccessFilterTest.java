@@ -1,5 +1,6 @@
 package com.waylo.crmservice.controller;
 
+import com.waylo.serviceauth.ServiceAuthFilter;
 import com.waylo.crmservice.filter.CrmAccessFilter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
@@ -12,14 +13,14 @@ import static org.mockito.Mockito.*;
 class CrmAccessFilterTest {
 
     private static final String TOKEN = "t".repeat(40);
-    private final CrmAccessFilter filter = new CrmAccessFilter(TOKEN);
+    private final CrmAccessFilter filter = new CrmAccessFilter();
 
     private int call(String method, String uri, String userId, String role, String internal) throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest(method, uri);
         req.setRequestURI(uri);
         if (userId != null) req.addHeader("X-User-Id", userId);
         if (role != null) req.addHeader("X-User-Role", role);
-        if (internal != null) req.addHeader("X-Internal-Token", internal);
+        if (TOKEN.equals(internal)) req.setAttribute(ServiceAuthFilter.CALLER_ATTRIBUTE, "notification-service"); // set by service-auth-common
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
         filter.doFilter(req, res, chain);

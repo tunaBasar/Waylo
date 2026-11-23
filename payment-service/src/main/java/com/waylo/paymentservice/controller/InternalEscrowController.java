@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** Service-to-service only (X-Internal-Token enforced by InternalTokenFilter, never routed by the gateway). */
+/** Service-to-service only (X-Service-Token enforced by service-auth-common ServiceAuthFilter, never routed by the gateway). */
 @RestController
 @RequestMapping("/internal/escrow-items")
 public class InternalEscrowController {

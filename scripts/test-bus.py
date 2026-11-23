@@ -20,6 +20,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 BASE = 'http://localhost:8080'
 BUS = 'http://localhost:8096'
@@ -104,7 +106,7 @@ def hold(trip, frm, to, passengers, key=None, user=None):
     return call('POST', '/internal/bus-holds', {
         'tripId': trip, 'fromSeq': frm, 'toSeq': to, 'passengers': passengers,
         'principalUserId': user or str(uuid.uuid4()), 'idempotencyKey': key or 'bt-' + uuid.uuid4().hex,
-        'orderCorrelationId': 'bus-test'}, base=BUS, headers={'X-Internal-Token': INTERNAL})
+        'orderCorrelationId': 'bus-test'}, base=BUS, headers=service_token.headers('package-booking-service', 'bus-service'))
 
 
 def pax(seat, gender='MALE'):
@@ -286,12 +288,12 @@ def main():
 
     # confirm / release
     hid = held['holdId']
-    c = call('POST', f'/internal/bus-holds/{hid}/confirm', base=BUS, headers={'X-Internal-Token': INTERNAL})
+    c = call('POST', f'/internal/bus-holds/{hid}/confirm', base=BUS, headers=service_token.headers('package-booking-service', 'bus-service'))
     check('confirm HELD -> CONFIRMED', c[0] == 200 and data(c)['status'] == 'CONFIRMED', c)
     bk = data(call('GET', P + '/bookings', token=partner)) or []
     check('partner sees confirmed booking with passenger', len(bk) == 1 and bk[0]['tickets'][0]['seatNo'] == 7, bk)
-    a = call('POST', f'/internal/bus-holds/{hid}/release', base=BUS, headers={'X-Internal-Token': INTERNAL})
-    b2 = call('POST', f'/internal/bus-holds/{hid}/release', base=BUS, headers={'X-Internal-Token': INTERNAL})
+    a = call('POST', f'/internal/bus-holds/{hid}/release', base=BUS, headers=service_token.headers('package-booking-service', 'bus-service'))
+    b2 = call('POST', f'/internal/bus-holds/{hid}/release', base=BUS, headers=service_token.headers('package-booking-service', 'bus-service'))
     check('release CONFIRMED -> CANCELLED, idempotent', a[0] == 200 and b2[0] == 200 and data(b2)['status'] == 'CANCELLED')
     check('seat 7 free again after release', hold(trip, 0, 2, [pax(7)])[0] == 200)
     r = hold(trip, 0, 2, [pax(33)], user=partner_id, key=f'mine-{tag}')

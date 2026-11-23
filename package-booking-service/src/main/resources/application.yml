@@ -37,6 +37,17 @@ spring:
 waylo:
   internal:
     token: ${INTERNAL_API_TOKEN}
+  # Service-to-service allowlist (service-auth-common): verified X-Service-Token callers per route group.
+  # Derived from the Feign clients; any other /internal path fails closed. required: false = optional (user calls allowed too).
+  service-auth:
+    routes:
+      - path: /internal/orders/items
+        callers: [hotel-service, checkin-service]
+      - path: /internal/orders
+        callers: [payment-service, notification-service]
+      - path: /api/bookings
+        callers: [package-booking-saga-orchestrator]
+        required: false
   flight:
     # Platform seller organization that owns internal flight items (QR scan + payout). Required to sell flights.
     seller-organization-id: ${FLIGHT_SELLER_ORGANIZATION_ID:}

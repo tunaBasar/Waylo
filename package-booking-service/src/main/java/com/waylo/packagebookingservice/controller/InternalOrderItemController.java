@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/** Service-to-service only (X-Internal-Token enforced by InternalTokenFilter). Read model for checkin-service. */
+/** Service-to-service only (X-Service-Token enforced by service-auth-common ServiceAuthFilter). Read model for checkin-service. */
 @RestController
 @RequestMapping("/internal/orders/items")
 public class InternalOrderItemController {

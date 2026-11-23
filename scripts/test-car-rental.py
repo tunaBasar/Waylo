@@ -19,6 +19,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 BASE = 'http://localhost:8080'
 CAR = 'http://localhost:8084'
@@ -246,7 +248,7 @@ def main():
     check('offers return after renewal', len(data(call('GET', offers_q)) or []) == 1)
 
     # internal holds
-    IH = {'X-Internal-Token': INTERNAL}
+    IH = service_token.SignedHeaders('package-booking-service', 'car-rental-service')
     def hold(key, customer=None, a=A, r=A):
         return call('POST', '/internal/car-holds', {
             'pickupBranchId': a, 'returnBranchId': r, 'category': 'ECONOMY', 'transmission': 'MANUAL',

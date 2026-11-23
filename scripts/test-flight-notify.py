@@ -13,6 +13,8 @@ import secrets
 import sys
 import time
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 here = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('tfo', here / 'test-flight-order.py')
@@ -61,7 +63,7 @@ def main():
     check('payment AUTHORIZED', s == 200 and intent and intent.get('status') == 'AUTHORIZED', s)
     customer_id = data(call('GET', f"/api/orders/{order['id']}", token=tc))['customerId']
 
-    hdr = {'X-Internal-Token': internal}
+    hdr = service_token.SignedHeaders('notification-service', 'package-booking-service')
     q = f'/internal/orders/flight-items?flightNumber={fno}&departureDate={date}'
     s, _ = call('GET', q, base=PB)
     check('flight-items without token -> 401', s == 401, s)

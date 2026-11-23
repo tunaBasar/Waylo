@@ -16,6 +16,8 @@ import secrets
 import sys
 import time
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -98,7 +100,7 @@ def main():
     oid = data(r)['id']
     car.order_ids.append(oid)
     ref = psql('package_booking_db', f"SELECT fulfillment_ref FROM order_items WHERE order_id='{oid}' AND vertical='HOTEL'")
-    tok = {'X-Internal-Token': car.env_value('INTERNAL_API_TOKEN')}
+    tok = service_token.SignedHeaders('package-booking-service', 'hotel-service')
     s, _, _ = call('POST', f'/internal/hotel-holds/{ref}/release', base=HOTEL, headers=tok)
     check('hotel hold released', s == 200, s)
     s, r, _ = pay(oid)

@@ -48,6 +48,20 @@ def main():
                  ("GET", "/api/internal/orders"), ("POST", "/internal/escrow-items")]:
         c, _ = req(m, p, {} if m == "POST" else None, {"X-Internal-Token": "guess"})
         ok(c in (401, 403, 404), f"{m} {p} blocked ({c})")
+        c, _ = req(m, p, {} if m == "POST" else None, {"X-Service-Token": "guess.guess.guess"})
+        ok(c in (401, 403, 404), f"{m} {p} with X-Service-Token blocked ({c})")
+
+    # 1b. a genuinely valid signed service token is stripped by the gateway: the legacy /api/bookings API
+    # accepts it directly from the saga, but through the gateway the caller stays anonymous
+    try:
+        import pathlib, sys as _sys
+        _sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        import service_token
+        valid = service_token.sign("package-booking-saga-orchestrator", "package-booking-service")
+        c, _ = req("GET", "/api/bookings", None, {"X-Service-Token": valid})
+        ok(c in (401, 403, 404), f"valid X-Service-Token stripped at gateway, /api/bookings -> {c}")
+    except SystemExit:
+        print("SKIP: service keys not generated (scripts/gen-service-keys.py)")
 
     # 2. traversal / encoded variants
     for p in ["/api/hotels/%2e%2e/orders", "/api/hotels/..%2fauth", "/api/hotels//x", "/api/hotels;x=1",

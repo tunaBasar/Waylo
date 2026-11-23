@@ -26,6 +26,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402  signed X-Service-Token for direct /internal calls
 
 BASE = 'http://localhost:8080'
 SEATS_DIRECT = 'http://127.0.0.1:8082'
@@ -240,10 +242,10 @@ def main():
                         ('missing date', '/api/flight-offers?from=IST&to=ESB'), ('bad adults', f'/api/flight-offers?from=IST&to=ESB&date={date}&adults=x')):
         s, b = call('GET', path)
         check(f'offers {label} -> 400 BAD_REQUEST (not 500)', s == 400 and b.get('error') == 'BAD_REQUEST', (s, b.get('error')))
-    s, b = call('POST', '/internal/flight-holds', None, base=SEATS_DIRECT, headers={'X-Internal-Token': internal})
+    s, b = call('POST', '/internal/flight-holds', None, base=SEATS_DIRECT, headers=service_token.headers('package-booking-service', 'flight-seat-inventory-service'))
     check('internal hold without body -> 400', s == 400, s)
     req_raw = urllib.request.Request(SEATS_DIRECT + '/internal/flight-holds', data=b'{not json', method='POST',
-                                     headers={'Content-Type': 'application/json', 'X-Internal-Token': internal})
+                                     headers={'Content-Type': 'application/json', **service_token.headers('package-booking-service', 'flight-seat-inventory-service')})
     try:
         urllib.request.urlopen(req_raw, timeout=15)
         code = 200
@@ -262,7 +264,7 @@ def main():
         return call('POST', '/internal/flight-holds',
                     {'offerId': offer['offerId'], 'seatNumber': '1A', 'passengerFirstName': 'Race', 'passengerLastName': 'Race' + chr(65 + i),
                      'principalUserId': str(uuid.uuid4()), 'idempotencyKey': f'race-{sfx}-{i}', 'orderCorrelationId': f'race-{i}'},
-                    base=SEATS_DIRECT, headers={'X-Internal-Token': internal})
+                    base=SEATS_DIRECT, headers=service_token.headers('package-booking-service', 'flight-seat-inventory-service'))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=PARALLEL) as ex:
         rs = list(ex.map(hold, range(PARALLEL)))
@@ -278,7 +280,7 @@ def main():
     again = hold(win_i)
     check('same idempotency key returns the same hold', again[0] == 200 and data(again)['holdId'] == data(rs[win_i])['holdId'])
     s, _ = call('POST', f"/internal/flight-holds/{data(rs[win_i])['holdId']}/release", base=SEATS_DIRECT,
-                headers={'X-Internal-Token': internal})
+                headers=service_token.headers('package-booking-service', 'flight-seat-inventory-service'))
     check('release frees the seat', s == 200, s)
 
     print('\n=== CHECK 4: Customer flight order ===')
@@ -373,7 +375,7 @@ def main():
     check('admin top-up 201, balance 100.00', s == 201 and float(data((s, b))['balance']) == 100.0, (s, b.get('error')))
     s, b = call('POST', f'/api/admin/supplier-accounts/{sup}/topups', topup, admin)
     check('top-up replay does not add again', s == 201 and float(data((s, b))['balance']) == 100.0, s)
-    tok = {'X-Internal-Token': internal}
+    tok = service_token.SignedHeaders('flight-seat-inventory-service', 'payment-service')
     mv = {'supplier': sup, 'orderId': str(uuid.uuid4()), 'currency': 'EUR', 'idempotencyKey': f'po-{sfx}-1'}
     s, b = call('POST', '/internal/supplier-payouts', {**mv, 'amount': 100.01}, base=PAYMENT_DIRECT, headers=tok)
     check('insufficient payout 422 SUPPLIER_BALANCE_INSUFFICIENT', s == 422 and b.get('error') == 'SUPPLIER_BALANCE_INSUFFICIENT', (s, b.get('error')))

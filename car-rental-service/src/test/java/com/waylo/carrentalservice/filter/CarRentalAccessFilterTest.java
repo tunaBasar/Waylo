@@ -1,5 +1,6 @@
 package com.waylo.carrentalservice.filter;
 
+import com.waylo.serviceauth.ServiceAuthFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -13,14 +14,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CarRentalAccessFilterTest {
 
     private static final String TOKEN = "t".repeat(40);
-    private final CarRentalAccessFilter filter = new CarRentalAccessFilter(new ObjectMapper(), TOKEN);
+    private final CarRentalAccessFilter filter = new CarRentalAccessFilter(new ObjectMapper());
     private final String uid = UUID.randomUUID().toString();
 
     private int run(String method, String path, String user, String role, String token) throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest(method, path);
         if (user != null) req.addHeader("X-User-Id", user);
         if (role != null) req.addHeader("X-User-Role", role);
-        if (token != null) req.addHeader("X-Internal-Token", token);
+        if (TOKEN.equals(token)) req.setAttribute(ServiceAuthFilter.CALLER_ATTRIBUTE, "package-booking-service"); // set by service-auth-common
         MockHttpServletResponse res = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
         filter.doFilter(req, res, chain);

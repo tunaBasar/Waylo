@@ -28,6 +28,19 @@ docker compose up -d --build
 
 Proje kökündeki `.env` dosyasında `POSTGRES_PASSWORD` ve `PGADMIN_PASSWORD` değişkenleri tanımlı olmalıdır; aksi halde Compose başlatmayı reddeder.
 
+### Servisler arası kimlik (X-Service-Token)
+
+Her servis kendi Ed25519 anahtarıyla imzalı kısa ömürlü bir token (JWT, `iss`=çağıran, `aud`=hedef, `exp`<=60 sn, `jti`) gönderir; alıcı servis imzayı çağıranın açık anahtarıyla, `aud` alanını ve `/internal/**` route grubu başına izinli çağıran listesini (`waylo.service-auth.routes`, her servisin `application.yml` dosyasında) doğrular. Ortak kod: `service-auth-common` modülü.
+
+İlk kurulumda (ve yeni servis eklendiğinde) anahtarları üretin; anahtarlar `.env` dosyasına yazılır (gitignore'da), ekrana basılmaz, mevcut anahtarlar korunur:
+
+```bash
+python3 scripts/gen-service-keys.py            # eksik anahtarları üret
+python3 scripts/gen-service-keys.py --rotate payment-service   # bir servisin anahtarını yenile
+```
+
+`WAYLO_SERVICE_AUTH_MODE`: `dual` (varsayılan; imzalı token veya eski `X-Internal-Token` kabul) veya `strict` (yalnızca imzalı token). Anahtarlar yoksa servisler `dual` modda eski token ile çalışmaya devam eder. Doğrulama: `python3 scripts/test-service-auth.py`.
+
 Bu komut backend kaynaklarını Java 21 ile derler, frontend için `npm ci` ve production build çalıştırır, ardından altyapı ve uygulama servislerini başlatır. İlk derleme internet bağlantısı gerektirir ve sonraki derlemelerden daha uzun sürer.
 
 Başlatmanın tamamlanması için `docker compose up -d --build --wait --wait-timeout 240` kullanılabilir. İlk açılışta Eureka kayıtlarının gateway'e ulaşması kısa süre alabilir, bu sırada API geçici olarak 503 dönebilir.

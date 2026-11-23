@@ -70,11 +70,13 @@ class JwtAuthenticationFilterTest {
             var authenticated = MockServerWebExchange.from(MockServerHttpRequest.post(path)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
                     .header("X-User-Id", "spoofed-user")
-                    .header("X-Internal-Token", "spoofed-internal").build());
+                    .header("X-Internal-Token", "spoofed-internal")
+                    .header("X-Service-Token", "spoofed-service").build());
             filter.filter(authenticated, chain).block();
             assertThat(forwarded.get()).isNotNull();
             assertThat(forwarded.get().getHeaders().getFirst("X-User-Id")).isEqualTo("user-1");
             assertThat(forwarded.get().getHeaders().getFirst("X-Internal-Token")).isNull();
+            assertThat(forwarded.get().getHeaders().getFirst("X-Service-Token")).isNull();
         }
     }
 
