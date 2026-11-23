@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /**
  * Internal endpoints for hotel hold operations.
- * Access restricted by InternalTokenFilter.
+ * Access restricted by service-auth-common ServiceAuthFilter.
  */
 @RestController
 @RequestMapping("/internal")

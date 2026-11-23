@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Unfiltered hotel lookup for service-to-service callers (X-Internal-Token enforced by InternalTokenFilter).
+ * Unfiltered hotel lookup for service-to-service callers (X-Service-Token enforced by service-auth-common ServiceAuthFilter).
  * auth-service uses it to verify a hotel's organization while granting roles, before the hotel is public.
  */
 @RestController

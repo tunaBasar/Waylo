@@ -8,6 +8,7 @@ import com.waylo.hotelservice.exception.AuthenticationRequiredException;
 import com.waylo.hotelservice.exception.AuthorizationUnavailableException;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.repository.HotelRepository;
+import com.waylo.hotelservice.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -63,7 +64,11 @@ public class HotelAccessGuard {
         }
         try {
             AccessDecision decision = authAccessClient.check(userId, organizationId, null, "HOTEL_READ");
-            return decision != null && decision.allowed();
+            boolean allowed = decision != null && decision.allowed();
+            if (allowed) {
+                TenantContext.authorizePartner(organizationId);
+            }
+            return allowed;
         } catch (RuntimeException e) {
             log.warn("Authorization service unavailable for userId={}, permission=HOTEL_READ", userId);
             return false;
@@ -86,5 +91,7 @@ public class HotelAccessGuard {
         if (decision == null || !decision.allowed()) {
             throw new AccessDeniedException("Not allowed to perform this action");
         }
+        // RM-14: subsequent transactions in this request run in RLS partner mode scoped to this organization.
+        TenantContext.authorizePartner(organizationId);
     }
 }
