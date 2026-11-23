@@ -25,6 +25,8 @@ export interface ApiClient {
   del<T>(path: string, body?: unknown): Promise<T>;
   /** Unauthenticated envelope call (login/register/...), returns data. */
   publicPost<T>(path: string, body?: unknown): Promise<T>;
+  /** Unauthenticated envelope GET (email verification). */
+  publicGet<T>(path: string): Promise<T>;
   refresh(): Promise<boolean>;
   tokens: TokenStore;
 }
@@ -110,5 +112,6 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     patch: (p, b) => request(p, 'PATCH', b ?? {}),
     del: (p, b) => request(p, 'DELETE', b),
     publicPost: async (p, b) => parse(await send(p, 'POST', b ?? {}, false)),
+    publicGet: async (p) => parse(await send(p, 'GET', undefined, false)),
   };
 }

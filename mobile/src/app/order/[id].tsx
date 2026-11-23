@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { ApiError, type CancellationPreview, type Order, type OrderItem, type Voucher } from '@/api';
 import { checkoutErrorMessage, ordersApi, paySandbox } from '@/features/orders/api';
 import { useAsync } from '@/features/useAsync';
+import { useOnline } from '@/features/network/NetworkContext';
+import { orderLinkOpened } from '@/features/deeplinks';
 import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
 import { fmtLocal, money, ORDER_STATUS_TR, policyText, refundText } from '@/features/format';
@@ -49,8 +51,12 @@ function Vouchers({ orderId, checkedInItemIds }: { orderId: string; checkedInIte
 }
 
 export default function OrderDetail() {
+  const online = useOnline();
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useAsync(() => ordersApi.get(id), [id]);
+  // Cleared only once the order is shown: right after login the router guard can unmount this screen once.
+  const loaded = state.data != null;
+  useEffect(() => { if (id && loaded) orderLinkOpened(id); }, [id, loaded]);
   const checkins = useAsync(() => checkinApi.mine(), [id]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -105,8 +111,8 @@ export default function OrderDetail() {
             {o.status === 'PENDING' && (
               <>
                 <TestBanner />
-                <Button title={busy ? 'Isleniyor...' : 'Ode (TEST ODEME)'} disabled={busy} onPress={() => pay('TEST_OK')} />
-                <Button kind="secondary" title="Reddedilen test odemesi" disabled={busy} onPress={() => pay('TEST_DECLINE')} />
+                <Button title={busy ? 'Isleniyor...' : 'Ode (TEST ODEME)'} disabled={busy || !online} onPress={() => pay('TEST_OK')} />
+                <Button kind="secondary" title="Reddedilen test odemesi" disabled={busy || !online} onPress={() => pay('TEST_DECLINE')} />
               </>
             )}
             {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} />}
@@ -118,7 +124,7 @@ export default function OrderDetail() {
                 {preview.cancellable ? (
                   <>
                     <Text style={{ fontWeight: '700' }}>{o.status === 'PENDING' ? 'Odeme yapilmadi, tutar cekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
-                    <Button kind="danger" title="Iptali onayla" disabled={busy} onPress={confirmCancel} />
+                    <Button kind="danger" title="Iptali onayla" disabled={busy || !online} onPress={confirmCancel} />
                   </>
                 ) : <Text>{`Bu siparis iptal edilemez (${preview.blockedReason}).`}</Text>}
                 <Button kind="secondary" title="Vazgec" onPress={() => setPreview(null)} />

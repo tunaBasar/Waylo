@@ -1,6 +1,5 @@
-import { api, type CancellationPreview, type Order, type PaymentIntent, type Voucher } from '@/api';
+import { api, type CancellationPreview, type CartItem, type Order, type PaymentIntent, type Voucher } from '@/api';
 import { toPackageRequest } from '@/features/cart/CartContext';
-import type { CartItem } from '@/api';
 
 const e = encodeURIComponent;
 

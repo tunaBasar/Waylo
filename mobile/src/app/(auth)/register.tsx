@@ -22,7 +22,7 @@ export default function Register() {
       <Screen>
         <Title>E-postani dogrula</Title>
         <Muted>{`${sentTo} adresine dogrulama baglantisi gonderildi. Dogruladiktan sonra giris yapabilirsin.`}</Muted>
-        <Link href="/(auth)/login">Girise don</Link>
+        <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girise don">Girise don</Link>
       </Screen>
     );
   }

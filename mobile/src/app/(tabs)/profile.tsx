@@ -16,6 +16,7 @@ export default function ProfileScreen() {
   const [conf, setConf] = useState('');
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (user) { setFirst(user.firstName); setLast(user.lastName); } }, [user]);
 
   async function saveName() {

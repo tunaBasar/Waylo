@@ -31,7 +31,7 @@ export default function Flights() {
       {q && (
         <AsyncView<FlightOffer[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Bu tarih icin ucus bulunamadi.">
           {(offers) => offers.map((o) => (
-            <Pressable key={o.offerId} accessibilityRole="button" onPress={() => router.push(`/flight/${o.offerId}`)}>
+            <Pressable key={o.offerId} accessibilityRole="button" accessibilityLabel={`${o.airline} ${o.flightNumber}, ${money(o.totalAmount, o.currency)}`} onPress={() => router.push(`/flight/${o.offerId}`)}>
               <Card>
                 <Text style={{ fontWeight: '700' }}>{`${o.airline} ${o.flightNumber}`}</Text>
                 <Muted>{`${o.departureAirport} ${fmtLocal(o.departureTime)} → ${o.arrivalAirport} ${fmtLocal(o.arrivalTime)}`}</Muted>

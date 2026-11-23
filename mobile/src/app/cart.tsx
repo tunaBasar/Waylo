@@ -5,11 +5,13 @@ import { ApiError } from '@/api';
 import { useCart } from '@/features/cart/CartContext';
 import { checkoutErrorMessage, ordersApi } from '@/features/orders/api';
 import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { useOnline } from '@/features/network/NetworkContext';
 import { money } from '@/features/format';
 
 export default function CartScreen() {
   const cart = useCart();
   const router = useRouter();
+  const online = useOnline();
   const [promo, setPromo] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,8 @@ export default function CartScreen() {
       <Muted>Kesin fiyat siparis olusturulurken sunucudan alinir.</Muted>
       <Field label="Promosyon kodu (istege bagli)" value={promo} onChangeText={setPromo} autoCapitalize="characters" />
       <ErrorBanner message={error} />
-      <Button title={busy ? 'Isleniyor...' : 'Siparisi olustur'} onPress={buy} disabled={busy} />
+      <Button title={busy ? 'Isleniyor...' : 'Siparisi olustur'} onPress={buy} disabled={busy || !online} />
+      {!online ? <Muted>Siparis olusturmak icin internet baglantisi gerekir.</Muted> : null}
     </Screen>
   );
 }

@@ -1,9 +1,23 @@
+import { useEffect, useState } from 'react';
+import { Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { CartProvider } from '@/features/cart/CartContext';
+import { NetworkProvider, OfflineBanner } from '@/features/network/NetworkContext';
+import { rememberOrderLink } from '@/features/deeplinks';
+
+/** An order deep link opened while signed out is remembered; the tabs layout opens it after login. */
+function usePendingOrderLink(signedIn: boolean) {
+  const url = Linking.useLinkingURL();
+  // On web the guard rewrites the address bar before the async initial URL resolves, so read it synchronously once.
+  const [initialWebUrl] = useState(() => (Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.href : null));
+  useEffect(() => { if (!signedIn) { rememberOrderLink(initialWebUrl); rememberOrderLink(url); } }, [url, initialWebUrl, signedIn]);
+}
 
 function Routes() {
   const { user, loading } = useAuth();
+  usePendingOrderLink(!!user);
   if (loading) return null;
   return (
     <Stack screenOptions={{ headerShown: true }}>
@@ -23,16 +37,24 @@ function Routes() {
         <Stack.Screen name="(auth)/register" options={{ title: 'Kayit ol' }} />
         <Stack.Screen name="(auth)/forgot" options={{ title: 'Sifremi unuttum' }} />
       </Stack.Protected>
+      {/* Email links work signed in or out. */}
+      <Stack.Screen name="verify" options={{ title: 'E-posta dogrulama' }} />
+      <Stack.Screen name="reset-password" options={{ title: 'Sifre sifirlama' }} />
     </Stack>
   );
 }
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <Routes />
-      </CartProvider>
-    </AuthProvider>
+    <NetworkProvider>
+      <AuthProvider>
+        <CartProvider>
+          <View style={{ flex: 1 }}>
+            <OfflineBanner />
+            <Routes />
+          </View>
+        </CartProvider>
+      </AuthProvider>
+    </NetworkProvider>
   );
 }

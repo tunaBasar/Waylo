@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { ApiError } from '@/api';
 import { useAuth } from '@/features/auth/AuthContext';
-import { api } from '@/api';
+import { api, ApiError } from '@/api';
 import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 
 export default function Settings() {

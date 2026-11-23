@@ -18,6 +18,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], enabled = tru
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!enabled) { setLoading(false); return; }
     let alive = true;
     setLoading(true);

@@ -50,7 +50,7 @@ export default function Hotels() {
       {query && (
         <AsyncView<Hotel[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Bu tarihlerde uygun otel bulunamadi.">
           {(hotels) => hotels.map((h) => (
-            <Pressable key={h.id} accessibilityRole="button" onPress={() => router.push(`/hotel/${h.id}?${stayQueryString(query)}`)}>
+            <Pressable key={h.id} accessibilityRole="button" accessibilityLabel={`${h.name}, ${h.city}`} onPress={() => router.push(`/hotel/${h.id}?${stayQueryString(query)}`)}>
               <Card>
                 <Text style={{ fontWeight: '700' }}>{h.name}</Text>
                 <Muted>{`${h.city}, ${h.country} · ${h.starRating} yildiz`}</Muted>

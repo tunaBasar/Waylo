@@ -18,13 +18,13 @@ export default function Login() {
   }
   return (
     <Screen>
-      <Title>Waylo'ya giris</Title>
+      <Title>Waylo&apos;ya giris</Title>
       <ErrorBanner message={error} />
       <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
       <Field label="Sifre" value={password} onChangeText={setPassword} secureTextEntry />
       <Button title={busy ? 'Giris yapiliyor...' : 'Giris yap'} onPress={submit} disabled={busy || !email || !password} />
-      <Link href="/(auth)/register">Hesabin yok mu? Kayit ol</Link>
-      <Link href="/(auth)/forgot">Sifremi unuttum</Link>
+      <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabin yok mu? Kayit ol">Hesabin yok mu? Kayit ol</Link>
+      <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Sifremi unuttum">Sifremi unuttum</Link>
     </Screen>
   );
 }
