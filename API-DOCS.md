@@ -21,11 +21,14 @@
 9. [CRM Service](#8-crm-service)
 10. [Check-in Service](#9-check-in-service)
 11. [Notification Service](#10-notification-service)
-12. [Saga Orchestrator](#11-saga-orchestrator)
+12. [Saga Orchestrator (retired)](#11-saga-orchestrator)
 13. [Traffic Simulator](#12-traffic-simulator)
-14. [Enums Reference](#enums-reference)
-15. [Kafka Events](#kafka-events)
-16. [Architecture](#architecture)
+14. [Auth Service and Account](#13-auth-service-and-account)
+15. [Bus Service](#14-bus-service)
+16. [Service-to-service (internal) endpoints](#15-service-to-service-internal-endpoints)
+17. [Enums Reference](#enums-reference)
+18. [Kafka Events](#kafka-events)
+19. [Architecture](#architecture)
 
 ---
 
@@ -241,6 +244,38 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 // Response: 204 No Content
 ```
 
+### Added endpoints (flight seat inventory, flight offers)
+
+Gateway route: `/api/seat-inventory/**`, `/api/flight-offers`, `/api/flight-offers/**`. `SeatAccessFilter`: reads are open, reserve/cancel need a user, every other write needs ADMIN.
+
+#### `POST /api/seat-inventory/seats/bulk` - Create seats in bulk (ADMIN)
+
+| Field | Type | Validation |
+|-------|------|-----------|
+| `flightNumber` | String | required |
+| `seatType` | String | required |
+| `price` | BigDecimal | required, >= 0.01, max 8 integer and 2 fraction digits |
+| `fromRow` | Integer | required, 1..999 |
+| `toRow` | Integer | required, 1..999 |
+| `letters` | String | required, distinct characters between A and K |
+
+Response `data`: `{flightNumber, created}`. Errors: 400 validation, 403 not ADMIN, 409 on existing seats.
+
+#### `DELETE /api/seat-inventory/seats/{flightNumber}/{seatNumber}` - Delete seat (ADMIN)
+
+204 No Content. 403 for non-ADMIN, 404 if the seat does not exist, 409 `SEAT_HELD` if the seat has an active hold.
+
+#### `GET /api/flight-offers?from=&to=&date=&adults=` - Search flight offers (public)
+
+`from`, `to` (airport codes) and `date` (ISO date) are required, `adults` defaults to 1. Response `data`: list of
+`{offerId, supplier, flightNumber, airline, departureAirport, arrivalAirport, departureTime, arrivalTime, cabin, currency,
+totalAmount, availableSeats, expiresAt}`. Offers are short-lived; use `offerId` in `POST /api/orders/flight`.
+
+#### `GET /api/flight-offers/{offerId}` - Re-price an offer (public)
+
+Response `data`: one offer (same fields). Errors: 404 for an unknown offer; the exact failure for an expired offer was not verified in source.
+
+
 ---
 
 ## 3. Hotel Service
@@ -352,6 +387,130 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 #### `DELETE /api/hotels/{hotelId}/rooms/{roomId}` - Delete Room (204)
 #### `POST /api/hotels/{hotelId}/rooms/{roomId}/status?status=RESERVED` - Update Room Status
 #### `GET /api/hotels/{hotelId}/rooms/available-count` - Available Room Count
+
+### Added endpoints (hotel availability, rate plans, room types, inventory, rates, reviews)
+
+Partner endpoints require `ROOM_MANAGE` on the hotel's organization (`HotelAccessGuard.requireRoomManage`, checked through auth-service). Without
+`X-User-Id` they return 401, without permission 403, and a hotel with no owning organization is locked (403). Responses use `ApiResponse<T>`
+(`{success, data, message, timestamp}`). Enums: `MealPlan` = `ROOM_ONLY | BREAKFAST | HALF_BOARD | FULL_BOARD | ALL_INCLUSIVE`,
+`CancellationPolicy` = `FREE_CANCELLATION | NON_REFUNDABLE`, `CatalogStatus` = `ACTIVE | INACTIVE`, `ReviewStatus` = `PUBLISHED | HIDDEN`.
+
+#### `GET /api/hotels/{hotelId}/availability` - Priced availability (public)
+
+Query: `checkIn` (ISO date, required), `checkOut` (ISO date, required), `rooms` (default 1), `adults` (default 1), `childrenAges` (repeatable int, optional).
+Response `data`: `{hotelId, checkIn, checkOut, nights, rooms, adults, childrenAges, occupancy, offers: [{roomTypeId, roomTypeCode, roomTypeName,
+maxAdults, maxChildren, maxOccupancy, ratePlanId, ratePlanCode, ratePlanName, mealPlan, cancellationPolicy, freeCancellationDaysBefore, nights,
+rooms, occupancy, currency, totalAmount, nightly: [{stayDate, amount, currency}]}]}`.
+
+#### `POST /api/hotels/{hotelId}/room-types` - Create room type (partner + ROOM_MANAGE)
+
+| Field | Type | Validation |
+|-------|------|-----------|
+| `code` | String | required, `^[A-Z0-9_]{2,30}$` |
+| `name` | String | required, max 120 |
+| `description` | String | optional, max 2000 |
+| `maxAdults` | Integer | required, 1..20 |
+| `maxChildren` | Integer | required, 0..10 |
+| `maxOccupancy` | Integer | required, 1..30 |
+| `sizeSqm` | Integer | optional, 1..2000 |
+
+Response `RoomTypeResponse`: `{id, hotelId, code, name, description, maxAdults, maxChildren, maxOccupancy, sizeSqm, status, version, createdAt, updatedAt}`.
+
+#### `GET /api/hotels/{hotelId}/room-types` - List room types (partner + ROOM_MANAGE)
+#### `GET /api/hotels/{hotelId}/room-types/{roomTypeId}` - Get room type (partner + ROOM_MANAGE)
+
+Query `includeInactive` (default false).
+
+#### `PATCH /api/hotels/{hotelId}/room-types/{roomTypeId}` - Update room type (partner + ROOM_MANAGE)
+
+All fields optional: `name` (not blank, max 120), `description` (max 2000), `maxAdults` (1..20), `maxChildren` (0..10), `maxOccupancy` (1..30),
+`sizeSqm` (1..2000), `status` (`CatalogStatus`), `expectedVersion` (Long, optimistic lock, stale -> 409).
+
+#### `POST /api/hotels/{hotelId}/rate-plans` - Create rate plan (partner + ROOM_MANAGE)
+
+| Field | Type | Validation |
+|-------|------|-----------|
+| `code` | String | required, `^[A-Z0-9_]{2,30}$` |
+| `name` | String | required, max 120 |
+| `description` | String | optional, max 2000 |
+| `mealPlan` | MealPlan | required |
+| `cancellationPolicy` | CancellationPolicy | required |
+| `freeCancellationDaysBefore` | Integer | optional, 0..365 |
+
+Response `RatePlanResponse`: `{id, hotelId, code, name, description, mealPlan, cancellationPolicy, freeCancellationDaysBefore, status, version, createdAt, updatedAt}`.
+
+#### `GET /api/hotels/{hotelId}/rate-plans` - List rate plans (partner + ROOM_MANAGE)
+#### `GET /api/hotels/{hotelId}/rate-plans/{ratePlanId}` - Get rate plan (partner + ROOM_MANAGE)
+
+Query `includeInactive` (default false).
+
+#### `PATCH /api/hotels/{hotelId}/rate-plans/{ratePlanId}` - Update rate plan (partner + ROOM_MANAGE)
+
+All optional: `name`, `description`, `mealPlan`, `cancellationPolicy`, `freeCancellationDaysBefore` (0..365), `status`, `expectedVersion`.
+
+#### `GET /api/hotels/{hotelId}/inventory?from=&to=&roomTypeId=` - Daily inventory (partner + ROOM_MANAGE)
+
+`from`, `to` ISO dates required, `roomTypeId` optional. Response: list of `{id, hotelId, roomTypeId, stayDate, allotment, outOfService, held,
+confirmed, available, stopSell, version, updatedAt}`.
+
+#### `PUT /api/hotels/{hotelId}/inventory` - Update daily inventory (partner + ROOM_MANAGE)
+
+Body: `reason` (optional, max 500), `items` (required, 1..400) of `{roomTypeId (required), stayDate (required), allotment (0..10000), outOfService (>=0),
+stopSell (Boolean), expectedVersion (Long)}`. Response: updated list of daily inventory rows (fields as above).
+
+#### `GET /api/hotels/{hotelId}/rates?from=&to=&roomTypeId=&ratePlanId=` - Daily rates (partner + ROOM_MANAGE)
+
+`from`, `to` required ISO dates, the two ids optional. Response: list of `{id, hotelId, roomTypeId, ratePlanId, stayDate, occupancy, amount, currency, version, updatedAt}`.
+
+#### `PUT /api/hotels/{hotelId}/rates` - Update daily rates (partner + ROOM_MANAGE)
+
+Body `items` (required, 1..500) of `{roomTypeId (required), ratePlanId (required), stayDate (required), occupancy (required, 1..30),
+amount (required, >= 0.01, 10 integer and 2 fraction digits), currency (required, 3 uppercase letters), expectedVersion (Long)}`. Response: updated rate rows.
+
+#### `GET /api/hotels/{hotelId}/rates/currency` - Hotel currency (partner + ROOM_MANAGE)
+
+Response `data`: `{currency}`.
+
+#### `GET /api/hotels/{id}/reviews?page=&size=` - Published reviews (public)
+
+`page` default 0, `size` default 10. Response `data`: `{items: [{id, hotelId, score, text, status, partnerResponse, respondedAt, createdAt,
+orderItemId (null), moderationReason (null), moderatedAt (null)}], page, size, total, averageScore, reviewCount}`. Private fields are hidden in the public view.
+
+#### `GET /api/me/reviewable-hotel-items` - My items I can still review (customer)
+
+Response: list of `{orderItemId, hotelId, hotelName, description, checkIn, checkOut}`.
+
+#### `POST /api/me/hotel-reviews` - Write a review (customer)
+
+Body: `orderItemId` (required UUID), `score` (int, 1..5), `text` (optional, max 2000). Platform ADMIN gets 403. Eligibility is checked against
+package-booking-service (`review-eligibility`); response `ReviewResponse` with the owner-visible fields.
+
+#### `GET /api/me/hotel-reviews` - My reviews (customer)
+
+Response: list of `ReviewResponse` (`{id, hotelId, score, text, status, partnerResponse, respondedAt, createdAt, orderItemId, moderationReason, moderatedAt}`).
+
+#### `GET /api/partner/organizations/{orgId}/hotel-reviews?page=&size=` - Organization reviews (partner + HOTEL_READ, or ADMIN)
+
+`page` default 0, `size` default 20. Response: the same `Page` shape as the public list. 403 without access.
+
+#### `POST /api/partner/organizations/{orgId}/hotel-reviews/{id}/response` - Respond to a review (partner + HOTEL_MANAGE on the hotel)
+
+Body `{text}` (required, max 2000). Response `ReviewResponse`.
+
+#### `GET /api/admin/hotel-reviews?status=&page=&size=` - All reviews (ADMIN)
+
+`status` optional (`PUBLISHED | HIDDEN`), `page` default 0, `size` default 20. Response: `Page` of `ReviewResponse`.
+
+#### `POST /api/admin/hotel-reviews/{id}/moderate` - Moderate a review (ADMIN)
+
+Body: `status` (required, `PUBLISHED | HIDDEN`), `reason` (required, max 500). Response `ReviewResponse`.
+
+#### `GET /api/quotes/{id}` - Get a hotel quote (customer)
+
+`X-User-Id` required. Response `QuoteResponse`: `{quoteId, hotelId, roomTypeId, roomTypeCode, roomTypeName, ratePlanId, ratePlanCode, ratePlanName,
+mealPlan, cancellationPolicy, freeCancellationDaysBefore, checkIn, checkOut, nights, rooms, adults, childrenAges, occupancy, currency, totalAmount,
+nightly, createdAt, expiresAt, expired}`. Quotes are created with `POST /api/quotes` (customer, ADMIN gets 403 `ADMIN_CANNOT_PURCHASE`).
+
 
 ---
 
@@ -722,7 +881,7 @@ Cancelling releases the car hold via the payment escrow refund flow.
 **Port:** 8085 | **DB:** package_booking_db
 
 > The `/api/bookings` endpoints below are legacy and internal-only (see "Legacy bookings"). Customers use
-> `/api/orders/hotel` and `/api/orders/car`.
+> `/api/orders/hotel`, `/api/orders/car`, `/api/orders/flight`, `/api/orders/bus` and `/api/orders/package`. Legacy `/api/bookings` responses carry a `Deprecation: true` header.
 
 #### `POST /api/bookings` - Create Booking
 
@@ -804,7 +963,7 @@ Cancelling releases the hotel hold (and car hold).
 
 ### Legacy bookings: internal only
 
-`/api/bookings/**` is no longer a customer API. Allowed: calls carrying a valid `X-Internal-Token` (saga,
+`/api/bookings/**` is no longer a customer API and is **deprecated**: every response carries a `Deprecation: true` header (`LegacyBookingAccessFilter`; use `/api/orders`). Allowed: calls carrying a valid `X-Internal-Token` (saga,
 notification-service) and read-only GET/HEAD by a gateway-verified ADMIN. Everything else gets 403.
 
 ### Partner order items
@@ -824,6 +983,64 @@ granted to ORGANIZATION_OWNER, HOTEL_OWNER, HOTEL_MANAGER, HOTEL_STAFF). Status 
   "page": 0, "size": 20, "total": 1 } }
 ```
 No guest name, email, phone, payment data or other items are returned (no CRM lookup is done).
+
+### Added endpoints (orders, vouchers, admin orders, bookings)
+
+#### `POST /api/orders/flight` - Create flight order (customer, 201)
+
+Platform ADMIN gets 403 `ADMIN_CANNOT_PURCHASE`. Body (`FlightOrderCreateRequest`): `offerId` (required, max 600, from `GET /api/flight-offers`),
+`seatNumber` (optional, max 5), `passengerFirstName` (required, max 80, letters, space, apostrophe, hyphen), `passengerLastName` (same rules),
+`promoCode` (optional, max 50). Response `data`: `OrderResponse` (same as the other order creators).
+
+#### `POST /api/orders/bus` - Create bus order (customer, 201)
+
+ADMIN gets 403. Body (`BusOrderCreateRequest`): `tripId` (required UUID), `fromSeq` (int, >=0), `toSeq` (int, >=1), `passengers` (required, 1..5 of
+`{seatNo (int >=1), name (required, 2..150), gender (required, FEMALE|MALE), identityNumber (optional, max 20)}`), `promoCode` (optional, max 50).
+
+#### `POST /api/orders/package` - Create multi-item order (customer, 201)
+
+ADMIN gets 403. Body (`PackageOrderCreateRequest`): `items` (required, 1..10), `promoCode` (optional, max 50), `notes` (optional, max 1000).
+Each item: `vertical` (required, `HOTEL | FLIGHT | CAR | BUS`) plus the fields of that vertical's single-item request:
+HOTEL `quoteId`; CAR `pickupBranchId, returnBranchId, category, transmission, pickupAt, returnAt, driverAge`;
+FLIGHT `offerId, seatNumber, passengerFirstName, passengerLastName`; BUS `tripId, fromSeq, toSeq, passengers`.
+Only the fields that belong to the item's vertical are read. Which of them are mandatory per vertical is enforced in the service, not by annotations, so
+the failure mode of a missing field was not documented precisely.
+
+`OrderResponse`: `{id, customerId, status, currency, quoteId, totalAmount, notes, version, items: [OrderItemResponse], createdAt, updatedAt, holdExpiresAt}`.
+`OrderItemResponse` includes `{id, orderId, vertical, supplierOrganizationId, productRef, fulfillmentRef, description, unitAmount, quantity, subtotal,
+currency, createdAt, pickupAt, returnAt, flight: {flightNumber, departureAt, seatNumber, passengerFirstName, passengerLastName, pnr, ticketNumber, supplier},
+grossAmount, discountAmount, discountFundedBy, netAmount, taxAmount, promoCode, cancellationPolicy, cancelFreeHoursBefore, cancelOutcome, refundAmount}`.
+
+#### `GET /api/orders/{id}/cancellation-preview` - Preview cancellation (customer)
+
+Owner only. Response `data`: `{orderId, cancellable, blockedReason, currency, totalRefund, items: [{orderItemId, description, policy, freeHoursBefore,
+outcome, chargedAmount, refundAmount}]}`.
+
+#### `GET /api/orders/{id}/vouchers` - Order vouchers (customer)
+
+Owner only. Response: list of `{voucherId, orderItemId, description, payload, status, validFrom, validUntil, redeemedAt}`.
+
+#### `POST /api/partner/organizations/{organizationId}/vouchers/redeem` - Redeem a voucher (partner + RESERVATION_REDEEM)
+
+Body `{payload}` (required, max 200, the QR payload). Permission is checked through auth-service (fails closed with 503 `AUTHORIZATION_UNAVAILABLE`).
+Response `data`: `{voucherId, orderItemId, description, amountReleased, currency, redeemedAt}`. Redeeming releases the escrow of that item.
+
+#### `GET /api/partner/organizations/{organizationId}/order-items` - fields added
+
+Items also carry `pickupAt, returnAt, vertical, checkIn, checkOut, passengerFirstName, passengerLastName, voucherStatus, cancelOutcome, refundAmount`
+(`PartnerOrderItemResponse`). Permission `RESERVATION_READ`.
+
+#### `GET /api/admin/orders?status=&vertical=&from=&to=&page=&size=` - All orders (ADMIN)
+
+`status` (`OrderStatus`), `vertical` (`HOTEL | FLIGHT | CAR | BUS`), `from`/`to` (ISO dates) are optional, `page` default 0, `size` default 20.
+Response `data`: `{items: [{id, customerId, status, paymentState, currency, totalAmount, createdAt, items: [{id, vertical, description, netAmount,
+promoCode, cancelOutcome, refundAmount}]}], page, size, total}`. 403 `Administrator role required` otherwise.
+
+#### `GET /api/bookings/flight/{flightId}` - Legacy bookings by flight
+
+Legacy and internal-only like the rest of `/api/bookings/**` (see "Legacy bookings" below). Returns `List<PackageBookingResponse>`
+`{id, customerId, flightId, hotelReservationId, vehicleReservationId, status, totalPrice, notes, createdAt, updatedAt}`.
+
 
 ---
 
@@ -871,6 +1088,56 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 #### `POST /api/pricing-rules/{id}/deactivate` - Deactivate
 #### `POST /api/pricing-rules/{id}/activate` - Activate
 
+### Added endpoints (pricing preview and admin)
+
+Admin routes live under `/api/admin/*`. `AdminRoleFilter` enforces `X-User-Role=ADMIN` on POST, PUT, PATCH and DELETE (403 otherwise).
+GET requests are not role-checked by this filter. Responses here are **not** wrapped in the `{success,data}` envelope: they return the DTO or list directly.
+
+#### `POST /api/pricing/preview` - Price preview (customer)
+
+Body (`PreviewRequest`, no validation annotations): `vertical` (String), `supplierOrganizationId` (UUID), `grossAmount` (BigDecimal), `currency` (String),
+`promoCode` (String, optional). Response: `{netAmount, discountLines: [{description, amount, fundedBy}], taxAmount}`.
+
+#### Campaigns
+
+#### `POST /api/admin/campaigns` - Create campaign (ADMIN)
+
+Body (`CampaignRequest`): `name` (required), `vertical` (required), `scopeOrgId` (UUID, optional), `discountType` (required, `PERCENTAGE | FIXED`),
+`discountValue` (required), `minOrderAmount` (optional, defaults to 0), `startAt` (required), `endAt` (required), `maxUsesGlobal`, `maxUsesPerUser` (optional ints),
+`fundedBy` (required, `PLATFORM | PARTNER`), `description` (optional). Admin may only create `PLATFORM`-funded campaigns: `PARTNER` returns a business-rule error
+`PARTNER_FUNDING_REQUIRES_CONSENT`. Response: `{id, name, vertical, scopeOrgId, discountType, discountValue, minOrderAmount, startAt, endAt, maxUsesGlobal,
+maxUsesPerUser, fundedBy, description, createdAt, updatedAt}`.
+
+#### `GET /api/admin/campaigns` - List campaigns (ADMIN)
+#### `GET /api/admin/campaigns/{id}` - Get campaign (ADMIN)
+#### `PATCH /api/admin/campaigns/{id}` - Update campaign (ADMIN)
+
+PATCH body (`CampaignUpdateRequest`): `name`, `description`, `endAt`, all optional. Response: campaign.
+
+#### `DELETE /api/admin/campaigns/{id}` - Delete campaign (ADMIN)
+
+204 No Content.
+
+#### Promo codes and tax rates
+
+#### `POST /api/admin/promo-codes` - Create promo codes (ADMIN)
+
+Body (`PromoCodeRequest`): `campaignId` (required UUID), `codes` (required list of `{code (required), maxUsesTotal (optional), validFrom (required), validUntil (required)}`).
+Response: list of `{id, campaignId, code, maxUsesTotal, usesCount, validFrom, validUntil}`.
+
+#### `GET /api/admin/campaigns/{campaignId}/promo-codes` - List codes of a campaign (ADMIN)
+#### `DELETE /api/admin/promo-codes/{id}` - Delete promo code (ADMIN, 204)
+
+#### `POST /api/admin/tax-rates` - Create tax rate (ADMIN)
+
+Body (`TaxRateRequest`): `vertical` (required), `scopeOrgId` (optional), `taxType` (required), `rate` (required, 0.0..1.0), `inclusive` (required Boolean),
+`validFrom` (required). Response: `{id, vertical, scopeOrgId, taxType, rate, inclusive, validFrom}`.
+
+#### `GET /api/admin/tax-rates` - List tax rates (ADMIN)
+#### `GET /api/admin/tax-rates/{id}` - Get tax rate (ADMIN)
+#### `DELETE /api/admin/tax-rates/{id}` - Delete tax rate (ADMIN, 204)
+
+
 ---
 
 ## 7. Payment Service
@@ -914,6 +1181,54 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 #### `GET /api/payments/booking/{bookingId}` - By Booking
 #### `GET /api/payments/customer/{customerId}` - By Customer
 #### `POST /api/payments/{id}/refund` - Refund Payment
+
+### Added endpoints (payment intents, partner earnings, admin finance)
+
+Payment-service responses use `ApiResponse<T>`. `X-User-Id` is required (401 `Authentication required`), admin endpoints return 403 `Administrator role required`.
+
+#### `POST /api/payments/orders/{orderId}/intent` - Create payment intent (customer, 201)
+
+No body. `X-User-Id` and `X-User-Role` are passed to the service, which decides ownership. Response `IntentResponse`: `{id, orderId, amount, currency, status, provider, testMode,
+failureCode, createdAt, updatedAt}` (`testMode` is true when the provider is `TEST`).
+
+#### `POST /api/payments/intents/{id}/confirm` - Confirm payment intent (customer)
+
+Body `{paymentToken}` (required, non-blank). Response: `IntentResponse`.
+
+#### `GET /api/payments/orders/{orderId}` - Payment state of an order (customer)
+
+Response `data`: `{intent: IntentResponse, items: [{orderItemId, vertical, amount, currency, status, releaseTrigger, heldAt, releasedAt, refundedAt}]}`.
+
+#### `GET /api/partner/organizations/{organizationId}/earnings?from=&to=` - Partner earnings (partner + RESERVATION_READ)
+
+`from`, `to` optional ISO dates. Response `data`: `{currency, totals: {held, released, refunded}, items: [{orderItemId, vertical, gross, commission, partnerNet,
+escrowState, heldAt, releasedAt}]}`.
+
+#### `GET /api/admin/commission-rates` - List commission rates (ADMIN)
+#### `POST /api/admin/commission-rates` - Create commission rate (ADMIN)
+
+Body: `vertical` (required, `HOTEL | CAR | FLIGHT | BUS`), `supplierOrganizationId` (UUID, optional, supplier-specific override), `rate` (required, 0..1,
+max 1 integer and 4 fraction digits), `validFrom` (optional instant). Response: `{id, vertical, supplierOrganizationId, rate, validFrom, createdBy, createdAt}`.
+
+#### `GET /api/admin/ledger?orderId=` - Order ledger (ADMIN)
+
+`orderId` required. Response `data`: `{orderId, balance, entries: [{entryId, groupId, occurredAt, orderItemId, account, debitAmount, creditAmount, currency,
+correlationId, description}]}`.
+
+#### `GET /api/admin/supplier-accounts` - Supplier prepaid accounts (ADMIN)
+
+Response: list of `{supplier, currency, balance, updatedAt}`.
+
+#### `POST /api/admin/supplier-accounts/{supplier}/topups` - Top up a supplier account (ADMIN, 201)
+
+Body: `amount` (required, 0.01..10000000.00), `currency` (required, 3 uppercase letters), `reference` (required, max 200), `idempotencyKey` (required, max 150).
+Response: the account (`{supplier, currency, balance, updatedAt}`), message `Top-up recorded`.
+
+#### `GET /api/admin/supplier-accounts/{supplier}/ledger?page=&size=` - Supplier ledger (ADMIN)
+
+`page` default 0, `size` default 20. Response `data`: `{items: [{id, entryType, amount, balanceAfter, currency, orderId, orderItemId, reference, createdBy,
+createdAt}], total, page, size}`.
+
 
 ---
 
@@ -960,6 +1275,14 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 #### `PUT /api/customers/{id}` - Update Customer
 #### `DELETE /api/customers/{id}` - Delete Customer (204)
 #### `POST /api/customers/{id}/loyalty-points?points=100` - Add Loyalty Points
+
+### Added endpoints (CRM)
+
+#### `GET /api/customers/me` - My customer profile (customer)
+
+`X-User-Id` required. Response `data`: `{id, firstName, lastName, email, loyaltyEnabled, loyaltyPoints, tier}` (`loyaltyPoints` and `tier` are only meaningful
+when `loyaltyEnabled` is true). `tier`: `BRONZE | SILVER | GOLD | PLATINUM`.
+
 
 ---
 
@@ -1014,6 +1337,24 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 
 #### `POST /api/checkins/{id}/cancel` - Cancel Check-in
 
+### Added endpoints (order-item check-in)
+
+Check-in is per flight order item (QR/PNR flow). The older booking-based endpoints above remain.
+
+#### `POST /api/checkins/order-items/{orderItemId}` - Check in (customer)
+
+No body. `X-User-Id` required; only the item's owner can check in. Response `data` (`OrderCheckinResponse`): `{id, orderItemId, orderId, customerId, pnr,
+passengerName, flightNumber, departureAt, seatNumber, status, checkedInAt}`, message `Checked in`.
+
+#### `GET /api/checkins/me` - My check-ins (customer)
+
+Response: list of `OrderCheckinResponse`.
+
+#### `GET /api/admin/checkins?page=&size=` - All check-ins (ADMIN)
+
+`page` default 0, `size` default 20. Response `data`: `{items: [OrderCheckinResponse], page, size, total}`. 403 `FORBIDDEN` for non-ADMIN.
+
+
 ---
 
 ## 10. Notification Service
@@ -1044,13 +1385,35 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 #### `GET /api/notifications/booking/{bookingId}` - By Booking
 #### `POST /api/notifications/{id}/retry` - Retry Failed Notification
 
+### Added endpoints (notifications and push devices)
+
+#### `GET /api/notifications/me` - My notifications (customer)
+
+`X-User-Id` required. Response: list of `{id, customerId, bookingId, type, recipient, subject, body, status, retryCount, sentAt, createdAt, updatedAt}`.
+
+#### `POST /api/me/devices` - Register a push device (customer)
+
+Body: `token` (required, max 512), `platform` (required, `ios | android | web`). Response `data`: `{token, platform, createdAt}`, message `Device registered`.
+
+#### `GET /api/me/devices` - List my devices (customer)
+
+Response: list of `{token, platform, createdAt}`.
+
+#### `DELETE /api/me/devices/{token}` - Unregister a device (customer)
+
+204 No Content.
+
+
 ---
 
 ## 11. Saga Orchestrator
 
 **Port:** 8091 | **DB:** saga_db
 
-> Manages distributed transactions for package bookings using the Saga pattern.
+> **RETIRED.** `package-booking-saga-orchestrator` is out of the runtime path (see `SAGA-DECISION.md`). It sits behind the `legacy-saga` compose profile and
+> is not started by `docker compose up` or `scripts/dev-up.sh`. The gateway route `/api/sagas/**` is kept, so these calls return **503** while the service is off.
+> Nothing calls it: customer orders use synchronous orchestration in package-booking-service (`/api/orders/**`). The endpoints below are kept for
+> reference and apply only if the service is re-enabled (`docker compose --profile legacy-saga up -d --no-deps package-booking-saga-orchestrator`).
 
 #### `POST /api/sagas` - Start Saga
 
@@ -1140,6 +1503,356 @@ No guest name, email, phone, payment data or other items are returned (no CRM lo
 #### `POST /api/simulations/{simulationId}/cancel` - Cancel Simulation
 
 ---
+
+## 13. Auth Service and Account
+
+**Port:** 8081 | **DB:** auth_db | Gateway route: `/api/auth/**`, `/api/organizations/**`, `/api/me/**`, `/api/admin/**`
+
+> Auth levels used below: **public** (no token), **customer** (any authenticated user, `X-User-Id` set by the gateway from the JWT),
+> **partner + permission** (authenticated and holding a permission on the organization), **ADMIN** (`X-User-Role=ADMIN`).
+> Auth-service responses use `{success, message, data, code}` (`code` only on some errors; null fields are omitted).
+> Paged admin lists use `{success, message, data: [...], total}`.
+
+### Public auth endpoints (`/api/auth/*`)
+
+All of `/api/auth/*` is public at the gateway (rate limits are listed under "Other changes").
+
+#### `POST /api/auth/register` - Register (public)
+
+| Field | Type | Validation |
+|-------|------|-----------|
+| `firstName` | String | required |
+| `lastName` | String | required |
+| `email` | String | required, valid e-mail |
+| `password` | String | required, `@StrongPassword` (checked together with the e-mail) |
+
+Response `data`: `{email, emailVerified}`. Errors: 400 validation or `success=false`, 409 duplicate registration.
+
+#### `POST /api/auth/login` - Login (public)
+
+Body: `email` (required, e-mail), `password` (required). Response `data` (`AuthResponse`): `{token, refreshToken, userId, email,
+firstName, lastName, role, emailVerified}`. Errors: 401 bad credentials, 403 e-mail not verified (`code` = `EMAIL_NOT_VERIFIED`),
+429 account locked.
+
+#### `GET /api/auth/verify?token=` - Verify e-mail (public)
+
+Query `token` (required). 200 on success, 400 on invalid or expired token. `data` is empty.
+
+#### `POST /api/auth/resend-verification?email=` - Resend verification mail (public)
+
+Query `email` (required). Always 200 with an `ApiResponse` (`data` empty).
+
+#### `POST /api/auth/forgot-password` - Request password reset (public)
+
+Body `{email}` (required, valid e-mail). Always 200.
+
+#### `POST /api/auth/reset-password` - Reset password (public)
+
+Body `{token, newPassword}`: `token` required, `newPassword` required and `@StrongPassword`. 400 on invalid token or weak password.
+
+#### `POST /api/auth/refresh` - Refresh tokens (public)
+
+Body `{"refreshToken": "..."}` (a plain map, not a validated DTO). Response `data`: `AuthResponse` (same as login).
+Errors: 401 when the body or token is missing or invalid, 403 when the e-mail is no longer verified.
+
+#### `POST /api/auth/logout` - Logout (public)
+
+Body `{"refreshToken": "..."}` optional. If the gateway supplied `X-User-Id`, that user's refresh tokens are revoked,
+otherwise the given refresh token is revoked. Always 200.
+
+#### `GET /api/auth/health` - Health (public)
+
+Plain text `Auth service is running` (not enveloped).
+
+### Account (`/api/me`, customer)
+
+All require a valid JWT (401 otherwise). Bodies are validated, errors are 400.
+
+#### `GET /api/me` - Get my profile (customer)
+
+Response `data`: `{id, email, firstName, lastName, role, emailVerified, createdAt}`.
+
+#### `PATCH /api/me` - Update my profile (customer)
+
+Body `{firstName, lastName}`, both required, max 100 chars each. Response: updated profile (same fields as `GET /api/me`).
+
+#### `POST /api/me/password` - Change password (customer)
+
+Body `{currentPassword, newPassword}`: both required, `newPassword` `@StrongPassword`. Response `data`: `AuthResponse` (new tokens).
+
+#### `POST /api/me/email` - Request e-mail change (customer)
+
+Body `{newEmail, currentPassword}`: `newEmail` required, valid e-mail, max 255; `currentPassword` required. Returns **202**; a
+verification link is mailed to the new address and the change applies only once the link is confirmed.
+
+#### `DELETE /api/me` - Delete my account (customer)
+
+Body `{"password": "..."}` (required). 204 No Content (see "Other changes").
+
+#### `GET /api/me/memberships` - My organization memberships (customer)
+
+Response `data`: list of `{membershipId, organizationId, organizationName, organizationStatus, organizationBusinessType,
+organizationLegalType, status, roles: [RoleGrantResponse]}`.
+
+### Organizations and role grants
+
+#### `POST /api/organizations` - Create organization (customer)
+
+Body: `name` (required, max 255), `businessType` (required, `HOTEL | CAR_RENTAL | BUS`), `legalType` (required, `COMPANY | INDIVIDUAL`).
+Returns **201**, `data`: `{id, name, status, businessType, legalType}`.
+
+#### `GET /api/organizations/{organizationId}/members` - List members (partner)
+
+Caller must hold one of the member-viewing roles in the organization (403 otherwise). Response `data`: list of
+`{userId, email, name, role, scopeType, scopeId, grantId, createdAt}`.
+
+#### `POST /api/organizations/{organizationId}/role-grants` - Grant a role (partner)
+
+Body: `email` (required, valid), `role` (required, `ORGANIZATION_OWNER | HOTEL_OWNER | HOTEL_MANAGER | HOTEL_STAFF`), `hotelId` (required UUID).
+Returns **201**, `data`: `{grantId, userId, role, scopeType, scopeId}`.
+
+#### `DELETE /api/organizations/{organizationId}/role-grants/{grantId}` - Revoke a role (partner)
+
+204 No Content.
+
+### Admin (ADMIN only, 403 otherwise)
+
+#### `POST /api/admin/organizations/{id}/approve` - Approve organization (ADMIN)
+
+No body. `data` empty.
+
+#### `POST /api/admin/organizations/{id}/suspend` - Suspend organization (ADMIN)
+
+Body `{reason}` (required, max 500). `data` empty.
+
+#### `POST /api/admin/users/{id}/role` - Change a user's platform role (ADMIN)
+
+Body `{role}` (required, `USER | ADMIN`). Response `data`: `{id, email, fullName, role, verified, deletedAt}`.
+
+`GET /api/admin/organizations` and `GET /api/admin/users` are described under "Other changes (2026-10-24)".
+
+---
+
+## 14. Bus Service
+
+**Port:** 8096 | **DB:** bus_db | Contract: `BUS-CONTRACT.md`
+
+> Responses use `ApiResponse<T>`: `{success, data, message, timestamp}`. Times are Europe/Istanbul local time.
+> Ticket sales are gated by `BUS_SALES_ENABLED` (default false): while false, trip search returns an empty list and the seat map 404s.
+
+| Group | Auth | Description |
+|-------|------|-------------|
+| Catalogue | public | terminals, sales status, trip search, seat map (GET only) |
+| Customer | customer | own bookings |
+| Partner | partner + `BUS_MANAGE` on a BUS organization | buses, trips, documents |
+| Admin | ADMIN | terminals, documents review, all buses |
+| Internal | `X-Service-Token` | hold lifecycle, see "Service-to-service endpoints" |
+
+### Public catalogue
+
+#### `GET /api/bus-sales-status` - Are bus sales enabled (public)
+
+Response `data`: a `Map<String, Boolean>` of sales flags.
+
+#### `GET /api/bus-terminals` - List terminals (public)
+
+Response `data`: `[{id, city, name, active}]`.
+
+#### `GET /api/bus-trips?fromCity=&toCity=&date=` - Search trips (public)
+
+All three required; `date` is ISO date. Response `data`: list of `TripOffer`: `{tripId, organizationId, companyName, code, fromSeq, toSeq,
+fromTerminalId, toTerminalId, fromCity, toCity, departureAt, arrivalAt, price, currency, availableSeats, busBrand, busModel, layout}`.
+
+#### `GET /api/bus-trips/{id}/seats?fromSeq=&toSeq=` - Seat map (public)
+
+`fromSeq`, `toSeq` required ints (stop sequence numbers). Response `data`: `{tripId, layout, rowCount, fromSeq, toSeq,
+seats: [{seatNo, available, occupantGender}]}`. 404 when sales are disabled or the trip is unknown.
+
+### Customer
+
+#### `GET /api/bus-bookings/me` - My bus bookings (customer)
+
+Response `data`: list of `BookingResponse`: `{id, organizationId, customerId, tripId, fromSeq, toSeq, currency, totalAmount, status,
+holdExpiresAt, boardingAt, tickets: [{id, seatNo, passengerName, gender, price, status}], createdAt}`.
+
+#### `GET /api/bus-bookings/{id}` - Get bus booking (customer / ADMIN)
+
+Customers see their own bookings only (403 or 404 otherwise); `X-User-Role=ADMIN` may read any. Response: `BookingResponse`.
+
+Bus orders are created through `POST /api/orders/bus` (see Package Booking, section 5a).
+
+### Partner (`/api/bus-partner/organizations/{orgId}`, `BUS_MANAGE`)
+
+The caller needs `BUS_MANAGE` on the organization (ORGANIZATION_OWNER of a BUS org). 403 when denied, 503 when auth-service is unreachable.
+
+#### `GET /api/bus-partner/organizations/{orgId}/terminals` - List active terminals (partner)
+
+Response: `[TerminalResponse]` (`{id, city, name, active}`).
+
+#### `GET /api/bus-partner/organizations/{orgId}/buses` - List buses (partner)
+#### `POST /api/bus-partner/organizations/{orgId}/buses` - Create bus (partner, 201)
+#### `PUT /api/bus-partner/organizations/{orgId}/buses/{id}` - Update bus (partner)
+
+Body (`BusRequest`): `plateNumber` (required, max 20), `brand` (required, max 100), `model` (required, max 100), `year` (int, 1980..2100),
+`layout` (required, `TWO_PLUS_TWO | TWO_PLUS_ONE`), `rowCount` (int, 5..20), `active` (Boolean, optional).
+Response `BusResponse`: `{id, organizationId, plateNumber, brand, model, year, layout, rowCount, seatCount, active, sellable,
+missingDocuments, createdAt, updatedAt}`. Errors: 409 duplicate plate or `BUS_HAS_TRIPS` (seat plan cannot change while published trips exist).
+
+#### `POST /api/bus-partner/organizations/{orgId}/buses/{id}/deactivate` - Deactivate bus (partner)
+#### `POST /api/bus-partner/organizations/{orgId}/buses/{id}/activate` - Activate bus (partner)
+
+No body. Response: `BusResponse`.
+
+#### `GET /api/bus-partner/organizations/{orgId}/trips` - List trips (partner)
+#### `POST /api/bus-partner/organizations/{orgId}/trips` - Create trip (partner, 201)
+
+Body (`TripRequest`): `busId` (required UUID), `code` (required, max 40), `currency` (required, 3 uppercase letters),
+`stops` (required, 2..20 items of `{terminalId, arrivalAt, departureAt}`, all required), `fares` (required, 1..200 items of
+`{fromSeq (>=0), toSeq (>=1), price (>=0.01)}`). Response `TripResponse`: `{id, organizationId, busId, code, status, currency,
+stops: [{seq, terminalId, city, terminalName, arrivalAt, departureAt}], fares: [{fromSeq, toSeq, price}], soldSeats, seatCount}`.
+
+#### `POST /api/bus-partner/organizations/{orgId}/trips/{id}/cancel` - Cancel trip (partner)
+
+No body. Response `TripResponse`.
+
+#### `GET /api/bus-partner/organizations/{orgId}/documents` - List documents (partner)
+#### `POST /api/bus-partner/organizations/{orgId}/documents` - Upload document (partner, 201)
+
+`multipart/form-data`: `file` (required), `type` (required, `TRANSPORT_AUTHORIZATION | TAX_CERTIFICATE | VEHICLE_REGISTRATION |
+VEHICLE_CARD | TRAFFIC_INSURANCE | SEAT_ACCIDENT_INSURANCE`), `documentNumber` (required), `validUntil` (ISO date, required for types where the contract
+demands an expiry), `busId` (UUID, for bus-level types). Response `DocumentResponse`: `{id, organizationId, busId, type, documentNumber,
+validUntil, status, rejectReason, reviewedBy, reviewedAt, fileName, contentType, sizeBytes, uploadedBy, createdAt, updatedAt}`.
+
+#### `GET /api/bus-partner/organizations/{orgId}/documents/{id}/file` - Download document file (partner)
+
+Binary body with the stored content type.
+
+#### `GET /api/bus-partner/organizations/{orgId}/bookings` - List bookings of the organization (partner)
+
+Response: list of `BookingResponse`.
+
+#### `GET /api/bus-partner/organizations/{orgId}/status` - Sellability status (partner)
+
+Response `data`: `{sellable, missingOrgDocuments, salesEnabled}`.
+
+### Admin (ADMIN)
+
+#### `GET /api/admin/bus-documents?status=` - List documents (ADMIN)
+
+`status` optional (`DocumentStatus`). Response: list of `{document: DocumentResponse, organizationName, busLabel}`.
+
+#### `GET /api/admin/bus-documents/{id}/file` - Download document file (ADMIN)
+#### `POST /api/admin/bus-documents/{id}/approve` - Approve document (ADMIN)
+#### `POST /api/admin/bus-documents/{id}/reject` - Reject document (ADMIN)
+
+Reject body `{reason}` (required, max 500). Approve and reject return `DocumentResponse`.
+
+#### `GET /api/admin/bus-vehicles` - List all buses (ADMIN)
+
+Response: list of `{bus: BusResponse, organizationName}`.
+
+#### `GET /api/admin/bus-terminals` - List all terminals (ADMIN)
+#### `POST /api/admin/bus-terminals` - Create terminal (ADMIN, 201)
+#### `PUT /api/admin/bus-terminals/{id}` - Update terminal (ADMIN)
+
+Body (`TerminalRequest`): `city` (required, max 100), `name` (required, max 150), `active` (Boolean, optional). Response: `TerminalResponse`.
+
+---
+
+## 15. Service-to-service (internal) endpoints
+
+`/internal/**` endpoints are **not** routed by the api-gateway (no gateway predicate matches them) and are never called by browsers or apps.
+Services call each other directly (Eureka/Feign).
+
+### X-Service-Token
+
+Each service signs a short-lived JWT with its own Ed25519 key and sends it in the `X-Service-Token` header.
+Claims: `iss` = calling service, `aud` = target service, `exp` <= 60 seconds, plus a `jti`. The receiving service verifies the signature with the
+caller's public key, checks `aud`, and checks that `iss` is in the allowed caller list of the matching `/internal/**` route group
+(`waylo.service-auth.routes` in that service's `application.yml`, shared code in the `service-auth-common` module).
+Keys are generated by `python3 scripts/gen-service-keys.py` into `.env` (never printed). Verify with `python3 scripts/test-service-auth.py`.
+
+Mode is set with `WAYLO_SERVICE_AUTH_MODE`:
+
+| Mode | Behaviour |
+|------|-----------|
+| `dual` (default) | accepts a valid `X-Service-Token` **or** the legacy shared `X-Internal-Token` |
+| `strict` | accepts only a valid `X-Service-Token` |
+
+When no keys are configured, services stay in `dual` mode and keep working with the legacy token. A route marked `required: false` in its config
+(for example `/api/customers` and `/api/bookings`) accepts calls without a service token.
+
+### Route groups and allowed callers
+
+Read from `waylo.service-auth.routes` as currently on disk (uncommitted working tree).
+
+| Callee service | Route prefix | Allowed callers |
+|----------------|--------------|-----------------|
+| auth-service | `/internal/access` | hotel-service, bus-service, car-rental-service, package-booking-service, payment-service |
+| auth-service | `/internal/organizations` | hotel-service, bus-service, car-rental-service |
+| hotel-service | `/internal/hotels` | auth-service |
+| hotel-service | `/internal/hotel-holds` | package-booking-service |
+| car-rental-service | `/internal/car-holds` | package-booking-service |
+| bus-service | `/internal/bus-holds` | package-booking-service |
+| flight-seat-inventory-service | `/internal/flight-holds` | package-booking-service |
+| pricing-service | `/internal/pricing` | package-booking-service |
+| payment-service | `/internal/escrow-items` | package-booking-service |
+| payment-service | `/internal/supplier-payouts` | flight-seat-inventory-service (no in-code caller yet) |
+| payment-service | `/internal/supplier-credits` | flight-seat-inventory-service (no in-code caller yet) |
+| package-booking-service | `/internal/orders/items` | hotel-service, checkin-service |
+| package-booking-service | `/internal/orders` | payment-service, notification-service |
+| package-booking-service | `/api/bookings` (`required: false`) | package-booking-saga-orchestrator |
+| crm-service | `/api/customers` (`required: false`) | notification-service |
+
+Note: `/internal/orders/items` is more specific than `/internal/orders`, so item endpoints are limited to hotel-service and checkin-service.
+A caller listed for a prefix may call every endpoint under it. Routes are matched in order, first match wins. An `/internal/**` path matching no configured route is fail-closed (no caller allowed).
+
+### Endpoint inventory
+
+| Method and path | Callee | Allowed callers |
+|-----------------|--------|-----------------|
+| `GET /internal/access` (query `userId`, `organizationId`, `permission`, optional hotel scope) | auth-service | hotel, bus, car-rental, package-booking, payment |
+| `GET /internal/organizations/active-ids` | auth-service | hotel, bus, car-rental |
+| `GET /internal/organizations/{id}` | auth-service | hotel, bus, car-rental |
+| `GET /internal/hotels/{id}` | hotel-service | auth-service |
+| `POST /internal/hotel-holds` | hotel-service | package-booking-service |
+| `GET /internal/hotel-holds/{holdId}` | hotel-service | package-booking-service |
+| `POST /internal/hotel-holds/{holdId}/confirm` | hotel-service | package-booking-service |
+| `POST /internal/hotel-holds/{holdId}/release` | hotel-service | package-booking-service |
+| `POST /internal/car-holds` | car-rental-service | package-booking-service |
+| `POST /internal/car-holds/{id}/confirm` | car-rental-service | package-booking-service |
+| `POST /internal/car-holds/{id}/release` | car-rental-service | package-booking-service |
+| `POST /internal/bus-holds` | bus-service | package-booking-service |
+| `POST /internal/bus-holds/{id}/confirm` | bus-service | package-booking-service |
+| `POST /internal/bus-holds/{id}/release` | bus-service | package-booking-service |
+| `POST /internal/flight-holds` | flight-seat-inventory-service | package-booking-service |
+| `GET /internal/flight-holds/{id}` | flight-seat-inventory-service | package-booking-service |
+| `POST /internal/flight-holds/{id}/confirm` | flight-seat-inventory-service | package-booking-service |
+| `POST /internal/flight-holds/{id}/release` | flight-seat-inventory-service | package-booking-service |
+| `GET /internal/flight-holds/{id}/refund-quote` | flight-seat-inventory-service | package-booking-service |
+| `POST /internal/pricing/quote` | pricing-service | package-booking-service |
+| `POST /internal/pricing/reservations/{orderId}/release` | pricing-service | package-booking-service |
+| `POST /internal/escrow-items/{orderItemId}/release` | payment-service | package-booking-service |
+| `POST /internal/escrow-items/{orderItemId}/cancellation-preview` | payment-service | package-booking-service |
+| `POST /internal/escrow-items/{orderItemId}/cancel` | payment-service | package-booking-service |
+| `POST /internal/escrow-items/{orderItemId}/no-show` | payment-service | package-booking-service |
+| `POST /internal/escrow-items/{orderItemId}/refund` | payment-service | package-booking-service |
+| `POST /internal/supplier-payouts` | payment-service | flight-seat-inventory-service |
+| `POST /internal/supplier-credits` | payment-service | flight-seat-inventory-service |
+| `GET /internal/orders/items/{orderItemId}` | package-booking-service | hotel-service, checkin-service |
+| `GET /internal/orders/items/{orderItemId}/review-eligibility` | package-booking-service | hotel-service, checkin-service |
+| `GET /internal/orders/items/review-eligible` | package-booking-service | hotel-service, checkin-service |
+| `GET /internal/orders/flight-items` (query `flightNumber`, `departureDate`) | package-booking-service | payment-service, notification-service |
+| `GET /internal/orders/{id}` | package-booking-service | payment-service, notification-service |
+| `POST /internal/orders/{id}/paid` | package-booking-service | payment-service, notification-service |
+
+Hold request bodies are small DTOs owned by the callee (for example bus `HoldRequest`: `tripId, fromSeq, toSeq, passengers (1..5), principalUserId,
+idempotencyKey, orderCorrelationId`; supplier movements `{supplier, orderId, orderItemId, amount, currency, idempotencyKey}`). Their per-field contracts are
+described in the service contract files (`BUS-CONTRACT.md`, `CAR-RENTAL-CONTRACT.md`, `FLIGHT-SUPPLIER-CONTRACT.md`, `PACKAGE-ORDER-CONTRACT.md`, `CANCELLATION-CONTRACT.md`)
+and were not re-expanded here.
+
+---
+
 
 ## Enums Reference
 
