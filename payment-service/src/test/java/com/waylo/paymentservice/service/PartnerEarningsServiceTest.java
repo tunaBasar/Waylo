@@ -61,4 +61,35 @@ class PartnerEarningsServiceTest {
         assertThatThrownBy(() -> service.earnings(user, org, null, null)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(repo);
     }
+
+    @Test
+    void twoCurrencies_giveOneTotalsRowEach_andNoSingleCurrencyFields() {
+        when(auth.check(user, org, "RESERVATION_READ")).thenReturn(new AuthAccessClient.AccessDecision(true, List.of("ORGANIZATION_OWNER")));
+        EscrowItem eur = item(EscrowStatus.RELEASED, "50.00");
+        eur.setCurrency("EUR");
+        when(repo.findForSupplier(eq(org), any(), any())).thenReturn(List.of(item(EscrowStatus.RELEASED, "90.00"), eur, item(EscrowStatus.HELD, "10.00")));
+
+        var r = service.earnings(user, org, null, null);
+
+        assertThat(r.currency()).isNull();
+        assertThat(r.totals()).isNull();
+        assertThat(r.totalsByCurrency()).hasSize(2);
+        var tryTotals = r.totalsByCurrency().stream().filter(t -> t.currency().equals("TRY")).findFirst().orElseThrow();
+        var eurTotals = r.totalsByCurrency().stream().filter(t -> t.currency().equals("EUR")).findFirst().orElseThrow();
+        assertThat(tryTotals.released()).isEqualByComparingTo("90.00");
+        assertThat(tryTotals.held()).isEqualByComparingTo("10.00");
+        assertThat(eurTotals.released()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void singleCurrency_keepsCurrencyAndTotalsForBackwardCompatibility() {
+        when(auth.check(user, org, "RESERVATION_READ")).thenReturn(new AuthAccessClient.AccessDecision(true, List.of()));
+        when(repo.findForSupplier(eq(org), any(), any())).thenReturn(List.of(item(EscrowStatus.RELEASED, "90.00")));
+
+        var r = service.earnings(user, org, null, null);
+
+        assertThat(r.currency()).isEqualTo("TRY");
+        assertThat(r.totals().released()).isEqualByComparingTo("90.00");
+        assertThat(r.totalsByCurrency()).hasSize(1);
+    }
 }

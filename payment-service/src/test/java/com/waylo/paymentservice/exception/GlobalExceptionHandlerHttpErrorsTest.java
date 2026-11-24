@@ -141,4 +141,37 @@ class GlobalExceptionHandlerHttpErrorsTest {
         assertThat(response.getBody().status()).isEqualTo(500);
         assertThat(response.getBody().error()).isEqualTo("INTERNAL_SERVER_ERROR");
     }
+
+    @Test
+    void conflictException_is409_withItsCodeAndDetails() {
+        var ex = new ConflictException("INVALID_STATE_TRANSITION", "nope", java.util.Map.of("from", "PAID", "to", "FAILED"));
+        ResponseEntity<ErrorResponse> response = handler.handleConflict(ex, request);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().error()).isEqualTo("INVALID_STATE_TRANSITION");
+        assertThat(response.getBody().details()).containsEntry("from", "PAID").containsEntry("to", "FAILED");
+    }
+
+    @Test
+    void businessRule_422_carriesDetails_andBadRequestIs400() {
+        var rule = new BusinessRuleException("PAYOUT_BELOW_MINIMUM", "low", java.util.Map.of("minimum", new java.math.BigDecimal("100.00")));
+        ResponseEntity<ErrorResponse> r422 = handler.handleBusinessRule(rule, request);
+        assertThat(r422.getStatusCode().value()).isEqualTo(422);
+        assertThat(r422.getBody().details()).containsKey("minimum");
+        ResponseEntity<ErrorResponse> r400 = handler.handleBadRequest(new BadRequestException("INVALID_IBAN", "bad"), request);
+        assertThat(r400.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(r400.getBody().error()).isEqualTo("INVALID_IBAN");
+    }
+
+    @Test
+    void dataIntegrityViolation_onAPayoutConstraint_isTranslated_withoutLeakingSql() {
+        var cause = new RuntimeException("ERROR: duplicate key value violates unique constraint \"uq_payout_open\" Detail: Key (organization_id, currency)=(x, TRY)");
+        ResponseEntity<ErrorResponse> r = handler.handleDataIntegrityViolation(new DataIntegrityViolationException("could not execute statement", cause), request);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(r.getBody().error()).isEqualTo("OPEN_PAYOUT_EXISTS");
+        assertThat(r.getBody().message()).doesNotContain("uq_payout_open").doesNotContain("Key (");
+        ResponseEntity<ErrorResponse> ref = handler.handleDataIntegrityViolation(new DataIntegrityViolationException("x", new RuntimeException("violates unique constraint \"uq_payout_reference\"")), request);
+        assertThat(ref.getBody().error()).isEqualTo("PAYMENT_REFERENCE_IN_USE");
+        ResponseEntity<ErrorResponse> iban = handler.handleDataIntegrityViolation(new DataIntegrityViolationException("x", new RuntimeException("violates unique constraint \"uq_bank_iban_hash_live\"")), request);
+        assertThat(iban.getBody().error()).isEqualTo("IBAN_ALREADY_IN_USE");
+    }
 }

@@ -16,5 +16,9 @@ public interface AuthAccessClient {
                          @RequestParam("organizationId") UUID organizationId,
                          @RequestParam("permission") String permission);
 
+    /** IDs of organizations in ACTIVE status (partner payouts are only requested by active organizations). */
+    @GetMapping("/organizations/active-ids")
+    List<UUID> activeOrganizationIds();
+
     record AccessDecision(boolean allowed, List<String> roles) {}
 }

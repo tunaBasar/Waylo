@@ -47,6 +47,14 @@ waylo:
         callers: [flight-seat-inventory-service]
       - path: /internal/supplier-credits
         callers: [flight-seat-inventory-service]
+  payouts:
+    # PAYOUT-CONTRACT.md. Money-out is manual (admin bank transfer), no provider call.
+    holdback-days: 0
+    minimum-amount:
+      TRY: 100.00
+    # base64 of exactly 32 bytes (openssl rand -base64 32). Required: the service refuses to start without it.
+    iban-key: ${WAYLO_PAYOUT_IBAN_KEY:}
+    require-different-admins: false
   payments:
     # TEST is refused at startup under the prod profile. A real provider (iyzico) is a later task.
     provider: ${WAYLO_PAYMENTS_PROVIDER:TEST}

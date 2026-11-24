@@ -14,12 +14,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 @Service
 public class PartnerEarningsService {
 
+    private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
     private static final Instant FAR_FUTURE = Instant.parse("9999-01-01T00:00:00Z");
 
     private final EscrowItemRepository escrowRepository;
@@ -45,9 +49,16 @@ public class PartnerEarningsService {
         List<PartnerEarningsResponse.Row> rows = items.stream().map(e -> new PartnerEarningsResponse.Row(
                 e.getOrderItemId(), e.getVertical(), e.getGrossAmount(), e.getCommissionAmount(), e.getSupplierAmount(),
                 e.getStatus(), e.getHeldAt(), e.getReleasedAt())).toList();
-        String currency = items.isEmpty() ? "TRY" : items.get(0).getCurrency();
-        return new PartnerEarningsResponse(currency, new PartnerEarningsResponse.Totals(
-                sum(items, EscrowStatus.HELD), sum(items, EscrowStatus.RELEASED), sum(items, EscrowStatus.REFUNDED)), rows);
+        Map<String, List<EscrowItem>> byCurrency = new TreeMap<>();
+        for (EscrowItem e : items) byCurrency.computeIfAbsent(e.getCurrency().trim(), k -> new ArrayList<>()).add(e);
+        List<PartnerEarningsResponse.CurrencyTotals> totals = byCurrency.entrySet().stream()
+                .map(en -> new PartnerEarningsResponse.CurrencyTotals(en.getKey(), sum(en.getValue(), EscrowStatus.HELD),
+                        sum(en.getValue(), EscrowStatus.RELEASED), sum(en.getValue(), EscrowStatus.REFUNDED))).toList();
+        if (byCurrency.size() > 1) return new PartnerEarningsResponse(null, null, totals, rows);
+        PartnerEarningsResponse.CurrencyTotals only = totals.isEmpty() ? null : totals.get(0);
+        return new PartnerEarningsResponse(only == null ? "TRY" : only.currency(),
+                new PartnerEarningsResponse.Totals(only == null ? ZERO : only.held(), only == null ? ZERO : only.released(),
+                        only == null ? ZERO : only.refunded()), totals, rows);
     }
 
     private static BigDecimal sum(List<EscrowItem> items, EscrowStatus status) {

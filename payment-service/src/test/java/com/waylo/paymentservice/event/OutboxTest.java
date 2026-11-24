@@ -52,6 +52,32 @@ class OutboxTest {
     }
 
     @Test
+    void payoutPaidEvent_usesThePayoutPaidToken_andNeverCarriesAFullIban() {
+        OutboxWriter writer = new OutboxWriter(jdbc);
+        PaymentEventPublisher publisher = new PaymentEventPublisher(writer);
+        UUID payoutId = UUID.randomUUID();
+        UUID org = UUID.randomUUID();
+        publisher.publishPayoutPaid(new PayoutPaidEvent(payoutId, org, UUID.randomUUID(), "owner@example.test", new BigDecimal("900.00"),
+                "TRY", "1326", "TRF-1", java.time.Instant.parse("2026-11-24T10:00:00Z")));
+
+        ArgumentCaptor<Object> args = ArgumentCaptor.forClass(Object.class);
+        verify(jdbc).update(contains("INSERT INTO outbox_event"), args.capture(), args.capture(), args.capture(),
+                args.capture(), args.capture(), args.capture(), args.capture(), args.capture());
+        List<Object> v = args.getAllValues();
+        assertThat(v.get(1)).isEqualTo("PAYOUT");
+        assertThat(v.get(2)).isEqualTo(payoutId.toString());
+        assertThat(v.get(3)).isEqualTo("payment-events");
+        assertThat(v.get(4)).isEqualTo(org.toString());
+        assertThat(v.get(5)).isEqualTo("payoutPaid");
+        assertThat((String) v.get(6)).contains("\"eventType\":\"PAYOUT_PAID\"").contains("\"ibanLast4\":\"1326\"").contains("TRF-1")
+                .doesNotContain("TR33");
+        // the token is registered on the producer side with the same name the consumer maps
+        assertThat(com.waylo.paymentservice.config.KafkaProducerConfig.TYPE_MAPPINGS)
+                .contains("payoutPaid:com.waylo.paymentservice.event.PayoutPaidEvent")
+                .contains("payoutFailed:com.waylo.paymentservice.event.PayoutFailedEvent");
+    }
+
+    @Test
     void writerRequiresExistingTransaction() throws Exception {
         var m = OutboxWriter.class.getMethod("write", String.class, String.class, String.class, String.class, Object.class);
         assertThat(m.getAnnotation(Transactional.class).propagation()).isEqualTo(Propagation.MANDATORY);

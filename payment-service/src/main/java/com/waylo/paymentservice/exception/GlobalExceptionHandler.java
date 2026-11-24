@@ -85,6 +85,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
+        log.warn("Conflict [{}]: {}", ex.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponse(409, ex.getCode(), ex.getMessage(), request.getRequestURI(), ex.getDetails()));
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
+        log.warn("Bad request [{}]", ex.getCode());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ErrorResponse(400, ex.getCode(), ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex,
                                                              HttpServletRequest request) {
@@ -93,7 +107,8 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY.value(),
                 ex.getRuleCode(),
                 ex.getMessage(),
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex.getDetails()
         );
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
     }
@@ -196,6 +211,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
                                                                       HttpServletRequest request) {
+        RuntimeException translated = PayoutConstraints.translate(ex);
+        if (translated instanceof ConflictException ce) {
+            log.warn("Payout constraint violation: {}", ce.getCode());
+            return handleConflict(ce, request);
+        }
         log.warn("Data integrity violation: {}", ex.getMessage());
         var response = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),

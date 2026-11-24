@@ -24,4 +24,14 @@ public class PaymentEventPublisher {
         log.info("Queueing PaymentRefundedEvent: {}", event.getPaymentId());
         outbox.write("PAYMENT", event.getPaymentId().toString(), KafkaTopics.PAYMENT_EVENTS, event.getPaymentId().toString(), event);
     }
+
+    public void publishPayoutPaid(PayoutPaidEvent event) {
+        log.info("Queueing PayoutPaidEvent: {}", event.getPayoutId());
+        outbox.write("PAYOUT", event.getPayoutId().toString(), KafkaTopics.PAYMENT_EVENTS, event.getOrganizationId().toString(), event);
+    }
+
+    public void publishPayoutFailed(PayoutFailedEvent event) {
+        log.info("Queueing PayoutFailedEvent: {}", event.getPayoutId());
+        outbox.write("PAYOUT", event.getPayoutId().toString(), KafkaTopics.PAYMENT_EVENTS, event.getOrganizationId().toString(), event);
+    }
 }

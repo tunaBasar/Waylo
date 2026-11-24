@@ -28,7 +28,9 @@ public class KafkaProducerConfig {
      */
     public static final String TYPE_MAPPINGS =
             "paymentCompleted:com.waylo.paymentservice.event.PaymentCompletedEvent,"
-          + "paymentRefunded:com.waylo.paymentservice.event.PaymentRefundedEvent";
+          + "paymentRefunded:com.waylo.paymentservice.event.PaymentRefundedEvent,"
+          + "payoutPaid:com.waylo.paymentservice.event.PayoutPaidEvent,"
+          + "payoutFailed:com.waylo.paymentservice.event.PayoutFailedEvent";
 
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
