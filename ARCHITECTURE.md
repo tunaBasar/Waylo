@@ -154,14 +154,16 @@ orijinal topic'e geri yollar; idempotent consumer tekrar işlemeyi önler. Saya�
 aynı gönderim yolundan yeniden denenir (satırlar `FOR UPDATE SKIP LOCKED` ile alınır, iki instance aynı satırı göndermez).
 5 denemeden sonra durum `GAVE_UP` olur. SENT ve SUPPRESSED asla yeniden gönderilmez. Sayaç: `waylo.notifications.delivery`.
 
-### 9. Kiracı izolasyonu: kod + PostgreSQL RLS (hotel, car-rental, bus)
+### 9. Kiracı izolasyonu: kod + PostgreSQL RLS (hotel, car-rental, bus, package-booking)
 Kod katmanı: her mutasyon `HotelAccessGuard` ile auth-service'e sorulur, child kayıtlar `hotelId + childId` ile bağlanır.
 DB katmanı (V9): uygulama her transaction'da `SET LOCAL ROLE waylo_app` (NOLOGIN, BYPASSRLS yok) ve transaction-local
 `app.mode` / `app.org_ids` ayarlar. Partner modunda yalnız yetkili kuruluşların satırları okunur ve yazılır. Public, servis ve admin
 okumaları bugünkü gibi kalır. Mod başlangıçta en düşük yetkidir (`/internal` ve `/internal/...` -> SERVICE, ADMIN rolü -> ADMIN,
 geri kalan -> PUBLIC). PARTNER modu yalnız başarılı erişim kontrolünden sonra açılır. Bağlam transaction sonunda düşer, pool'da sızmaz.
 Aynı model car-rental-service (şube, araç, tarife, tek yön, belge) ve bus-service (otobüs, sefer, durak, ücret, belge) için de
-kuruludur. Rezervasyon, hold, quote ve outbox gibi işlem tabloları kapsam dışıdır; package-booking henüz RLS'siz.
+kuruludur. Rezervasyon, hold, quote ve outbox gibi işlem tabloları kapsam dışıdır. package-booking'de (V12) `order_items`
+(`supplier_organization_id`) ve `vouchers` partner modunda RLS altındadır; `orders` kodda müşteri sahipliğiyle korunur, job'lar
+SERVICE modunda çalışır. Tüm dikeylerin yetki matrisi ve RLS sınıflandırması `scripts/acceptance/tenant_matrix.py` ile sınanır (RM-37).
 
 ### 10. Otel yayın akışı, public projeksiyon ve satış kapısı
 Otel `DRAFT -> SUBMITTED -> APPROVED -> PUBLISHED` akışından geçer (`REJECTED`, `SUSPENDED`, `ARCHIVED` de var,
@@ -184,7 +186,8 @@ iptal hak vermez.
 EXIF/XMP/IPTC silinir, dosya rastgele anahtarla `hotel_media` volume'ünde saklanır, kullanıcının dosya adı kullanılmaz.
 Harici virüs tarayıcı yoktur: yapısal çözümleme tarama yerine geçer, fotoğraf admin onayına kadar görünmez. Public servis yalnız
 onaylı fotoğrafları ve yalnız public otel için verir (aksi 404). `hotel_media` RLS altındadır; partner kendi fotoğrafını
-onaylayamaz (trigger).
+onaylayamaz (trigger). Silme soft delete'tir (V12 `deleted_at`): append-only karar kayıtları fotoğrafa bağlı kalır, dosya
+volume'den silinir, silinmiş satır hiçbir okumada görünmez ve partner geri alamaz.
 
 ### 11. Spring Boot 4.x artifact değişiklikleri
 - `spring-boot-starter-web` -> `spring-boot-starter-webmvc`
@@ -215,7 +218,8 @@ kısa sırla başlamayı reddeder (mesajda yalnız değişken adı geçer). Stat
 - Unit: `./gradlew :<modül>:test` (hotel-service RLS için Testcontainers PostgreSQL kullanır).
 - Statik: `python3 scripts/check-bean-constructors.py` (Spring bean'lerinde tek constructor) ve `scripts/check-yaml-duplicates.py`.
 - Canlı kabul: `scripts/test-*.py` gateway üzerinden gerçek akışları sınar. Örnekler: test-package-order, test-payments,
-  test-rls, test-service-auth, test-gateway-security.
+  test-rls, test-service-auth, test-gateway-security. Kiracı yetki matrisi (RM-37): `scripts/acceptance/tenant_matrix.py`
+  (sahip/müdür/personel/diğer kuruluş/müşteri/admin x uç noktalar, sıfır DB etkisi ve RLS sınıflandırması, JSON kanıt raporu).
 - Web: `npx tsc --noEmit`, `npx eslint`, `npm test`, Playwright e2e (`frontend/e2e`).
 - Mobil: `npx tsc --noEmit`, `npx jest --ci`, `npx expo lint`.
 - CI (`.github/workflows/ci.yml`): statik kontroller + tüm Gradle testleri, frontend ve mobil kontrolleri.

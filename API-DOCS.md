@@ -1864,7 +1864,7 @@ Partner (`HOTEL_MANAGE` on the hotel):
 | GET | `/api/hotels/{id}/media/mine` | all own photos with `reviewStatus` (PENDING/APPROVED/REJECTED + reason) |
 | PUT | `/api/hotels/{id}/media/order` | `{ids:[...]}` new sort order |
 | PATCH | `/api/hotels/{id}/media/{mediaId}` | `{caption}`; editing an approved photo sends it back to review |
-| DELETE | `/api/hotels/{id}/media/{mediaId}` | 204; 409 `MEDIA_LIVE` for an approved photo of a published hotel |
+| DELETE | `/api/hotels/{id}/media/{mediaId}` | 204 (soft delete: the review history stays, the file is removed, the photo disappears everywhere); 409 `MEDIA_LIVE` for an approved photo of a published hotel |
 | GET | `/api/hotels/{id}/media/{mediaId}/file` | own file, `Cache-Control: no-store` |
 
 Public (no token): `GET /api/hotels/{id}/media` -> `[{id, caption, sortOrder, width, height}]` and
