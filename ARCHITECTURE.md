@@ -127,6 +127,7 @@ Her karar append-only `payment_reconciliations` tablosuna yazılır, admin `GET 
 ### 7. İptal, iade ve finans
 İptal kuralları kalem bazında saklanan **politika snapshot'ından** hesaplanır, sonradan fiyat veya otel düzenlemesi bunu değiştirmez.
 `GET /api/orders/{id}/cancellation-preview` sonucu önceden gösterir. Para iadesi, escrow ve stok serbest bırakma ayrı sonuçlarla izlenir.
+Ödenmiş bir otel konaklaması iptal edildiğinde CONFIRMED hold da bırakılır ve oda yeniden satışa çıkar (`confirmed` sayacı düşer).
 Komisyon, işletme alacağı ve iade etkisi payment-service'te **append-only ledger** kayıtlarıdır. Partner kazanç ekranı
 escrow kalemlerinden beslenir, para birimi başına toplamlarla.
 
@@ -161,7 +162,8 @@ DB katmanı (V9): uygulama her transaction'da `SET LOCAL ROLE waylo_app` (NOLOGI
 okumaları bugünkü gibi kalır. Mod başlangıçta en düşük yetkidir (`/internal` ve `/internal/...` -> SERVICE, ADMIN rolü -> ADMIN,
 geri kalan -> PUBLIC). PARTNER modu yalnız başarılı erişim kontrolünden sonra açılır. Bağlam transaction sonunda düşer, pool'da sızmaz.
 Aynı model car-rental-service (şube, araç, tarife, tek yön, belge) ve bus-service (otobüs, sefer, durak, ücret, belge) için de
-kuruludur. Rezervasyon, hold, quote ve outbox gibi işlem tabloları kapsam dışıdır. package-booking'de (V12) `order_items`
+kuruludur. Rezervasyon tabloları da partner modunda RLS altındadır: car `rentals` (V7), bus `bookings` ve `tickets` (V3).
+Hold, quote ve outbox gibi teknik işlem tabloları kapsam dışıdır. package-booking'de (V12) `order_items`
 (`supplier_organization_id`) ve `vouchers` partner modunda RLS altındadır; `orders` kodda müşteri sahipliğiyle korunur, job'lar
 SERVICE modunda çalışır. Tüm dikeylerin yetki matrisi ve RLS sınıflandırması `scripts/acceptance/tenant_matrix.py` ile sınanır (RM-37).
 
