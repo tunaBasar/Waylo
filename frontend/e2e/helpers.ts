@@ -9,6 +9,11 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const STATE_FILE = path.join(__dirname, '.state.json');
 
 export interface Account { email: string; password: string }
+/** Untyped JSON default for fixture calls. Callers that assert on fields pass an explicit type argument. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Loose = any;
+/** Body of POST /api/auth/login (auth-service AuthResponse). */
+export interface Session { token: string; refreshToken: string; userId: string; email: string; firstName: string; lastName: string; role: string; emailVerified: boolean }
 export interface State {
   customer: Account;
   hotelPartner: Account;
@@ -56,31 +61,31 @@ export function psql(db: string, sql: string): string {
   return execFileSync('docker', ['exec', 'waylo-postgres', 'psql', '-U', 'waylo', '-d', db, '-tAc', sql], { encoding: 'utf8' }).trim();
 }
 
-export async function api<T = any>(method: string, p: string, body?: unknown, token?: string, form?: FormData): Promise<{ status: number; data: T }> {
+export async function api<T = Loose>(method: string, p: string, body?: unknown, token?: string, form?: FormData): Promise<{ status: number; data: T }> {
   const headers: Record<string, string> = {};
   if (!form) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(API + p, { method, headers, body: form ?? (body === undefined ? undefined : JSON.stringify(body)) });
   const text = await res.text();
-  let json: any = null;
+  let json: { data?: unknown } | null = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not json */ }
   return { status: res.status, data: json?.data as T };
 }
 
-export async function must<T = any>(method: string, p: string, body?: unknown, token?: string): Promise<T> {
+export async function must<T = Loose>(method: string, p: string, body?: unknown, token?: string): Promise<T> {
   const r = await api<T>(method, p, body, token);
   if (r.status >= 300) throw new Error(`${method} ${p} -> ${r.status}`);
   return r.data;
 }
 
-const sessions = new Map<string, { at: number; data: any }>();
+const sessions = new Map<string, { at: number; data: Session }>();
 
 /** Logs in once per account per 5 minutes (the gateway limits /api/auth/login per IP), retrying on 429. */
-export async function login(a: Account): Promise<{ token: string; refreshToken: string }> {
+export async function login(a: Account): Promise<Session> {
   const hit = sessions.get(a.email);
   if (hit && Date.now() - hit.at < 300_000) return hit.data;
   for (let i = 0; ; i++) {
-    const r = await api('POST', '/api/auth/login', a);
+    const r = await api<Session>('POST', '/api/auth/login', a);
     if (r.status === 429 && i < 8) { await sleep(10_000); continue; }
     if (r.status >= 300) throw new Error(`login -> ${r.status}`);
     sessions.set(a.email, { at: Date.now(), data: r.data });
@@ -102,7 +107,7 @@ export async function createUser(prefix: string, first: string): Promise<Account
 
 /** Puts the user's tokens into localStorage before any page script runs. */
 export async function signIn(context: BrowserContext, a: Account) {
-  const t: any = await login(a);
+  const t = await login(a);
   const user = JSON.stringify({ id: t.userId, firstName: t.firstName, lastName: t.lastName, email: t.email, role: t.role, emailVerified: t.emailVerified });
   await context.addInitScript(([tok, ref, u]) => {
     localStorage.setItem('waylo_token', tok);

@@ -63,7 +63,6 @@ test('formatters', () => {
 });
 
 test('busErrorMessage maps known codes and falls back', () => {
-  const err = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
   assert.match(m.busErrorMessage('x', 'fb'), /fb/);
   assert.equal(m.busErrorMessage({}, 'fb'), 'fb');
 });

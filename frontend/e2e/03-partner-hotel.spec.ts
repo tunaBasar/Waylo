@@ -66,7 +66,7 @@ test.describe.serial('partner hotel', () => {
     await page.getByRole('button', { name: 'Kuponu kullan' }).click();
     await expect(page.getByRole('status')).toContainText('Kupon kullanildi');
     await expectNoRawIcons(page);
-    const v = await api('GET', `/api/orders/${s.hotelOrderId}/vouchers`, undefined, cust);
-    expect((v.data as any[])[0].status).toBe('REDEEMED');
+    const v = await api<{ status: string }[]>('GET', `/api/orders/${s.hotelOrderId}/vouchers`, undefined, cust);
+    expect(v.data[0].status).toBe('REDEEMED');
   });
 });

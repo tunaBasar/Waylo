@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { adminAccount, api, expectNoRawIcons, loadState, login, psql, signIn } from './helpers';
+import { adminAccount, api, expectNoRawIcons, isoDate, loadState, login, psql, signIn } from './helpers';
 
 test.beforeEach(async ({ context }) => { await signIn(context, adminAccount()); });
 
@@ -22,7 +22,7 @@ test('admin organizations: approve a pending org', async ({ page }) => {
   await row.getByRole('button', { name: 'Onayla' }).click();
   await expect(page.getByText(id)).toHaveCount(0); // left the pending list
   const admin = (await login(adminAccount())).token;
-  const orgs = await api<any[]>('GET', '/api/admin/organizations?status=ACTIVE', undefined, admin);
+  const orgs = await api<unknown[]>('GET', '/api/admin/organizations?status=ACTIVE', undefined, admin);
   expect(JSON.stringify(orgs.data)).toContain(id);
 });
 
@@ -55,7 +55,7 @@ test('admin reviews moderation: verified review is listed and can be hidden', as
   await row.getByPlaceholder('Gerekce (zorunlu)').fill('E2E moderasyon');
   await row.getByRole('button', { name: 'Gizle' }).click();
   await expect(row.getByRole('button', { name: 'Yayinla' })).toBeVisible();
-  const pub = await api<any>('GET', `/api/hotels/${s.hotelId}/reviews`);
+  const pub = await api<unknown>('GET', `/api/hotels/${s.hotelId}/reviews`);
   expect(JSON.stringify(pub.data)).not.toContain(text);
 });
 
@@ -70,4 +70,33 @@ test('admin notifications page loads', async ({ page }) => {
   expect(list.data.length, 'notification service has data (orders above send emails)').toBeGreaterThan(0);
   await expect(page.getByText(list.data[0].recipient, { exact: true }).first()).toBeVisible();
   await expectNoRawIcons(page);
+});
+
+test('admin hotel publications page lists the review queue', async ({ page }) => {
+  const s = loadState();
+  // A second hotel left SUBMITTED so the queue has a row to render.
+  const hp = (await login(s.hotelPartner)).token;
+  const name = `E2E Queue ${Date.now().toString(36)}`;
+  const created = await api('POST', '/api/hotels', { name, city: s.hotelCity, country: 'TR', address: 'E2E only', starRating: 3, organizationId: s.hotelOrgId }, hp);
+  expect(created.status).toBe(201);
+  const hotelId = created.data.id as string;
+  const room = await api('POST', `/api/hotels/${hotelId}/room-types`, { code: 'Q_DBL', name: 'Queue room', maxAdults: 2, maxChildren: 0, maxOccupancy: 2 }, hp);
+  const plan = await api('POST', `/api/hotels/${hotelId}/rate-plans`, { code: 'Q_FLEX', name: 'Queue plan', mealPlan: 'ROOM_ONLY', cancellationPolicy: 'NON_REFUNDABLE' }, hp);
+  const day = isoDate(60);
+  await api('PUT', `/api/hotels/${hotelId}/inventory`, { items: [{ roomTypeId: room.data.id, stayDate: day, allotment: 1, expectedVersion: null }], reason: 'e2e queue' }, hp);
+  await api('PUT', `/api/hotels/${hotelId}/rates`, { items: [{ roomTypeId: room.data.id, ratePlanId: plan.data.id, stayDate: day, occupancy: 2, currency: 'TRY', amount: 900 }] }, hp);
+  const sub = await api('POST', `/api/hotels/${hotelId}/publication-requests`, {}, hp);
+  expect(sub.status).toBe(201);
+
+  await page.goto('/admin/hotel-publications');
+  await expect(page.getByRole('heading', { name: 'Otel Yayinlari' })).toBeVisible();
+  await expect(page.getByText(name)).toBeVisible();
+  await expectNoRawIcons(page);
+  await page.getByText(name).click();
+  const reject = page.getByRole('button', { name: 'Reddet', exact: true });
+  await expect(reject).toBeDisabled();
+  await page.getByRole('textbox').fill('E2E eksik bilgi');
+  await expect(reject).toBeEnabled();
+  await reject.click();
+  await expect(page.getByText(name)).toHaveCount(0);
 });
