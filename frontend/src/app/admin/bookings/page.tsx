@@ -9,6 +9,7 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   PENDING: { label: 'Beklemede', class: 'bg-primary-fixed text-primary' },
   CANCELLED: { label: 'Iptal', class: 'bg-error-container text-on-error-container' },
   FAILED: { label: 'Basarisiz', class: 'bg-error-container text-on-error-container' },
+  EXPIRED: { label: 'Süresi doldu', class: 'bg-surface-container text-on-surface-variant' },
 };
 const paymentLabel: Record<string, string> = {
   UNPAID: 'Odenmedi', PAID: 'Odendi', PARTIALLY_REFUNDED: 'Kismi iade', REFUNDED: 'Iade edildi',
@@ -83,7 +84,7 @@ export default function BookingsPage() {
       ) : (
         <div className="space-y-space-sm">
           {orders.map(o => {
-            const sc = statusConfig[o.status] ?? statusConfig.PENDING;
+            const sc = statusConfig[o.status] ?? { label: o.status, class: 'bg-surface-container text-on-surface-variant' };
             return (
               <div key={o.id} className="bg-surface-container-lowest rounded-xl shadow-sm p-4">
                 <div className="flex items-center justify-between mb-2">
