@@ -49,11 +49,12 @@ public class FlightEventListener {
             } else {
                 log.debug("Atlanıyor: {}", event == null ? "null" : event.getClass().getSimpleName());
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT). No ack here.
             log.error("Flight event islenirken hata: {}", ex.getMessage(), ex);
-        } finally {
-            ack.acknowledge();
+            throw ex;
         }
+        ack.acknowledge();
     }
 
     private void handleFlightCancelled(FlightCancelledEvent event) {

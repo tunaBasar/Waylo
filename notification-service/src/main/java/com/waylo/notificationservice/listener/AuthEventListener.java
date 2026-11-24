@@ -39,8 +39,13 @@ public class AuthEventListener {
                 case "USER_DELETED", "PROFILE_UPDATED", "USER_UPDATED" -> log.debug("Ignoring non-email auth event: {}", event.getEventType());
                 default -> log.warn("Unknown auth event type: {}", event.getEventType());
             }
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Malformed payload: non-retryable, straight to the DLT
+            throw new IllegalArgumentException("Malformed auth event JSON", e);
+        } catch (RuntimeException e) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT)
             log.error("Failed to process auth event: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }

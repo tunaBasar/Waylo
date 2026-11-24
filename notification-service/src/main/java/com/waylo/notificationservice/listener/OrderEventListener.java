@@ -51,11 +51,12 @@ public class OrderEventListener {
                     handle(e, "Siparişiniz iptal edildi", refundBody(e));
                 }
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT). No ack here.
             log.error("Order event islenirken hata: {}", ex.getMessage(), ex);
-        } finally {
-            ack.acknowledge();
+            throw ex;
         }
+        ack.acknowledge();
     }
 
     private void handle(OrderEvent e, String subject, String body) {
