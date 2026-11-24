@@ -1237,6 +1237,26 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void supportCapabilities_isPublic_butSupportCasesNeedAuth() {
+        AtomicReference<ServerHttpRequest> open = new AtomicReference<>();
+        ServerWebExchange pub = MockServerWebExchange.from(MockServerHttpRequest.get("/api/support/capabilities").build());
+        new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper())
+                .filter(pub, ex -> { open.set(ex.getRequest()); return ex.getResponse().setComplete(); }).block();
+        assertThat(open.get()).isNotNull();
+        assertThat(open.get().getHeaders().getFirst("X-User-Id")).isNull();
+
+        for (String path : new String[]{"/api/me/support-cases", "/api/support/capabilities/../cases", "/api/admin/support-cases"}) {
+            AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+            ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path).build());
+            new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper())
+                    .filter(exchange, ex -> { captured.set(ex.getRequest()); return ex.getResponse().setComplete(); }).block();
+            assertThat(captured.get()).as(path).isNull();
+            // traversal is refused earlier with 400 by the path guard, the rest needs a token (401)
+            assertThat(exchange.getResponse().getStatusCode()).as(path).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Test
     void publicCarOffersGet_anon_passesWithoutIdentity() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {

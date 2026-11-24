@@ -152,6 +152,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 || (path.startsWith("/api/bus-trips/") && path.endsWith("/seats"))) {
             return true;
         }
+        // Support channel capabilities (RM-36): static, public, no customer data. Support cases stay authenticated.
+        if (path.equals("/api/support/capabilities")) {
+            return true;
+        }
         return false;
     }
 

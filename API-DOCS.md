@@ -2089,3 +2089,17 @@ open http://localhost:5050  # admin@waylo.com / admin
   `GET /api/admin/users?email=x` still returns the single-user `{success,message,data:{...same fields}}` (404 if missing).
 - **Rate limits (gateway, per client IP, per minute)**: login 10, register 5, forgot-password 3, resend-verification 3,
   refresh 30. Exceeding returns 429. Fails open if Redis is down.
+
+### 16.8 Support cases (crm-service, RM-36)
+
+A support case is opened on the customer's own order. There is no live chat. Cases are asynchronous message threads.
+Status: `OPEN` (customer wrote last), `ANSWERED` (partner or admin wrote last), `CLOSED` (terminal, no more messages). Messages are append-only.
+
+- Customer (JWT): `POST /api/me/support-cases` `{orderId, orderItemId?, subject (max 150), message (max 4000)}` -> 201 (404 if the order is not yours),
+  `GET /api/me/support-cases`, `GET /api/me/support-cases/{id}` (with `messages`), `POST /api/me/support-cases/{id}/messages` `{body}`,
+  `POST /api/me/support-cases/{id}/close`. Another customer's case is 404.
+- Partner (`RESERVATION_READ` on the organization, else 403): `GET /api/partner/organizations/{orgId}/support-cases`, `GET .../{id}`,
+  `POST .../{id}/messages` `{body}` (sets `ANSWERED`). Only cases whose item supplier is that organization are visible (others 404).
+- Admin (ADMIN only, else 403): `GET /api/admin/support-cases?status=`, `GET .../{id}`, `POST .../{id}/messages`, `POST .../{id}/close`.
+- Posting to a CLOSED case: 422 `CASE_CLOSED`.
+- Public: `GET /api/support/capabilities` -> `{liveChat:false, channels:[], hours:null, decisionPending:true}` until the RM-06 operations playbook is decided.

@@ -42,7 +42,7 @@ waylo:
       - path: /internal/orders/items
         callers: [hotel-service, checkin-service]
       - path: /internal/orders
-        callers: [payment-service, notification-service]
+        callers: [payment-service, notification-service, crm-service]
       - path: /api/bookings
         callers: [package-booking-saga-orchestrator]
         required: false

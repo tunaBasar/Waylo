@@ -70,7 +70,7 @@ spring:
             - id: crm-service
               uri: lb://crm-service
               predicates:
-                - Path=/api/customers/**,/api/loyalty/**
+                - Path=/api/customers/**,/api/loyalty/**,/api/me/support-cases,/api/me/support-cases/**,/api/partner/organizations/*/support-cases,/api/partner/organizations/*/support-cases/**,/api/admin/support-cases,/api/admin/support-cases/**,/api/support/**
             - id: checkin-service
               uri: lb://checkin-service
               predicates:
