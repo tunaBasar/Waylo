@@ -10,6 +10,7 @@ import {
 import {
   PUBLICATION_STATUS_LABEL, PUBLICATION_STATUS_TONE, type PublicationRequestStatus,
 } from '@/lib/partner';
+import { MediaReview } from './MediaReview';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const TABS: Array<{ key: PublicationRequestStatus; label: string }> = [
@@ -190,6 +191,7 @@ export default function AdminHotelPublicationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [section, setSection] = useState<'requests' | 'media'>('requests');
 
   const load = useCallback(async (s: PublicationRequestStatus, p: number) => {
     setLoading(true);
@@ -222,6 +224,11 @@ export default function AdminHotelPublicationsPage() {
   return (
     <div className="space-y-space-md">
       <PageHeader title="Otel Yayinlari" subtitle="Partner otellerinin yayin ve icerik degisikligi taleplerini inceleyin." />
+      <div className="flex gap-2">
+        <Button variant={section === 'requests' ? 'primary' : 'ghost'} onClick={() => setSection('requests')}>Yayin talepleri</Button>
+        <Button variant={section === 'media' ? 'primary' : 'ghost'} onClick={() => setSection('media')}>Fotograflar</Button>
+      </div>
+      {section === 'media' ? <MediaReview /> : (<>
       <div className="flex flex-wrap gap-1.5">
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setStatus(t.key); setPage(0); setSelected(null); }}
@@ -261,6 +268,7 @@ export default function AdminHotelPublicationsPage() {
             )}
           </div>
         )}
+      </>)}
     </div>
   );
 }

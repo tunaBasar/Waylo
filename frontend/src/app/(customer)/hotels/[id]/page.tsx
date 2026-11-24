@@ -16,6 +16,9 @@ import { useAuth } from '@/lib/auth';
 import { HotelReviews } from '@/components/HotelReviews';
 import { scoreLabel } from '@/lib/reviews';
 
+interface PublicPhoto { id: string; caption: string | null; sortOrder: number; width: number; height: number }
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="text-center py-16">
@@ -288,6 +291,8 @@ function HotelsDetailContent() {
     () => parseStayQuery(searchParams),
   );
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [notPublished, setNotPublished] = useState(false);
+  const [photos, setPhotos] = useState<PublicPhoto[]>([]);
 
   // Load hotel
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -295,20 +300,32 @@ function HotelsDetailContent() {
     if (!id) return;
     setHotelLoading(true);
     setHotelError(null);
+    setNotPublished(false);
     api.get<Hotel>(`/api/hotels/${id}`).then(res => {
       setHotel(res.data);
       setHotelLoading(false);
-    }).catch(() => {
-      setHotelError('Otel bulunamadi');
+    }).catch((err: unknown) => {
+      if (err instanceof ApiError && err.status === 404) setNotPublished(true);
+      else setHotelError('Otel bulunamadi');
       setHotelLoading(false);
     });
   }, [id]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Approved photos only: the public list endpoint returns nothing else
+  useEffect(() => {
+    if (!hotel) return;
+    let cancelled = false;
+    api.get<PublicPhoto[]>(`/api/hotels/${hotel.id}/media`).then(res => {
+      if (!cancelled) setPhotos(res.data ?? []);
+    }).catch(() => { if (!cancelled) setPhotos([]); });
+    return () => { cancelled = true; };
+  }, [hotel]);
+
   // Load availability when searchQuery changes
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!searchQuery || !id) return;
+    if (!searchQuery || !id || !hotel) return;
     setOfferLoading(true);
     setOfferError(null);
     hotelStayApi.availability(id, searchQuery).then(res => {
@@ -318,7 +335,7 @@ function HotelsDetailContent() {
       setOfferError(err instanceof Error ? err.message : 'Araba sirasinda bir hata olustu');
       setOfferLoading(false);
     });
-  }, [id, searchQuery]);
+  }, [id, searchQuery, hotel]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleFormSubmit = useCallback((q: StayQuery) => {
@@ -345,6 +362,8 @@ function HotelsDetailContent() {
       setPendingQuote(false);
       if (err instanceof ApiError && err.code === 'ADMIN_CANNOT_PURCHASE') {
         setOfferError(ADMIN_CANNOT_PURCHASE_MESSAGE);
+      } else if (err instanceof ApiError && err.code === 'HOTEL_NOT_BOOKABLE') {
+        setOfferError('Bu otel su anda rezervasyona acik degil.');
       } else if (err instanceof ApiError && (err.status === 409 || err.status === 422)) {
         setNoticeMessage('Fiyat veya musaitlik degisti, lutfen tekrar arayin');
         // Re-run availability to refresh
@@ -362,6 +381,18 @@ function HotelsDetailContent() {
   }, [hotel, searchQuery, router, authUser]);
 
   if (hotelLoading) return <LoadingState />;
+  if (notPublished) {
+    return (
+      <div className="text-center py-16" data-testid="hotel-not-published">
+        <span className="material-symbols-outlined text-on-surface-variant text-5xl mb-4 block">visibility_off</span>
+        <h2 className="text-lg font-semibold text-on-surface">Bu otel şu anda yayında değil</h2>
+        <p className="text-on-surface-variant text-sm mt-1">Otel yayından kaldırılmış veya henüz yayına alınmamış olabilir.</p>
+        <Link href="/hotels" className="inline-flex items-center gap-1 text-primary text-sm font-medium mt-4 hover:underline">
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span> Otellere don
+        </Link>
+      </div>
+    );
+  }
   if (hotelError || !hotel) return <ErrorState message={hotelError ?? 'Otel bulunamadi'} />;
 
   const stars = '★'.repeat(hotel.starRating);
@@ -372,6 +403,16 @@ function HotelsDetailContent() {
       <Link href="/hotels" className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline">
         <span className="material-symbols-outlined text-[18px]">arrow_back</span> Otellere don
       </Link>
+
+      {photos.length > 0 && hotel && (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3" data-testid="hotel-photos">
+          {photos.map(p => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={p.id} src={`${API_BASE}/api/hotels/${hotel.id}/media/${p.id}`} alt={p.caption ?? hotel.name}
+              loading="lazy" className="h-40 w-full rounded-xl object-cover" />
+          ))}
+        </div>
+      )}
 
       {/* Hotel info */}
       <div className="bg-surface-container-lowest rounded-xl p-6 shadow-sm">

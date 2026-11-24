@@ -19,6 +19,7 @@ import {
   type HotelRequest, type OrganizationStatus, type BusinessType, type LegalType, type PartnerHotel,
   type PublicationRequestSummary, type HotelContentView, type HotelContent,
 } from '@/lib/partner';
+import { HotelPhotosPanel } from './HotelPhotosPanel';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const STATUS_TONE: Record<OrganizationStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -498,6 +499,10 @@ export default function PartnerOrganizationsPage() {
           )}
           {hotel && (
             <PublicationPanel key={hotel.id} hotel={hotel} organizationStatus={membership?.organizationStatus}
+              canManage={membership ? canManageHotel(membership.roles, hotel.id) : false} />
+          )}
+          {hotel && (
+            <HotelPhotosPanel key={`photos-${hotel.id}`} hotel={hotel}
               canManage={membership ? canManageHotel(membership.roles, hotel.id) : false} />
           )}
         </section>

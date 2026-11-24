@@ -279,6 +279,9 @@ services:
       WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_HOTEL_SERVICE:-}"
       WAYLO_SERVICE_KEYS_AUTH_SERVICE: "${WAYLO_SERVICE_KEYS_AUTH_SERVICE:-}"
       WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:-}"
+      HOTEL_MEDIA_DIR: /data/hotel-media
+    volumes:
+      - hotel_media:/data/hotel-media
     depends_on:
       discovery-service:
         condition: service_healthy
@@ -769,3 +772,4 @@ volumes:
   postgres_data:
   car_documents:
   bus_documents:
+  hotel_media:

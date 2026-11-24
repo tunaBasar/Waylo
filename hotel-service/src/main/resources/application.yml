@@ -17,6 +17,10 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 2
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: validate

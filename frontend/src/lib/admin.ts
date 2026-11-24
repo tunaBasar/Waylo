@@ -158,3 +158,30 @@ export const adminApi = {
   createSeatsBulk: (b: BulkSeatRequest) => api.post<{ flightNumber: string; created: number }>('/api/seat-inventory/seats/bulk', b),
   availableSeatCount: (flightNumber: string) => api.get<number>(`/api/seat-inventory/seats/${enc(flightNumber)}/count`),
 };
+
+// ---------- hotel photo review (hotel-service V11) ----------
+
+export interface AdminHotelMedia {
+  media: import('./partner').HotelMediaItem;
+  hotelName: string | null;
+  organizationId: string;
+  uploadedBy: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  decisions: Array<{ id: string; decision: 'APPROVE' | 'REJECT'; fromStatus: string; toStatus: string; reason: string | null; actorUserId: string; createdAt: string }>;
+}
+export interface AdminHotelMediaPage { items: AdminHotelMedia[]; page: number; size: number; total: number }
+
+export const adminMediaApi = {
+  list: (reviewStatus: import('./partner').MediaReviewStatus, page = 0, size = 20) =>
+    api.get<AdminHotelMediaPage>(`/api/admin/hotel-media?reviewStatus=${reviewStatus}&page=${page}&size=${size}`),
+  decide: (mediaId: string, body: { decision: 'APPROVE' | 'REJECT'; reason: string | null }) =>
+    api.post<AdminHotelMedia>(`/api/admin/hotel-media/${enc(mediaId)}/decisions`, body),
+  file: async (mediaId: string): Promise<Blob> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('waylo_token') : null;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/admin/hotel-media/${enc(mediaId)}/file`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error('Fotograf yuklenemedi');
+    return res.blob();
+  },
+};

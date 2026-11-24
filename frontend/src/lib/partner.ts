@@ -852,3 +852,93 @@ export function checkOutErrorMessage(err: unknown): string {
   }
   return partnerErrorMessage(err, 'Check-out yapilamadi');
 }
+
+// ---------- hotel photos (hotel-service V11, contract sec. 5) ----------
+
+export const HOTEL_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+export const HOTEL_PHOTO_MAX_COUNT = 20;
+export const HOTEL_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const HOTEL_PHOTO_MIN_WIDTH = 800;
+export const HOTEL_PHOTO_MIN_HEIGHT = 600;
+
+export type MediaReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface HotelMediaItem {
+  id: string;
+  hotelId: string;
+  caption: string | null;
+  sortOrder: number;
+  rightsSource: string;
+  rightsNote: string | null;
+  contentType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  scanStatus: 'PENDING' | 'CLEAN' | 'REJECTED';
+  reviewStatus: MediaReviewStatus;
+  reviewReason: string | null;
+  createdAt: string;
+}
+
+export const MEDIA_STATUS_LABEL: Record<MediaReviewStatus, string> = {
+  PENDING: 'Incelemede',
+  APPROVED: 'Onaylandi',
+  REJECTED: 'Reddedildi',
+};
+export const MEDIA_STATUS_TONE: Record<MediaReviewStatus, 'success' | 'warning' | 'error'> = {
+  PENDING: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'error',
+};
+
+/** Client side pre-check (the server re-validates by magic bytes). Returns an error text or null. */
+export function validatePhotoFile(file: { type: string; size: number }, existingCount: number): string | null {
+  if (existingCount >= HOTEL_PHOTO_MAX_COUNT) return `En fazla ${HOTEL_PHOTO_MAX_COUNT} fotograf yuklenebilir`;
+  if (!(HOTEL_PHOTO_TYPES as readonly string[]).includes(file.type)) return 'Yalnizca JPEG, PNG veya WebP yuklenebilir';
+  if (file.size <= 0) return 'Dosya bos';
+  if (file.size > HOTEL_PHOTO_MAX_BYTES) return 'Dosya 5 MB sinirini asiyor';
+  return null;
+}
+
+/** Returns the ids after moving one item by delta positions, clamped. Same array when nothing changes. */
+export function moveId(ids: string[], id: string, delta: number): string[] {
+  const from = ids.indexOf(id);
+  if (from < 0) return ids;
+  const to = Math.max(0, Math.min(ids.length - 1, from + delta));
+  if (to === from) return ids;
+  const next = ids.slice();
+  next.splice(from, 1);
+  next.splice(to, 0, id);
+  return next;
+}
+
+function mediaAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('waylo_token') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+const mediaBase = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+export const hotelMediaApi = {
+  list: (hotelId: string) => api.get<HotelMediaItem[]>(`/api/hotels/${enc(hotelId)}/media/mine`),
+  /** Multipart: no JSON Content-Type, the browser sets the boundary. */
+  upload: async (hotelId: string, file: File, caption: string): Promise<HotelMediaItem> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (caption.trim()) fd.append('caption', caption.trim());
+    const res = await fetch(`${mediaBase()}/api/hotels/${enc(hotelId)}/media`, { method: 'POST', body: fd, headers: mediaAuthHeaders() });
+    const body = await res.json().catch(() => null) as { data?: HotelMediaItem; message?: string; error?: string } | null;
+    if (!res.ok || !body?.data) throw new ApiError(body?.message || 'Fotograf yuklenemedi', res.status, body?.error ?? null);
+    return body.data;
+  },
+  caption: (hotelId: string, mediaId: string, caption: string) =>
+    api.patch<HotelMediaItem>(`/api/hotels/${enc(hotelId)}/media/${enc(mediaId)}`, { caption }),
+  reorder: (hotelId: string, ids: string[]) =>
+    api.put<HotelMediaItem[]>(`/api/hotels/${enc(hotelId)}/media/order`, { ids }),
+  remove: (hotelId: string, mediaId: string) => api.del(`/api/hotels/${enc(hotelId)}/media/${enc(mediaId)}`),
+  /** Own photo bytes (any review state) as an object URL source. */
+  file: async (hotelId: string, mediaId: string): Promise<Blob> => {
+    const res = await fetch(`${mediaBase()}/api/hotels/${enc(hotelId)}/media/${enc(mediaId)}/file`, { headers: mediaAuthHeaders() });
+    if (!res.ok) throw new ApiError('Fotograf yuklenemedi', res.status, null);
+    return res.blob();
+  },
+};
