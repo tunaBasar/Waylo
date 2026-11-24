@@ -90,7 +90,7 @@ def publish_hotel(hotel_id, owner_token, admin_token):
 
 def register(prefix):
     email = f'{prefix}-{uuid.uuid4().hex[:12]}@example.test'
-    pw = secrets.token_urlsafe(20)
+    pw = "Pw7" + secrets.token_urlsafe(20)  # PasswordPolicy: letter + digit guaranteed
     must('POST', '/api/auth/register', {'firstName': 'Ord', 'lastName': 'Test', 'email': email, 'password': pw})
     psql('auth_db', f"UPDATE users SET email_verified = true WHERE email = '{email}'")
     time.sleep(13)  # gateway register limit 5/min

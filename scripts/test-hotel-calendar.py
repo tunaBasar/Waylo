@@ -58,7 +58,7 @@ def req(method, path, body=None, token=None):
 def reg(n):
     uid = uuid.uuid4().hex
     email = f"test{uid}@example.test"
-    password = secrets.token_urlsafe(16)
+    password = "Pw7" + secrets.token_urlsafe(16)  # PasswordPolicy: letter + digit guaranteed
     creds[email] = password
     s, d = req("POST", "/api/auth/register", {
         "firstName": "Test", "lastName": "User", "email": email, "password": password
@@ -126,8 +126,10 @@ def grp_a():
     ok(req("POST", f"/api/hotels/{H1}/room-types", {
         "code": "O1", "name": "O", "maxAdults": 2, "maxChildren": 1, "maxOccupancy": 3
     }, token=t2)[0] == 403, "Other user 403")
-    # Active public GET → 200 (includeInactive=false default, ACTIVE RT visible)
-    ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}", token=None)[0] == 200, "Active RT public 200")
+    # Active RT GET → 200 for the owner (includeInactive=false default). Anonymous reads of a non-published (DRAFT)
+    # hotel's children are 404 since the publication workflow (HOTEL-PUBLICATION-CONTRACT.md 3.4).
+    ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}", token=t1)[0] == 200, "Active RT owner 200")
+    ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}", token=None)[0] == 404, "Active RT of DRAFT hotel anon 404")
 
 # ── Group B: RT/RP PATCH + Inactive Guards ────────────────────────────────
 def grp_b():
@@ -136,7 +138,7 @@ def grp_b():
     s, d = req("PATCH", f"/api/hotels/{H1}/room-types/{RT1}", {"status": "INACTIVE"}, token=t1)
     ok(s == 200, "RT inactive 200"); RT1V = d["data"]["version"]
     # Inactive RT detail → 404
-    ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}", token=None)[0] == 404, "Inactive RT detail 404")
+    ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}", token=t1)[0] == 404, "Inactive RT detail 404")
     # includeInactive=true on DETAIL for anon 401, other 403, owner 200
     ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}?includeInactive=true", token=None)[0] == 401, "Inc detail anon 401")
     ok(req("GET", f"/api/hotels/{H1}/room-types/{RT1}?includeInactive=true", token=t2)[0] == 403, "Inc detail other 403")

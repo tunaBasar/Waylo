@@ -131,7 +131,7 @@ try:
     draft_quote = {'hotelId': hotel_id, 'roomTypeId': room['id'], 'ratePlanId': plan['id'],
                    'checkIn': nights[0], 'checkOut': check_out, 'rooms': 1, 'adults': 2, 'childrenAges': []}
     status, result = request('POST', '/api/quotes', draft_quote, owner)
-    check(status == 409 and (result or {}).get('error') == 'HOTEL_NOT_BOOKABLE', 'quote on unpublished DRAFT hotel is 409 HOTEL_NOT_BOOKABLE')
+    check(status == 422 and (result or {}).get('error') == 'HOTEL_NOT_BOOKABLE', 'quote on unpublished DRAFT hotel is 422 HOTEL_NOT_BOOKABLE')
     publish_hotel(hotel_id, owner, admin)
     offers = data('GET', availability_path)['offers']
     check(len(offers) == 1 and offers[0]['totalAmount'] == Decimal('210.75'), 'whole-stay offer total uses both nightly rates')

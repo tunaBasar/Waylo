@@ -53,7 +53,7 @@ def req(method, path, body=None, token=None):
 def reg():
     uid = uuid.uuid4().hex
     email = f"pubproj{uid}@example.test"
-    password = secrets.token_urlsafe(16)
+    password = "Pw7" + secrets.token_urlsafe(16)  # PasswordPolicy: letter + digit guaranteed
     s, d = req("POST", "/api/auth/register", {
         "firstName": "Test", "lastName": "User", "email": email, "password": password
     })
@@ -165,8 +165,16 @@ def main():
         ok(s == 404, f"Anonymous GET by id 404: {label} got {s}")
 
     def visible_publicly(label):
-        s, d = req("GET", "/api/hotels")
-        ok(s == 200 and any(h["id"] == hotel_id for h in d["data"]), f"Public list shows hotel: {label}")
+        # hotel-service caches the active-organization set for up to 30s (hotel.public-projection.org-cache-ttl-seconds),
+        # so a hotel of a just-approved organization may need one cache period to appear. Poll instead of sleeping blindly.
+        deadline = time.time() + 40
+        while True:
+            s, d = req("GET", "/api/hotels")
+            listed = s == 200 and any(h["id"] == hotel_id for h in d["data"])
+            if listed or time.time() > deadline:
+                break
+            time.sleep(3)
+        ok(listed, f"Public list shows hotel: {label}")
         s, d = req("GET", "/api/hotels/search?city=IST")
         ok(s == 200 and any(h["id"] == hotel_id for h in d["data"]), f"Public search shows hotel: {label}")
         s, d = req("GET", f"/api/hotels/{hotel_id}")
@@ -191,7 +199,7 @@ def main():
 
     # R1: DRAFT hotel is not bookable
     s, d = req("POST", "/api/quotes", quote_body, token)
-    ok(s == 409 and (d or {}).get("error") == "HOTEL_NOT_BOOKABLE", f"Quote on DRAFT hotel 409 HOTEL_NOT_BOOKABLE got {s}")
+    ok(s == 422 and (d or {}).get("error") == "HOTEL_NOT_BOOKABLE", f"Quote on DRAFT hotel 422 HOTEL_NOT_BOOKABLE got {s}")
 
     # Submit: hidden while SUBMITTED, owner cannot decide, non-admin 403, validation, version conflict
     s, d = req("POST", f"/api/hotels/{hotel_id}/publication-requests", {}, token)
@@ -201,7 +209,7 @@ def main():
     ok(s == 200 and d["data"].get("publicationStatus") == "SUBMITTED", "Hotel is SUBMITTED after submit")
     hidden_publicly("hotel SUBMITTED")
     s, d = req("POST", "/api/quotes", quote_body, token)
-    ok(s == 409 and (d or {}).get("error") == "HOTEL_NOT_BOOKABLE", f"Quote on SUBMITTED hotel 409 HOTEL_NOT_BOOKABLE got {s}")
+    ok(s == 422 and (d or {}).get("error") == "HOTEL_NOT_BOOKABLE", f"Quote on SUBMITTED hotel 422 HOTEL_NOT_BOOKABLE got {s}")
     decide = f"/api/admin/hotel-publications/{request_id}/decisions"
     s, _ = req("POST", decide, {"decision": "APPROVE_AND_PUBLISH", "expectedVersion": version}, token)
     ok(s == 403, f"Owner cannot self-approve (non-admin decision) 403 got {s}")

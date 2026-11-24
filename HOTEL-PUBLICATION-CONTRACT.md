@@ -289,7 +289,7 @@ Introduce one predicate in `HotelServiceImpl.filterPublic` (replace `Hotel::isAc
 | `GET /api/hotels/{id}/availability` | active + org ACTIVE, else "not available" body | + PUBLISHED. Not PUBLISHED returns the same non-bookable shape it returns for inactive today (keep response, do not turn it into 404) |
 | `GET /api/hotels/{id}/room-types`, `/rate-plans`, `/rooms`, `/rates` (anonymous reads) | no visibility check at all | **add**: if the hotel is not public (`isPublic` false) and the caller is not a member/ADMIN of its org, 404. `includeInactive=true` paths already require manage. This closes anonymous enumeration of draft children (R1 "onaysiz otel public listede yok"). Implementation: one helper in `HotelAccessGuard` e.g. `requireReadable(userId, role, hotelId)`; do not change the manage paths |
 | `GET /api/hotels/{id}/reviews` | public | unchanged. Hidden implicitly by `isPublic` only if you reuse the same helper, keep unchanged unless D3 (sec. 9) says otherwise |
-| `POST /api/quotes` (`QuoteServiceImpl.createQuote`, after the `!hotel.isActive()` check at step 2) | `HOTEL_NOT_BOOKABLE` 409 when inactive, org check next | add `publication_status != PUBLISHED` -> same `BusinessRuleException("HOTEL_NOT_BOOKABLE")`. Order: inactive, not PUBLISHED, org |
+| `POST /api/quotes` (`QuoteServiceImpl.createQuote`, after the `!hotel.isActive()` check at step 2) | `HOTEL_NOT_BOOKABLE` 422 when inactive, org check next | add `publication_status != PUBLISHED` -> same `BusinessRuleException("HOTEL_NOT_BOOKABLE")`. Order: inactive, not PUBLISHED, org |
 | `POST /internal/hotel-holds` (`HotelHoldServiceImpl.hold`) | uses the quote, no hotel check | add a re-check right after quote lock: load the hotel, if not PUBLISHED or inactive -> `HOTEL_NOT_BOOKABLE`. A quote created before a suspension must not turn into a hold |
 | `POST /internal/hotel-holds/{id}/confirm`, `/release`, `GET /internal/hotel-holds/{id}` | no hotel check | **unchanged, must NOT check publication** (existing reservations survive suspension) |
 | `GET /internal/hotels/{id}` | unfiltered (auth-service role grant uses it while org is PENDING) | unchanged, returns `publicationStatus` too |
@@ -448,7 +448,7 @@ Sequence constraint: submit needs the org ACTIVE, so publish must come AFTER `PO
 | File and line | Creates hotel (org) | Expects | Needs |
 |---|---|---|---|
 | `scripts/test-public-projection.py:88` | hotel under PENDING org, asserts hidden then (later) visible after approve | the visibility story itself | Rewrite assertions: PENDING org + DRAFT hidden; after org approve still hidden (new assertion, R1); after submit still hidden; after admin publish visible in list/search/GET id; SUSPEND hides, REINSTATE shows; deactivate hides. It is the main R1 live test. It has no admin login today (no approve call found), add one |
-| `scripts/test-quote-hold.py:88` (approve at :106) | hotel, approves org at 106 | quote and hold succeed | publish after org approve and after room/rate/inventory setup, before first quote. Add assertion: quote on DRAFT hotel -> 409 `HOTEL_NOT_BOOKABLE` |
+| `scripts/test-quote-hold.py:88` (approve at :106) | hotel, approves org at 106 | quote and hold succeed | publish after org approve and after room/rate/inventory setup, before first quote. Add assertion: quote on DRAFT hotel -> 422 `HOTEL_NOT_BOOKABLE` |
 | `scripts/test-order.py:117` | hotel, 1 approve | order flow | publish after org approve |
 | `scripts/test-package-order.py:48` | hotel, 1 approve | package order flow | publish after org approve |
 | `scripts/test-cancellation.py:58` | hotel, 2 approve calls | cancel flow | publish after org approve |
@@ -481,7 +481,7 @@ Naming: U = unit (Mockito, constructors passed to the real constructor, one cons
 | U2 | reason rules | REJECT/SUSPEND/REINSTATE/ARCHIVE with null or 4 char reason -> 400; APPROVE without reason ok | R1 |
 | U3 | submit gates | org not active -> `ORGANIZATION_NOT_ACTIVE`; auth down -> 503 fail closed; no room type -> `HOTEL_INCOMPLETE` listing missing; second open request -> `REQUEST_ALREADY_OPEN` | R1 |
 | U4 | `HotelServiceImplTest.filterPublic` | DRAFT, SUBMITTED, APPROVED, REJECTED, SUSPENDED, ARCHIVED hidden; PUBLISHED+active+ACTIVE org shown; PUBLISHED+inactive hidden; PUBLISHED+org not active hidden; PUBLISHED+auth down hidden but legacy (org NULL) PUBLISHED still shown; legacy DRAFT hidden | R1, R10 |
-| U5 | `QuoteServiceImplTest` | quote on non PUBLISHED -> 409 `HOTEL_NOT_BOOKABLE` for each non PUBLISHED status, message order inactive/not published/org | R1 |
+| U5 | `QuoteServiceImplTest` | quote on non PUBLISHED -> 422 `HOTEL_NOT_BOOKABLE` for each non PUBLISHED status, message order inactive/not published/org | R1 |
 | U6 | `AvailabilityServiceImplTest` | non PUBLISHED returns the same not-available shape as inactive | R1 |
 | U7 | `HotelHoldServiceImplTest.hold` | quote exists, hotel since SUSPENDED -> `HOTEL_NOT_BOOKABLE`, no inventory held | R1 |
 | U8 | `HotelHoldServiceImplTest.confirm/release` | hold created, hotel then SUSPENDED/ARCHIVED, confirm and release still succeed | R1 (suspension keeps existing rez) |
@@ -505,14 +505,14 @@ Extend `scripts/test-public-projection.py` (R1) and add `scripts/test-hotel-publ
 | ID | Scenario | Expected | R |
 |---|---|---|---|
 | L1 | register owner, create org, admin approves org, create hotel | 201, hotel `publicationStatus=DRAFT`; anonymous `GET /api/hotels`, `/search?city=`, `/{id}` -> not listed / 404; owner `GET /{id}` 200 | R1 |
-| L2 | anonymous `GET /api/hotels/{id}/room-types`, `/rate-plans`, `/availability`, `POST /api/quotes` as customer on the DRAFT hotel | 404 / not-available / 409 `HOTEL_NOT_BOOKABLE` | R1 |
+| L2 | anonymous `GET /api/hotels/{id}/room-types`, `/rate-plans`, `/availability`, `POST /api/quotes` as customer on the DRAFT hotel | 404 / not-available / 422 `HOTEL_NOT_BOOKABLE` | R1 |
 | L3 | submit without room type | 409 `HOTEL_INCOMPLETE` with `missing`; with PENDING org (separate org) 409 `ORGANIZATION_NOT_ACTIVE` | R1 |
 | L4 | add room type, rate plan, inventory, rates; submit | 201 SUBMITTED; hotel `SUBMITTED`; still hidden publicly; second submit 409 `REQUEST_ALREADY_OPEN`; owner `PUT` -> 409 `HOTEL_LOCKED_FOR_REVIEW` | R1 |
 | L5 | admin list status=SUBMITTED contains it; non admin token on the admin routes | list has it; 403 `FORBIDDEN`; spoofed `X-User-Role: ADMIN` without JWT -> 401 | R1, R3 |
 | L6 | admin REJECT without reason, then with | 400, then 200; owner sees reason via `GET publication-requests`; hotel `REJECTED`; still hidden; owner edits via PUT (allowed) and resubmits | R1 |
 | L7 | admin `APPROVE_AND_PUBLISH` | hotel `PUBLISHED`; anonymous list, search, GET id show it; availability + quote + hold + order work; decisions table has SUBMIT, REJECT, SUBMIT, APPROVE, PUBLISH (check through admin detail endpoint) | R1 |
 | L8 | owner PATCH content on PUBLISHED (`description`) | 200 revision DRAFT; public `GET` still old description; stale `expectedVersion` -> 409; `PUT` -> 409 `CONTENT_REQUIRES_REVISION`; submit CONTENT_CHANGE; admin reject with reason -> public old content still, request REJECTED; new revision, approve -> public new description, `contentVersion` +1 | R1, R3 |
-| L9 | admin SUSPEND (reason) | public list/search/GET hide it; new quote -> 409 `HOTEL_NOT_BOOKABLE`; a hold/order created before suspension still `confirm`s and appears in partner order list; owner can still read it; REINSTATE shows it again | R1 |
+| L9 | admin SUSPEND (reason) | public list/search/GET hide it; new quote -> 422 `HOTEL_NOT_BOOKABLE`; a hold/order created before suspension still `confirm`s and appears in partner order list; owner can still read it; REINSTATE shows it again | R1 |
 | L10 | org owner B (other org) vs hotel of A | `POST/GET publication-requests`, `PATCH/GET content`, `archive`, `withdraw` with A's `hotelId` -> 403; B's own `requestId` against A's hotel path -> 403/404; B's hotel id with A's request id -> 404; no row changed (admin detail unchanged); `GET /api/hotels?organizationId=A` as B returns only PUBLISHED of A | R3 |
 | L11 | org suspended by admin after hotel published | hotel disappears from public, hotel row status still PUBLISHED; org re-approved -> visible again with no hotel decision needed | R1 |
 | L12 | `DELETE /api/hotels/{id}` on a hotel with history | 409 `HOTEL_HAS_HISTORY`; ARCHIVE then hidden, and `GET /internal/hotels/{id}` (service token) still returns it | R1 |

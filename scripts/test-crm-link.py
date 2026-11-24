@@ -66,7 +66,7 @@ def main():
     BASE_URL = ap.parse_args().base_url
 
     email = f"crmlink{uuid.uuid4().hex[:10]}@example.test"
-    pw = secrets.token_urlsafe(16)
+    pw = "Pw7" + secrets.token_urlsafe(16)  # PasswordPolicy: letter + digit guaranteed
     s, d = req("POST", "/api/auth/register",
                {"firstName": "Plain", "lastName": "User", "email": email, "password": pw})
     ok(s == 200 and d and d.get("success"), f"register 200 (got {s})")
@@ -90,7 +90,7 @@ def main():
        "CRM customer auto-created with id == auth userId")
 
     s2, _ = req("POST", "/api/auth/register",
-                {"firstName": "Plain", "lastName": "User", "email": email, "password": secrets.token_urlsafe(16)})
+                {"firstName": "Plain", "lastName": "User", "email": email, "password": "Pw7" + secrets.token_urlsafe(16)})
     ok(s2 in (400, 409, 422), f"duplicate register rejected (got {s2})")
     s3, lst = req("GET", f"/api/customers/email/{email}", None, atok)
     ok(s3 == 200 and lst and lst.get("data", {}).get("id") == uid, "exactly the same CRM customer found by email")

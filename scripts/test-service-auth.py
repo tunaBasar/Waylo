@@ -88,11 +88,13 @@ def main():
     second = call(PB, UNKNOWN_ITEM, replay)
     ok(passed(first) and second == 401, f'same token used twice: first passes ({first}), replay -> 401 ({second})')
 
-    # Second service: auth-service /internal/organizations (hotel-service allowed, payment-service not).
+    # Second service: auth-service /internal/organizations (hotel-service and payment-service allowed, checkin-service not).
     s = call(AUTH, '/internal/organizations/active-ids', tok('hotel-service', 'auth-service'))
     ok(s == 200, f'auth-service: hotel-service -> /internal/organizations 200 ({s})')
     s = call(AUTH, '/internal/organizations/active-ids', tok('payment-service', 'auth-service'))
-    ok(s == 403, f'auth-service: payment-service not allowed on /internal/organizations -> 403 ({s})')
+    ok(s == 200, f'auth-service: payment-service (payout balance) -> /internal/organizations 200 ({s})')
+    s = call(AUTH, '/internal/organizations/active-ids', tok('checkin-service', 'auth-service'))
+    ok(s in (401, 403), f'auth-service: checkin-service not allowed on /internal/organizations -> 401/403 ({s})')
     s = call(AUTH, '/internal/organizations/active-ids', tok('hotel-service', 'hotel-service'))
     ok(s == 401, f'auth-service: token with aud=hotel-service -> 401 ({s})')
 

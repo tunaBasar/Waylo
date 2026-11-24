@@ -19,9 +19,12 @@ check, call, data, psql = t.check, t.call, t.data, t.psql
 
 
 def wait_row(customer_id, subject_like):
+    # The order confirmation is written once per channel (EMAIL needs the crm-service e-mail lookup, PUSH is a
+    # one-line summary). Read the EMAIL row: it carries the item lines, the total and the refund amount.
     for _ in range(40):
         row = psql('notification_db', f"SELECT id||'|'||status||'|'||body FROM notifications "
-                                      f"WHERE customer_id = '{customer_id}' AND subject LIKE '{subject_like}'")
+                                      f"WHERE customer_id = '{customer_id}' AND subject LIKE '{subject_like}' AND type = 'EMAIL' "
+                                      f"ORDER BY created_at DESC LIMIT 1")
         if row:
             return row
         time.sleep(1)

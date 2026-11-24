@@ -140,12 +140,21 @@ def main():
     check('page aggregate 4.0 / 1', page.get('averageScore') == 4.0 and page.get('reviewCount') == 1, page)
     s, r, _ = call('GET', f'/api/hotels/{hotel}')
     h = data(r) or {}
+    if not h:
+        # the fixture organization was approved seconds ago and hotel-service caches active organizations for up
+        # to 30s (public detail is hidden until then): read as the owner, the aggregate fields are identical
+        s, r, _ = call('GET', f'/api/hotels/{hotel}', token=partner)
+        h = data(r) or {}
     check('hotel DTO averageScore/reviewCount', h.get('averageScore') == 4.0 and h.get('reviewCount') == 1, h)
 
     print('\n=== member of the hotel organization cannot review ===')
     order2, item2 = place_paid_order(hotel, room, plan, nights, check_out, partner)
     s, r, _ = redeem(order2, item2, partner, partner, org_main)
     check('partner own order redeem 200', s == 200, (s, err(r)))
+    ver2 = int(psql('package_booking_db', f"SELECT version FROM vouchers WHERE order_item_id='{item2}'"))
+    s, r, _ = call('POST', f'/api/partner/organizations/{org_main}/order-items/{item2}/check-out',
+                   {'expectedVersion': ver2}, partner)
+    check('partner own order check-out 200', s == 200, (s, r))
     psql('package_booking_db', f"UPDATE order_items SET check_in='{past_in}', check_out='{past_out}' WHERE id='{item2}'")
     s, r, _ = call('POST', '/api/me/hotel-reviews', {'orderItemId': item2, 'score': 5, 'text': 'self'}, partner)
     check('org member -> 403 ORG_MEMBER_CANNOT_REVIEW', s == 403 and err(r) == 'ORG_MEMBER_CANNOT_REVIEW', (s, r))
@@ -184,8 +193,9 @@ def main():
     page = data(r) or {}
     check('hidden review gone from public list and aggregate', page.get('total') == 0 and page.get('averageScore') is None
           and page.get('reviewCount') == 0, page)
-    s, r, _ = call('GET', f'/api/hotels/{hotel}')
-    check('hotel aggregate back to null/0', data(r)['averageScore'] is None and data(r)['reviewCount'] == 0, data(r))
+    s, r, _ = call('GET', f'/api/hotels/{hotel}', token=partner)
+    h = data(r) or {}
+    check('hotel aggregate back to null/0', h.get('averageScore') is None and h.get('reviewCount') == 0, h)
     audit = psql('hotel_db', f"SELECT from_status||'>'||to_status||'|'||reason||'|'||(actor_id IS NOT NULL) "
                              f"FROM hotel_review_moderation_events WHERE review_id='{review['id']}'")
     check('moderation audit stored', audit == 'PUBLISHED>HIDDEN|Uygunsuz icerik|true', audit)
