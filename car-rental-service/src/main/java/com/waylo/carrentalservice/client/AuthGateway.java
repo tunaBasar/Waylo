@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import com.waylo.carrentalservice.tenant.TenantContext;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +38,8 @@ public class AuthGateway {
         if (!org.carRental()) {
             throw new ForbiddenException("Organization is not a car rental partner");
         }
+        // RM-14: from here on this request's transactions run in RLS partner mode scoped to this organization.
+        TenantContext.authorizePartner(organizationId);
         return org;
     }
 
