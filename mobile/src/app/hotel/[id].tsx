@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Availability } from '@/api';
 import { getHotelOrNotPublic, hotelsApi, type HotelResult } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
+import { HotelGallery } from '@/features/hotels/HotelGallery';
 import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
 import { money } from '@/features/format';
 import { reviewsApi, scoreLabel, type HotelReviewPage } from '@/features/reviews/api';
@@ -19,6 +20,7 @@ export default function HotelDetail() {
   const notPublic = hotel.data?.kind === 'notPublic';
   const avail = useAsync(() => hotelsApi.availability(p.id, stay), [p.id, p.checkIn, p.checkOut], !notPublic && !hotel.loading);
   const reviews = useAsync(() => reviewsApi.list(p.id), [p.id], !notPublic && !hotel.loading);
+  const photos = useAsync(() => hotelsApi.photos(p.id), [p.id], hotel.data?.kind === 'ok');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +40,7 @@ export default function HotelDetail() {
         {(r) => r.kind === 'notPublic' ? (<><Title>Bu otel şu anda yayında değil</Title><Muted>Otel yayından kaldırılmış veya henüz yayına alınmamış olabilir.</Muted><Button title="Geri dön" kind="secondary" onPress={() => router.back()} /></>) : ((h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}{h.reviewCount && h.averageScore != null ? <Text style={{ fontWeight: '700' }}>{`${scoreLabel(h.averageScore)} / 5 (${h.reviewCount} yorum)`}</Text> : null}</>))(r.hotel)}
       </AsyncView>
       {notPublic ? null : (<>
+      {photos.data && photos.data.length > 0 ? <HotelGallery hotelId={p.id} photos={photos.data} /> : null}
       <ErrorBanner message={error} />
       <AsyncView<Availability> state={avail} isEmpty={(a) => a.offers.length === 0} emptyText="Bu tarihlerde musait oda yok.">
         {(a) => a.offers.map((o) => {

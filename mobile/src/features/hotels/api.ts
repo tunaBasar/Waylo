@@ -17,7 +17,19 @@ export async function getHotelOrNotPublic(id: string): Promise<HotelResult> {
   }
 }
 
+export type HotelPhoto = { id: string; caption: string | null; sortOrder: number; width: number; height: number };
+
+export function photoUrl(baseUrl: string, hotelId: string, mediaId: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/api/hotels/${encodeURIComponent(hotelId)}/media/${encodeURIComponent(mediaId)}`;
+}
+
+/** width / height, falling back to 4:3 when either is missing or not positive. */
+export function photoAspect(width: number, height: number): number {
+  return width > 0 && height > 0 ? width / height : 4 / 3;
+}
+
 export const hotelsApi = {
+  photos: (id: string) => api.get<HotelPhoto[]>(`/api/hotels/${encodeURIComponent(id)}/media`),
   search: (q: StayQuery, city?: string) =>
     api.get<Hotel[]>(`/api/hotels/search?${stayQueryString(q)}${city ? `&city=${encodeURIComponent(city)}` : ''}`),
   get: (id: string) => api.get<Hotel>(`/api/hotels/${encodeURIComponent(id)}`),
