@@ -1,6 +1,7 @@
 package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.client.AuthAccessClient;
+import com.waylo.packagebookingservice.tenant.TenantContext;
 import com.waylo.packagebookingservice.domain.OrderStatus;
 import com.waylo.packagebookingservice.dto.PartnerOrderItemPage;
 import com.waylo.packagebookingservice.dto.PartnerOrderItemResponse;
@@ -65,5 +66,6 @@ public class PartnerOrderService {
         if (decision == null || !decision.allowed()) {
             throw new AccessDeniedException("Not allowed to view reservations of this organization");
         }
+        TenantContext.authorizePartner(organizationId); // DB RLS: partner mode scoped to this organization
     }
 }

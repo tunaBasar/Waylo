@@ -1,6 +1,7 @@
 package com.waylo.packagebookingservice.service;
 
 import com.waylo.packagebookingservice.client.AuthAccessClient;
+import com.waylo.packagebookingservice.tenant.TenantContext;
 import com.waylo.packagebookingservice.client.PaymentEscrowClient;
 import com.waylo.packagebookingservice.domain.OrderItem;
 import com.waylo.packagebookingservice.domain.Voucher;
@@ -141,5 +142,6 @@ public class VoucherRedemptionService {
         if (decision == null || !decision.allowed()) {
             throw new AccessDeniedException("Not allowed to redeem vouchers for this organization");
         }
+        TenantContext.authorizePartner(orgId); // DB RLS: partner mode scoped to this organization
     }
 }
