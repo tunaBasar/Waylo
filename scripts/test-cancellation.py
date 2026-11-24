@@ -32,6 +32,13 @@ def ok(cond, label):
         print('FAIL:', label)
 
 
+def publish_hotel(hotel_id, owner_token, admin_token):
+    # Publication workflow: owner submits, admin approves and publishes (org ACTIVE, hotel complete)
+    sub = must('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, owner_token)
+    must('POST', f'/api/admin/hotel-publications/{sub["id"]}/decisions',
+         {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': sub.get('version', 0)}, admin_token)
+
+
 def ledger_balance(order_id):
     return psql('payment_db', f"SELECT coalesce(sum(debit_amount)-sum(credit_amount),0) FROM ledger_entries WHERE order_id='{order_id}'")
 
@@ -72,6 +79,7 @@ def main():
         must('PUT', f'/api/hotels/{hotel_id}/rates', {'items': [
             {'roomTypeId': room['id'], 'ratePlanId': p['id'], 'stayDate': n, 'occupancy': 2, 'currency': 'TRY', 'amount': a}
             for p in (flex, nr) for n, a in zip(nights, [1000.00, 1500.00])]}, owner)
+        publish_hotel(hotel_id, owner, admin)
         must('POST', '/api/admin/commission-rates', {'vertical': 'HOTEL', 'supplierOrganizationId': org_id, 'rate': 0.1000}, admin)
 
         def paid_order(plan):

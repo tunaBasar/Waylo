@@ -34,6 +34,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(PublicationException.class)
+    public ResponseEntity<ErrorResponse> handlePublication(PublicationException ex, HttpServletRequest request) {
+        log.warn("Publication rule [{}]: {}", ex.getCode(), ex.getMessage());
+        var response = new ErrorResponse(ex.getStatus(), ex.getCode(), ex.getMessage(), request.getRequestURI(),
+                ex.getDetails());
+        return ResponseEntity.status(ex.getStatus()).body(response);
+    }
+
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationRequired(AuthenticationRequiredException ex,
                                                                        HttpServletRequest request) {

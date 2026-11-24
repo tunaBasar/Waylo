@@ -18,6 +18,11 @@ public interface HotelMapper {
     @Mapping(target = "rooms", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "publicationStatus", ignore = true)
+    @Mapping(target = "publishedRevisionId", ignore = true)
+    @Mapping(target = "publishedAt", ignore = true)
+    @Mapping(target = "contentVersion", ignore = true)
+    @Mapping(target = "sourceType", ignore = true)
     Hotel toEntity(HotelRequest request);
 
     @Mapping(target = "id", ignore = true)
@@ -26,5 +31,10 @@ public interface HotelMapper {
     @Mapping(target = "rooms", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "publicationStatus", ignore = true)
+    @Mapping(target = "publishedRevisionId", ignore = true)
+    @Mapping(target = "publishedAt", ignore = true)
+    @Mapping(target = "contentVersion", ignore = true)
+    @Mapping(target = "sourceType", ignore = true)
     void updateEntity(HotelRequest request, @MappingTarget Hotel hotel);
 }

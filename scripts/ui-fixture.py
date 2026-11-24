@@ -90,6 +90,25 @@ def create():
     state['hotelId'] = hotel['id']
     STATE.write_text(json.dumps(state))
     must('POST', f"/api/admin/organizations/{org['id']}/approve", token=admin_tok)
+    # Catalog so the completeness gate passes, then publication (org is ACTIVE after the approve above)
+    import datetime
+    hid = hotel['id']
+    room = must('POST', f'/api/hotels/{hid}/room-types', {'code': 'UI_DBL', 'name': 'UI double', 'maxAdults': 2,
+                                                          'maxChildren': 1, 'maxOccupancy': 3}, owner_tok)
+    plan = must('POST', f'/api/hotels/{hid}/rate-plans', {'code': 'UI_FLEX', 'name': 'UI flex', 'mealPlan': 'BREAKFAST',
+                                                          'cancellationPolicy': 'FREE_CANCELLATION',
+                                                          'freeCancellationDaysBefore': 2}, owner_tok)
+    start = datetime.date.today() + datetime.timedelta(days=1)
+    nights = [(start + datetime.timedelta(days=i)).isoformat() for i in range(30)]
+    must('PUT', f'/api/hotels/{hid}/inventory', {'items': [
+        {'roomTypeId': room['id'], 'stayDate': n, 'allotment': 5, 'expectedVersion': None} for n in nights],
+        'reason': 'ui fixture'}, owner_tok)
+    must('PUT', f'/api/hotels/{hid}/rates', {'items': [
+        {'roomTypeId': room['id'], 'ratePlanId': plan['id'], 'stayDate': n, 'occupancy': 2, 'currency': 'TRY',
+         'amount': 1500, 'expectedVersion': None} for n in nights]}, owner_tok)
+    sub = must('POST', f'/api/hotels/{hid}/publication-requests', {}, owner_tok)
+    must('POST', f"/api/admin/hotel-publications/{sub['id']}/decisions",
+         {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': sub.get('version', 0)}, admin_tok)
     print('fixture ready (credentials in', STATE, 'mode 0600)')
 
 
@@ -126,6 +145,10 @@ def cleanup():
         return print('nothing to clean')
     st = json.loads(STATE.read_text())
     if st.get('hotelId'):
+        for t in ('hotel_publication_decisions', 'hotel_publication_requests', 'hotel_content_revisions',
+                  'daily_rates', 'daily_inventory', 'inventory_adjustments', 'rate_plans', 'room_types'):
+            psql('hotel_db', f"DELETE FROM {t} WHERE hotel_id = '{st['hotelId']}'")
+        psql('hotel_db', f"UPDATE hotels SET published_revision_id = NULL WHERE id = '{st['hotelId']}'")
         psql('hotel_db', f"DELETE FROM hotels WHERE id = '{st['hotelId']}'")
     if st.get('orgId'):
         o = st['orgId']

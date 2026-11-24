@@ -105,6 +105,9 @@ public class QuoteServiceImpl implements QuoteService {
         if (!hotel.isActive()) {
             throw new BusinessRuleException("HOTEL_NOT_BOOKABLE", "Hotel is not bookable");
         }
+        if (hotel.getPublicationStatus() != com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) {
+            throw new BusinessRuleException("HOTEL_NOT_BOOKABLE", "Hotel is not bookable");
+        }
 
         // 3. Check organization is ACTIVE (fail closed)
         checkOrganizationActive(hotel.getOrganizationId());

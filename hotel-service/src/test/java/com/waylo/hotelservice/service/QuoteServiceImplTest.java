@@ -96,6 +96,7 @@ class QuoteServiceImplTest {
         hotel.setCity("Istanbul");
         hotel.setCountry("Turkey");
         hotel.setActive(active);
+        hotel.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
         hotel.setOrganizationId(orgId);
         return hotel;
     }
@@ -510,5 +511,21 @@ class QuoteServiceImplTest {
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Hotel is not bookable")
                 .extracting("ruleCode").isEqualTo("HOTEL_NOT_BOOKABLE");
+    }
+
+    @Test
+    void nonPublishedHotel_isNotBookable_forEveryStatus() {
+        for (com.waylo.hotelservice.domain.PublicationStatus status : com.waylo.hotelservice.domain.PublicationStatus.values()) {
+            if (status == com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) continue;
+            Hotel hotel = buildHotel(true);
+            hotel.setPublicationStatus(status);
+            when(hotelRepository.findById(hotelId)).thenReturn(Optional.of(hotel));
+
+            assertThatThrownBy(() -> service.createQuote(buildRequest(1, 2, List.of()), principalUserId))
+                    .as(status.name())
+                    .isInstanceOf(BusinessRuleException.class)
+                    .extracting("ruleCode").isEqualTo("HOTEL_NOT_BOOKABLE");
+        }
+        verify(authAccessClient, never()).activeOrganizationIds();
     }
 }

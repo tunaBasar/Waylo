@@ -14,6 +14,8 @@ import java.util.UUID;
 
 @Repository
 public interface DailyInventoryRepository extends JpaRepository<DailyInventory, UUID> {
+    boolean existsByHotelId(UUID hotelId);
+
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM DailyInventory d WHERE d.hotelId = :hotelId " +

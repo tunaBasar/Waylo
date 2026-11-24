@@ -63,6 +63,7 @@ class HotelServiceImplTest {
         hotel.setStarRating(4);
         hotel.setDescription("A great hotel");
         hotel.setActive(true);
+        hotel.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
         hotel.setOrganizationId(orgId);
         hotel.setLatitude(BigDecimal.valueOf(41.0));
         hotel.setLongitude(BigDecimal.valueOf(29.0));
@@ -461,5 +462,81 @@ class HotelServiceImplTest {
         hidden.setActive(false);
         when(hotelRepository.findByOrganizationId(orgId)).thenReturn(List.of(hidden));
         assertThat(hotelService.getPublicByOrganization(orgId)).isEmpty();
+    }
+
+    // ===== Publication projection gate (U4) =====
+
+    @Test
+    void getAll_hidesEveryNonPublishedStatus_showsPublished() {
+        java.util.List<Hotel> all = new java.util.ArrayList<>();
+        for (com.waylo.hotelservice.domain.PublicationStatus status : com.waylo.hotelservice.domain.PublicationStatus.values()) {
+            Hotel h = buildHotel(UUID.randomUUID(), status.name(), "Istanbul", "Turkey");
+            h.setPublicationStatus(status);
+            all.add(h);
+        }
+        when(hotelRepository.findAll()).thenReturn(all);
+        when(hotelMapper.toResponse(any(Hotel.class))).thenAnswer(i -> {
+            Hotel h = i.getArgument(0);
+            return new HotelResponse(h.getId(), orgId, h.getName(), "Istanbul", "Turkey", "a", 4, "d", null, null, true, 0, null, null);
+        });
+
+        assertThat(hotelService.getAll()).extracting(HotelResponse::name).containsExactly("PUBLISHED");
+    }
+
+    @Test
+    void publishedButInactive_orOrgNotActive_hidden_legacyPublishedShown_legacyDraftHidden() {
+        Hotel inactive = buildHotel(UUID.randomUUID(), "inactive", "Istanbul", "Turkey");
+        inactive.setActive(false);
+        Hotel otherOrg = buildHotel(UUID.randomUUID(), "otherorg", "Istanbul", "Turkey");
+        otherOrg.setOrganizationId(UUID.randomUUID());
+        Hotel legacyPublished = buildHotel(UUID.randomUUID(), "legacy", "Istanbul", "Turkey");
+        legacyPublished.setOrganizationId(null);
+        Hotel legacyDraft = buildHotel(UUID.randomUUID(), "legacydraft", "Istanbul", "Turkey");
+        legacyDraft.setOrganizationId(null);
+        legacyDraft.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.DRAFT);
+        when(hotelRepository.findAll()).thenReturn(List.of(inactive, otherOrg, legacyPublished, legacyDraft));
+        when(hotelMapper.toResponse(any(Hotel.class))).thenAnswer(i -> {
+            Hotel h = i.getArgument(0);
+            return new HotelResponse(h.getId(), null, h.getName(), "Istanbul", "Turkey", "a", 4, "d", null, null, true, 0, null, null);
+        });
+
+        assertThat(hotelService.getAll()).extracting(HotelResponse::name).containsExactly("legacy");
+
+        // auth down: org-owned PUBLISHED hidden, legacy PUBLISHED still shown
+        when(authAccessClient.activeOrganizationIds()).thenThrow(new RuntimeException("down"));
+        assertThat(hotelService.getAll()).extracting(HotelResponse::name).containsExactly("legacy");
+    }
+
+    @Test
+    void isPublic_dependsOnPublication_searchAndOrgListUseSameGate() {
+        Hotel draft = buildHotel(testId, "d", "Istanbul", "Turkey");
+        draft.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.SUSPENDED);
+        when(hotelRepository.findById(testId)).thenReturn(Optional.of(draft));
+        assertThat(hotelService.isPublic(testId)).isFalse();
+        draft.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
+        assertThat(hotelService.isPublic(testId)).isTrue();
+
+        draft.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.REJECTED);
+        when(hotelRepository.findByCity("Istanbul")).thenReturn(List.of(draft));
+        when(hotelRepository.findByOrganizationId(orgId)).thenReturn(List.of(draft));
+        assertThat(hotelService.search("Istanbul", null, null)).isEmpty();
+        assertThat(hotelService.getPublicByOrganization(orgId)).isEmpty();
+    }
+
+    @Test
+    void update_bumpsContentVersion_activateOnArchivedRejected() {
+        Hotel h = buildHotel(testId, "d", "Istanbul", "Turkey");
+        h.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.DRAFT);
+        when(hotelRepository.findById(testId)).thenReturn(Optional.of(h));
+        when(hotelRepository.save(any(Hotel.class))).thenAnswer(i -> i.getArgument(0));
+        hotelService.update(testId, new HotelRequest("n", "c", "k", "a", 3, null, null, null, orgId));
+        assertThat(h.getContentVersion()).isEqualTo(1);
+
+        h.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.ARCHIVED);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> hotelService.activate(testId))
+                .isInstanceOfSatisfying(com.waylo.hotelservice.exception.PublicationException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("HOTEL_ARCHIVED"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> hotelService.deactivate(testId))
+                .isInstanceOf(com.waylo.hotelservice.exception.PublicationException.class);
     }
 }

@@ -47,11 +47,14 @@ public class RoomTypeController {
     @GetMapping("/{roomTypeId}")
     public ResponseEntity<ApiResponse<RoomTypeResponse>> getById(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable UUID hotelId,
             @PathVariable UUID roomTypeId,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
         if (includeInactive) {
             accessGuard.requireRoomManage(userId, hotelId);
+        } else {
+            accessGuard.requireReadable(userId, role, hotelId);
         }
         RoomTypeResponse response = roomTypeService.getById(hotelId, roomTypeId, includeInactive);
         return ResponseEntity.ok(ApiResponse.of(response));
@@ -60,10 +63,13 @@ public class RoomTypeController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<RoomTypeResponse>>> getByHotelId(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable UUID hotelId,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
         if (includeInactive) {
             accessGuard.requireRoomManage(userId, hotelId);
+        } else {
+            accessGuard.requireReadable(userId, role, hotelId);
         }
         List<RoomTypeResponse> responses = roomTypeService.getByHotelId(hotelId, includeInactive);
         return ResponseEntity.ok(ApiResponse.of(responses));

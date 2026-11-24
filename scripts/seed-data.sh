@@ -314,6 +314,84 @@ done
 echo ""
 
 # =============================================
+# 4b. OTEL YAYINI (oda tipi, plan, stok, fiyat, sonra yayin istegi + admin onayi)
+# =============================================
+echo "--- 4b. OTEL YAYINI ---"
+login
+
+put_json() {
+  local path="$1" body="$2" label="$3" code
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE$path" -H "$H" -H "Authorization: Bearer $TOKEN" -d "$body")
+  if [ "$code" = "200" ] || [ "$code" = "201" ]; then
+    echo "  [OK] $label"
+  else
+    printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
+    echo "  [FAIL:$code] $label"
+  fi
+}
+
+# Katalog (oda tipi + plan + 30 gunluk stok/fiyat) yoksa kurar. Mevcut oda tipi varsa atlar (idempotent).
+seed_hotel_catalog() {
+  local hid="$1" rt_id plan_id items_inv items_rates
+  [ -n "$hid" ] || return 0
+  if [ -n "$(find_id_by_field "$(get_data "/api/hotels/$hid/room-types")" "code" "SEED_DBL")" ]; then
+    echo "  [SKIP] Katalog $hid (zaten var)"
+    return 0
+  fi
+  rt_id=$(post "/api/hotels/$hid/room-types" '{"code":"SEED_DBL","name":"Standart cift kisilik","maxAdults":2,"maxChildren":1,"maxOccupancy":3}' "Oda tipi $hid" | tail -1)
+  plan_id=$(post "/api/hotels/$hid/rate-plans" '{"code":"SEED_FLEX","name":"Esnek iptal","mealPlan":"BREAKFAST","cancellationPolicy":"FREE_CANCELLATION","freeCancellationDaysBefore":2}' "Fiyat plani $hid" | tail -1)
+  if [ -z "$rt_id" ] || [ -z "$plan_id" ]; then return 0; fi
+  items_inv=$(RT="$rt_id" python3 -c 'import json,os,datetime
+t=datetime.date.today()
+print(json.dumps({"items":[{"roomTypeId":os.environ["RT"],"stayDate":(t+datetime.timedelta(days=i)).isoformat(),"allotment":5,"expectedVersion":None} for i in range(1,31)],"reason":"seed"}))')
+  items_rates=$(RT="$rt_id" PLAN="$plan_id" python3 -c 'import json,os,datetime
+t=datetime.date.today()
+print(json.dumps({"items":[{"roomTypeId":os.environ["RT"],"ratePlanId":os.environ["PLAN"],"stayDate":(t+datetime.timedelta(days=i)).isoformat(),"occupancy":2,"currency":"TRY","amount":1500,"expectedVersion":None} for i in range(1,31)]}))')
+  put_json "/api/hotels/$hid/inventory" "$items_inv" "Stok $hid"
+  put_json "/api/hotels/$hid/rates" "$items_rates" "Fiyat $hid"
+}
+
+# Yayinda degilse yayin istegi gonderir, admin APPROVE_AND_PUBLISH verir. (Org onayi yukarida yapildi.)
+publish_seed_hotel() {
+  local hid="$1" status sub_resp sub_code sub_body rid ver dec_code
+  [ -n "$hid" ] || return 0
+  status=$(get_data "/api/hotels?organizationId=$ORG_ID" | HID="$hid" python3 -c 'import json,os,sys
+for h in json.loads(sys.stdin.read()):
+    if h.get("id") == os.environ["HID"]:
+        print(h.get("publicationStatus", "")); break')
+  if [ "$status" = "PUBLISHED" ]; then
+    echo "  [SKIP] Yayin $hid (zaten yayinda)"
+    return 0
+  fi
+  sub_resp=$(curl -s -w '\n%{http_code}' -X POST "$BASE/api/hotels/$hid/publication-requests" -H "$H" -H "Authorization: Bearer $TOKEN" -d '{}')
+  sub_code=$(echo "$sub_resp" | tail -1)
+  sub_body=$(echo "$sub_resp" | sed '$d')
+  if [ "$sub_code" != "201" ] && [ "$sub_code" != "200" ]; then
+    printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
+    echo "  [FAIL:$sub_code] Yayin istegi $hid"
+    return 0
+  fi
+  rid=$(echo "$sub_body" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["id"])' 2>/dev/null || echo "")
+  ver=$(echo "$sub_body" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"].get("version", 0))' 2>/dev/null || echo "0")
+  dec_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/admin/hotel-publications/$rid/decisions" -H "$H" -H "Authorization: Bearer $TOKEN" -d "{\"decision\":\"APPROVE_AND_PUBLISH\",\"expectedVersion\":${ver:-0}}")
+  if [ "$dec_code" = "200" ]; then
+    echo "  [OK] Yayinlandi $hid"
+  else
+    printf '%s\n' "$(( $(cat "$FAIL_COUNT_FILE") + 1 ))" > "$FAIL_COUNT_FILE"
+    echo "  [FAIL:$dec_code] Yayin onayi $hid"
+  fi
+}
+
+for hid in "${HOTEL_IDS[@]}"; do
+  seed_hotel_catalog "$hid"
+done
+for hid in "${HOTEL_IDS[@]}"; do
+  publish_seed_hotel "$hid"
+done
+
+echo ""
+
+# =============================================
 # 5. ARAC KIRALAMA (CAR_RENTAL partner akisi)
 # =============================================
 echo "--- 5. ARAC KIRALAMA PARTNERI ---"

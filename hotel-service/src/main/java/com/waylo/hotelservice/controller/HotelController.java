@@ -4,6 +4,7 @@ import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
+import com.waylo.hotelservice.publication.HotelPublicationService;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
 import com.waylo.hotelservice.service.HotelSearchService;
@@ -35,9 +36,11 @@ public class HotelController {
     private final HotelAccessGuard accessGuard;
     private final HotelSearchService hotelSearchService;
     private final ReviewService reviewService;
+    private final HotelPublicationService publicationService;
 
     public HotelController(HotelService hotelService, HotelAccessGuard accessGuard, HotelSearchService hotelSearchService,
-                           ReviewService reviewService) {
+                           ReviewService reviewService, HotelPublicationService publicationService) {
+        this.publicationService = publicationService;
         this.reviewService = reviewService;
         this.hotelService = hotelService;
         this.accessGuard = accessGuard;
@@ -102,6 +105,7 @@ public class HotelController {
                                                               @PathVariable UUID id,
                                                               @Valid @RequestBody HotelRequest request) {
         accessGuard.requireHotelManage(userId, id);
+        publicationService.assertDirectEditable(id, request.organizationId());
         return ResponseEntity.ok(ApiResponse.of(hotelService.update(id, request), "Hotel updated"));
     }
 
@@ -109,6 +113,7 @@ public class HotelController {
     public ResponseEntity<Void> delete(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
                                         @PathVariable UUID id) {
         accessGuard.requireHotelManage(userId, id);
+        publicationService.assertDeletable(id);
         hotelService.delete(id);
         return ResponseEntity.noContent().build();
     }

@@ -3,6 +3,7 @@ package com.waylo.hotelservice.security;
 import com.waylo.hotelservice.client.AccessDecision;
 import com.waylo.hotelservice.client.AuthAccessClient;
 import com.waylo.hotelservice.domain.Hotel;
+import com.waylo.hotelservice.domain.PublicationStatus;
 import com.waylo.hotelservice.exception.AccessDeniedException;
 import com.waylo.hotelservice.exception.AuthenticationRequiredException;
 import com.waylo.hotelservice.exception.AuthorizationUnavailableException;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -71,6 +73,32 @@ public class HotelAccessGuard {
             return allowed;
         } catch (RuntimeException e) {
             log.warn("Authorization service unavailable for userId={}, permission=HOTEL_READ", userId);
+            return false;
+        }
+    }
+
+    /**
+     * Read gate for anonymous child reads (room types, rate plans, rooms, reviews): a hotel that is not in the
+     * public projection is 404 unless the caller is ADMIN or a member of its organization. Fails closed.
+     */
+    public void requireReadable(UUID userId, String role, UUID hotelId) {
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        if (hotel.getPublicationStatus() == PublicationStatus.PUBLISHED && hotel.isActive()
+                && (hotel.getOrganizationId() == null || orgIsActive(hotel.getOrganizationId()))) {
+            return;
+        }
+        if (!canReadOrganization(userId, role, hotel.getOrganizationId())) {
+            throw new ResourceNotFoundException("Hotel", "id", hotelId);
+        }
+    }
+
+    private boolean orgIsActive(UUID organizationId) {
+        try {
+            List<UUID> active = authAccessClient.activeOrganizationIds();
+            return active != null && active.contains(organizationId);
+        } catch (RuntimeException e) {
+            log.warn("Active organization lookup failed, treating hotel as not public");
             return false;
         }
     }

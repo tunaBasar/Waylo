@@ -85,6 +85,13 @@ def data(method, path, body=None, token=None, direct=False, internal_token=None)
     return result.get('data')
 
 
+def publish_hotel(hotel_id, owner_token, admin_token):
+    # Publication workflow: owner submits, admin approves and publishes (org must be ACTIVE, hotel complete)
+    sub = data('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, owner_token)
+    data('POST', f'/api/admin/hotel-publications/{sub["id"]}/decisions',
+         {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': sub.get('version', 0)}, admin_token)
+
+
 owner_id, owner = register()
 foreign_id, foreign = register()
 hotel_id = None
@@ -121,6 +128,11 @@ try:
          'occupancy': 2, 'currency': 'EUR', 'amount': amount, 'expectedVersion': None}
         for night, amount in zip(nights, [100.25, 110.50])
     ]}, owner)
+    draft_quote = {'hotelId': hotel_id, 'roomTypeId': room['id'], 'ratePlanId': plan['id'],
+                   'checkIn': nights[0], 'checkOut': check_out, 'rooms': 1, 'adults': 2, 'childrenAges': []}
+    status, result = request('POST', '/api/quotes', draft_quote, owner)
+    check(status == 409 and (result or {}).get('error') == 'HOTEL_NOT_BOOKABLE', 'quote on unpublished DRAFT hotel is 409 HOTEL_NOT_BOOKABLE')
+    publish_hotel(hotel_id, owner, admin)
     offers = data('GET', availability_path)['offers']
     check(len(offers) == 1 and offers[0]['totalAmount'] == Decimal('210.75'), 'whole-stay offer total uses both nightly rates')
     check(len(offers[0]['nightly']) == 2, 'checkout date is excluded from nightly prices')

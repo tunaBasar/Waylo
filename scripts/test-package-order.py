@@ -31,7 +31,7 @@ def hotel_cleanup():
     if oid:
         psql('payment_db', f"DELETE FROM commission_rates WHERE supplier_organization_id='{oid}'")
     if hid:
-        for t in ('hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory',
+        for t in ('hotel_publication_decisions', 'hotel_publication_requests', 'hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory',
                   'rate_plans', 'room_types'):
             psql('hotel_db', f"DELETE FROM {t} WHERE hotel_id='{hid}'")
         psql('hotel_db', f"DELETE FROM hotels WHERE id='{hid}'")
@@ -39,6 +39,16 @@ def hotel_cleanup():
         psql('auth_db', f"DELETE FROM role_assignments WHERE organization_id='{oid}'")
         psql('auth_db', f"DELETE FROM organization_memberships WHERE organization_id='{oid}'")
         psql('auth_db', f"DELETE FROM organizations WHERE id='{oid}'")
+
+
+def publish_hotel(hotel_id, owner_token, admin_token):
+    # Publication workflow: owner submits, admin approves and publishes (org ACTIVE, hotel complete)
+    s, body, _ = call('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, owner_token)
+    check('hotel publication request submitted', s in (200, 201), s)
+    rid = ((body or {}).get('data') or {}).get('id')
+    s, _, _ = call('POST', f'/api/admin/hotel-publications/{rid}/decisions',
+                   {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': 0}, admin_token)
+    check('hotel approved and published', s == 200, s)
 
 
 def hotel_fixture(admin, partner):
@@ -63,6 +73,7 @@ def hotel_fixture(admin, partner):
     call('PUT', f'/api/hotels/{hotel}/rates', {'items': [
         {'roomTypeId': room['id'], 'ratePlanId': plan['id'], 'stayDate': n, 'occupancy': 2, 'currency': 'TRY', 'amount': a}
         for n, a in zip(nights, [1000.00, 1500.00])]}, partner)
+    publish_hotel(hotel, partner, admin)
     s, _, _ = call('POST', '/api/admin/commission-rates', {'vertical': 'HOTEL', 'supplierOrganizationId': org, 'rate': 0.125},
                    admin)
     check('hotel commission rate created', s in (200, 201), s)

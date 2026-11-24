@@ -107,6 +107,15 @@ try:
         ('GET', f'{hb}/inventory?from=2030-01-01&to=2030-01-03', None),
         ('GET', f'/api/hotels?organizationId={org_b}', None),
         ('GET', f'/api/partner/organizations/{org_b}/hotel-reviews', None),
+        ('POST', f'{hb}/publication-requests', {}),
+        ('GET', f'{hb}/publication-requests', None),
+        ('GET', f'{hb}/content', None),
+        ('PATCH', f'{hb}/content', {'expectedVersion': 0, 'content': {'description': 'pwned'}}),
+        ('POST', f'{hb}/archive', {'reason': 'pwned by A'}),
+        ('POST', f'{hb}/publication-requests/{uuid.uuid4()}/withdraw', None),
+        ('GET', '/api/admin/hotel-publications', None),
+        ('POST', f'/api/admin/hotel-publications/{uuid.uuid4()}/decisions', {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': 0}),
+        ('POST', f'/api/admin/hotels/{hotel_b}/publication-status', {'decision': 'SUSPEND', 'reason': 'pwned by A'}),
     ]
     for method, path, body in attempts:
         status, result = request(method, path, body, token_a)
@@ -141,6 +150,51 @@ try:
     except RuntimeError as e:
         inserted = 'row-level security' not in str(e) and 'violates' not in str(e)
     check(not inserted, 'DB: A INSERT into B room_types rejected by RLS')
+    # --- DB level: publication tables (rows seeded as service mode, then probed as partner A / public) ---
+    def as_mode(mode, org, sql):
+        return psql(f"BEGIN; SET LOCAL ROLE waylo_app; SELECT set_config('app.mode','{mode}',true), "
+                    f"set_config('app.org_ids','{org or ''}',true) \\g /dev/null\n{sql}; COMMIT;")
+
+    req_a, req_b = str(uuid.uuid4()), str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
+    for rid, hid, oid in ((req_a, hotel_a, org_a), (req_b, hotel_b, org_b)):
+        as_mode('service', None,
+                f"INSERT INTO hotel_publication_requests (id, hotel_id, organization_id, kind, status, submitted_by) "
+                f"VALUES ('{rid}', '{hid}', '{oid}', 'INITIAL', 'SUBMITTED', '{user_id}'); "
+                f"INSERT INTO hotel_publication_decisions (id, hotel_id, organization_id, request_id, decision, from_status, to_status, actor_user_id, actor_role) "
+                f"VALUES (gen_random_uuid(), '{hid}', '{oid}', '{rid}', 'SUBMIT', 'DRAFT', 'SUBMITTED', '{user_id}', 'PARTNER')")
+    for table, col in (('hotel_publication_requests', 'hotel_id'), ('hotel_publication_decisions', 'hotel_id'),
+                       ('hotel_content_revisions', 'hotel_id')):
+        check(as_mode('partner', org_a, f"SELECT count(*) FROM {table} WHERE {col} = '{hotel_b}'") == ['0'],
+              f'DB: A sees no B {table}')
+        check(as_mode('public', None, f"SELECT count(*) FROM {table} WHERE {col} IN {ids}") == ['0'],
+              f'DB: public mode sees no {table}')
+    check(as_mode('partner', org_a, f"SELECT count(*) FROM hotel_publication_requests WHERE hotel_id = '{hotel_a}'") == ['1'],
+          'DB: partner A sees its own publication request')
+    check(as_mode('partner', org_a, f"SELECT count(*) FROM hotel_publication_decisions WHERE hotel_id = '{hotel_a}'") == ['1'],
+          'DB: partner A sees its own publication decision')
+    check(as_mode('admin', None, f"SELECT count(*) FROM hotel_publication_requests WHERE hotel_id IN {ids}") == ['2'],
+          'DB: admin mode sees both orgs publication requests')
+    check(as_mode('partner', org_a, f"WITH u AS (UPDATE hotel_publication_requests SET submit_note='pwned' WHERE id='{req_b}' RETURNING 1) SELECT count(*) FROM u") == ['0'],
+          'DB: A UPDATE on B publication request affects 0 rows')
+    try:
+        as_mode('partner', org_a,
+                f"INSERT INTO hotel_publication_requests (id, hotel_id, organization_id, kind, status, submitted_by) "
+                f"VALUES (gen_random_uuid(), '{hotel_b}', '{org_b}', 'INITIAL', 'SUBMITTED', '{user_id}')")
+        pub_inserted = True
+    except RuntimeError as e:
+        pub_inserted = 'row-level security' not in str(e) and 'violates' not in str(e)
+    check(not pub_inserted, 'DB: A INSERT of publication request for org B rejected by RLS')
+    for mode, org in (('partner', org_a), ('admin', None), ('service', None)):
+        check(as_mode(mode, org, f"WITH u AS (UPDATE hotel_publication_decisions SET reason='tampered' WHERE hotel_id='{hotel_a}' RETURNING 1) SELECT count(*) FROM u") == ['0'],
+              f'DB: {mode} mode cannot UPDATE publication decisions')
+        check(as_mode(mode, org, f"WITH d AS (DELETE FROM hotel_publication_decisions WHERE hotel_id='{hotel_a}' RETURNING 1) SELECT count(*) FROM d") == ['0'],
+              f'DB: {mode} mode cannot DELETE publication decisions')
+    check(as_mode('partner', org_a, f"WITH d AS (DELETE FROM hotel_publication_requests WHERE id='{req_a}' RETURNING 1) SELECT count(*) FROM d") == ['0'],
+          'DB: partner cannot DELETE publication requests')
+    check(psql("SELECT bool_and(relforcerowsecurity) FROM pg_class WHERE relname IN ('hotel_publication_requests',"
+               "'hotel_publication_decisions','hotel_content_revisions')") == ['t'],
+          'DB: FORCE ROW LEVEL SECURITY on publication tables')
     check(as_partner(org_b, f"SELECT count(*) FROM room_types WHERE id = '{room_b}' AND name <> 'pwned'") == ['1'],
           'DB: partner B still sees its own unmodified room type')
 
@@ -160,6 +214,12 @@ try:
     check(psql("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = 'waylo_app'") == ['f'],
           'DB: waylo_app is neither superuser nor BYPASSRLS')
 finally:
+    for hotel_id, _ in hotels:
+        try:  # fixture publication rows (decisions are append only for waylo_app, owner connection cleans up)
+            psql(f"DELETE FROM hotel_publication_decisions WHERE hotel_id = '{hotel_id}'; "
+                 f"DELETE FROM hotel_publication_requests WHERE hotel_id = '{hotel_id}'")
+        except RuntimeError:
+            pass
     for hotel_id, token in hotels:
         request('POST', f'/api/hotels/{hotel_id}/deactivate', token=token)
 

@@ -97,6 +97,15 @@ def main():
     ok(c == 401, f"spoofed identity headers without token -> {c}")
     c, _ = req("GET", "/api/admin/orders", None, {"X-User-Id": "1", "X-User-Role": "ADMIN"})
     ok(c == 401, f"spoofed ADMIN header on admin route -> {c}")
+    c, _ = req("GET", "/api/admin/hotel-publications", None, {"X-User-Id": "1", "X-User-Role": "ADMIN"})
+    ok(c == 401, f"spoofed ADMIN header on hotel publication admin route -> {c}")
+    c, _ = req("POST", "/api/admin/hotel-publications/00000000-0000-0000-0000-000000000000/decisions",
+               {"decision": "APPROVE_AND_PUBLISH", "expectedVersion": 0}, {"X-User-Id": "1", "X-User-Role": "ADMIN"})
+    ok(c == 401, f"spoofed ADMIN header on hotel publication decision -> {c}")
+    c, _ = req("GET", "/api/hotels/00000000-0000-0000-0000-000000000000/publication-requests")
+    ok(c == 401, f"anonymous GET publication-requests -> {c}")
+    c, _ = req("GET", "/api/hotels/00000000-0000-0000-0000-000000000000/content")
+    ok(c == 401, f"anonymous GET hotel content -> {c}")
     c, _ = req("GET", "/api/hotels", None, {"X-User-Role": "ADMIN", "X-User-Id": "1"})
     ok(c in (200, 404), f"public GET with spoofed headers still anonymous-ok ({c})")
 

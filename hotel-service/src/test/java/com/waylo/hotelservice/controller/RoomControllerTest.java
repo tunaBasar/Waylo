@@ -77,7 +77,7 @@ class RoomControllerTest {
         RoomResponse response = buildRoomResponse(roomId);
         when(roomService.getById(hotelId, roomId)).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RoomResponse>> result = controller.getById(hotelId, roomId);
+        ResponseEntity<ApiResponse<RoomResponse>> result = controller.getById(userId, "USER", hotelId, roomId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -88,7 +88,7 @@ class RoomControllerTest {
         RoomResponse response = buildRoomResponse(roomId);
         when(roomService.getByHotelId(hotelId)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<RoomResponse>>> result = controller.getByHotelId(hotelId);
+        ResponseEntity<ApiResponse<List<RoomResponse>>> result = controller.getByHotelId(userId, "USER", hotelId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -102,7 +102,7 @@ class RoomControllerTest {
                 .thenReturn(List.of(response));
 
         ResponseEntity<ApiResponse<List<RoomResponse>>> result =
-                controller.search(hotelId, RoomType.DOUBLE, RoomStatus.AVAILABLE, BigDecimal.valueOf(200));
+                controller.search(userId, "USER", hotelId, RoomType.DOUBLE, RoomStatus.AVAILABLE, BigDecimal.valueOf(200));
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -112,7 +112,7 @@ class RoomControllerTest {
     void search_noFilters_returns200() {
         when(roomService.search(eq(hotelId), any(), any(), any())).thenReturn(List.of());
 
-        ResponseEntity<ApiResponse<List<RoomResponse>>> result = controller.search(hotelId, null, null, null);
+        ResponseEntity<ApiResponse<List<RoomResponse>>> result = controller.search(userId, "USER", hotelId, null, null, null);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -188,7 +188,7 @@ class RoomControllerTest {
     void getAvailableCount_returns200() {
         when(roomService.getAvailableRoomCount(hotelId)).thenReturn(10L);
 
-        ResponseEntity<ApiResponse<Long>> result = controller.getAvailableCount(hotelId);
+        ResponseEntity<ApiResponse<Long>> result = controller.getAvailableCount(userId, "USER", hotelId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();

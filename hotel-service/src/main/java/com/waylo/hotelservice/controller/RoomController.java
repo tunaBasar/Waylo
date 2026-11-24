@@ -47,22 +47,31 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}")
-    public ResponseEntity<ApiResponse<RoomResponse>> getById(@PathVariable UUID hotelId,
-                                                              @PathVariable UUID roomId) {
+    public ResponseEntity<ApiResponse<RoomResponse>> getById(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable UUID hotelId,
+            @PathVariable UUID roomId) {
+        accessGuard.requireReadable(userId, role, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.getById(hotelId, roomId)));
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<RoomResponse>>> getByHotelId(@PathVariable UUID hotelId) {
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getByHotelId(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable UUID hotelId) {
+        accessGuard.requireReadable(userId, role, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.getByHotelId(hotelId)));
     }
 
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<RoomResponse>>> search(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable UUID hotelId,
             @RequestParam(required = false) RoomType roomType,
             @RequestParam(required = false) RoomStatus status,
             @RequestParam(required = false) BigDecimal maxPrice) {
+        accessGuard.requireReadable(userId, role, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.search(hotelId, roomType, status, maxPrice)));
     }
 
@@ -94,7 +103,10 @@ public class RoomController {
     }
 
     @GetMapping("/available-count")
-    public ResponseEntity<ApiResponse<Long>> getAvailableCount(@PathVariable UUID hotelId) {
+    public ResponseEntity<ApiResponse<Long>> getAvailableCount(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable UUID hotelId) {
+        accessGuard.requireReadable(userId, role, hotelId);
         return ResponseEntity.ok(ApiResponse.of(roomService.getAvailableRoomCount(hotelId)));
     }
 }

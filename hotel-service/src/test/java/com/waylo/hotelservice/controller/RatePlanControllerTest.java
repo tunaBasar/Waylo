@@ -82,7 +82,7 @@ class RatePlanControllerTest {
         RatePlanResponse response = buildResponse(ratePlanId);
         when(ratePlanService.getById(hotelId, ratePlanId, false)).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RatePlanResponse>> result = controller.getById(userId, hotelId, ratePlanId, false);
+        ResponseEntity<ApiResponse<RatePlanResponse>> result = controller.getById(userId, "USER", hotelId, ratePlanId, false);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -95,7 +95,7 @@ class RatePlanControllerTest {
         RatePlanResponse response = buildResponse(ratePlanId);
         when(ratePlanService.getById(hotelId, ratePlanId, true)).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RatePlanResponse>> result = controller.getById(userId, hotelId, ratePlanId, true);
+        ResponseEntity<ApiResponse<RatePlanResponse>> result = controller.getById(userId, "USER", hotelId, ratePlanId, true);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -109,7 +109,7 @@ class RatePlanControllerTest {
         RatePlanResponse response = buildResponse(ratePlanId);
         when(ratePlanService.getByHotelId(hotelId, false)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<RatePlanResponse>>> result = controller.getByHotelId(userId, hotelId, false);
+        ResponseEntity<ApiResponse<List<RatePlanResponse>>> result = controller.getByHotelId(userId, "USER", hotelId, false);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -122,7 +122,7 @@ class RatePlanControllerTest {
         RatePlanResponse response = buildResponse(ratePlanId);
         when(ratePlanService.getByHotelId(hotelId, true)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<RatePlanResponse>>> result = controller.getByHotelId(userId, hotelId, true);
+        ResponseEntity<ApiResponse<List<RatePlanResponse>>> result = controller.getByHotelId(userId, "USER", hotelId, true);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();

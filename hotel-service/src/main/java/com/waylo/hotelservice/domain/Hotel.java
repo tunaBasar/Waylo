@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -55,6 +57,22 @@ public class Hotel {
 
     @Column(name = "organization_id")
     private UUID organizationId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "publication_status", nullable = false, length = 16)
+    private PublicationStatus publicationStatus = PublicationStatus.DRAFT;
+
+    @Column(name = "published_revision_id")
+    private UUID publishedRevisionId;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    @Column(name = "content_version", nullable = false)
+    private long contentVersion = 0L;
+
+    @Column(name = "source_type", nullable = false, length = 16)
+    private String sourceType = "DIRECT";
 
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Room> rooms = new ArrayList<>();
@@ -109,4 +127,19 @@ public class Hotel {
 
     public UUID getOrganizationId() { return organizationId; }
     public void setOrganizationId(UUID organizationId) { this.organizationId = organizationId; }
+
+    public PublicationStatus getPublicationStatus() { return publicationStatus; }
+    public void setPublicationStatus(PublicationStatus publicationStatus) { this.publicationStatus = publicationStatus; }
+
+    public UUID getPublishedRevisionId() { return publishedRevisionId; }
+    public void setPublishedRevisionId(UUID publishedRevisionId) { this.publishedRevisionId = publishedRevisionId; }
+
+    public Instant getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(Instant publishedAt) { this.publishedAt = publishedAt; }
+
+    public long getContentVersion() { return contentVersion; }
+    public void setContentVersion(long contentVersion) { this.contentVersion = contentVersion; }
+
+    public String getSourceType() { return sourceType; }
+    public void setSourceType(String sourceType) { this.sourceType = sourceType; }
 }

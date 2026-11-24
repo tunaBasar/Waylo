@@ -195,4 +195,75 @@ class HotelAccessGuardTest {
         when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenThrow(new RuntimeException("down"));
         assertThat(guard.canReadOrganization(userId, "USER", orgId)).isFalse();
     }
+
+    // ===== requireReadable (U11) =====
+
+    private Hotel readableHotel(com.waylo.hotelservice.domain.PublicationStatus status, boolean active, UUID org) {
+        Hotel hotel = new Hotel();
+        hotel.setId(hotelId);
+        hotel.setOrganizationId(org);
+        hotel.setActive(active);
+        hotel.setPublicationStatus(status);
+        when(hotelRepository.findById(hotelId)).thenReturn(Optional.of(hotel));
+        return hotel;
+    }
+
+    @Test
+    void requireReadable_publishedActiveActiveOrg_passesForAnonymous() {
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED, true, orgId);
+        when(authAccessClient.activeOrganizationIds()).thenReturn(List.of(orgId));
+        guard.requireReadable(null, null, hotelId);
+        verify(authAccessClient, never()).check(any(), any(), any(), any());
+    }
+
+    @Test
+    void requireReadable_publishedLegacyHotel_passes() {
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED, true, null);
+        guard.requireReadable(null, null, hotelId);
+    }
+
+    @Test
+    void requireReadable_unpublished_nonMember_is404() {
+        for (com.waylo.hotelservice.domain.PublicationStatus s : com.waylo.hotelservice.domain.PublicationStatus.values()) {
+            if (s == com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) continue;
+            readableHotel(s, true, orgId);
+            when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenReturn(new AccessDecision(false, List.of()));
+            assertThatThrownBy(() -> guard.requireReadable(userId, "USER", hotelId))
+                    .as(s.name()).isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> guard.requireReadable(null, null, hotelId))
+                    .as(s.name()).isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    @Test
+    void requireReadable_unpublished_memberAndAdmin_pass() {
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.DRAFT, true, orgId);
+        when(authAccessClient.check(userId, orgId, null, "HOTEL_READ")).thenReturn(new AccessDecision(true, List.of("OWNER")));
+        guard.requireReadable(userId, "USER", hotelId);
+        guard.requireReadable(UUID.randomUUID(), "ADMIN", hotelId);
+    }
+
+    @Test
+    void requireReadable_publishedButInactiveOrOrgNotActive_hiddenFromNonMembers() {
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED, false, orgId);
+        assertThatThrownBy(() -> guard.requireReadable(null, null, hotelId)).isInstanceOf(ResourceNotFoundException.class);
+
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED, true, orgId);
+        when(authAccessClient.activeOrganizationIds()).thenReturn(List.of());
+        assertThatThrownBy(() -> guard.requireReadable(null, null, hotelId)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void requireReadable_authOutage_failsClosed() {
+        readableHotel(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED, true, orgId);
+        when(authAccessClient.activeOrganizationIds()).thenThrow(new RuntimeException("down"));
+        when(authAccessClient.check(any(), any(), any(), any())).thenThrow(new RuntimeException("down"));
+        assertThatThrownBy(() -> guard.requireReadable(userId, "USER", hotelId)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void requireReadable_unknownHotel_404() {
+        when(hotelRepository.findById(hotelId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> guard.requireReadable(null, null, hotelId)).isInstanceOf(ResourceNotFoundException.class);
+    }
 }

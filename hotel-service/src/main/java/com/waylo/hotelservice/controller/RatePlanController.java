@@ -47,11 +47,14 @@ public class RatePlanController {
     @GetMapping("/{ratePlanId}")
     public ResponseEntity<ApiResponse<RatePlanResponse>> getById(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable UUID hotelId,
             @PathVariable UUID ratePlanId,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
         if (includeInactive) {
             accessGuard.requireRoomManage(userId, hotelId);
+        } else {
+            accessGuard.requireReadable(userId, role, hotelId);
         }
         RatePlanResponse response = ratePlanService.getById(hotelId, ratePlanId, includeInactive);
         return ResponseEntity.ok(ApiResponse.of(response));
@@ -60,10 +63,13 @@ public class RatePlanController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<RatePlanResponse>>> getByHotelId(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable UUID hotelId,
             @RequestParam(defaultValue = "false") boolean includeInactive) {
         if (includeInactive) {
             accessGuard.requireRoomManage(userId, hotelId);
+        } else {
+            accessGuard.requireReadable(userId, role, hotelId);
         }
         List<RatePlanResponse> responses = ratePlanService.getByHotelId(hotelId, includeInactive);
         return ResponseEntity.ok(ApiResponse.of(responses));

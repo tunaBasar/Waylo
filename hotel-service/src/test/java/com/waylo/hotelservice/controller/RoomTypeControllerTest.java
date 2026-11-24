@@ -81,7 +81,7 @@ class RoomTypeControllerTest {
         RoomTypeResponse response = buildResponse(roomTypeId);
         when(roomTypeService.getById(hotelId, roomTypeId, false)).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RoomTypeResponse>> result = controller.getById(userId, hotelId, roomTypeId, false);
+        ResponseEntity<ApiResponse<RoomTypeResponse>> result = controller.getById(userId, "USER", hotelId, roomTypeId, false);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -95,7 +95,7 @@ class RoomTypeControllerTest {
         RoomTypeResponse response = buildResponse(roomTypeId);
         when(roomTypeService.getById(hotelId, roomTypeId, true)).thenReturn(response);
 
-        ResponseEntity<ApiResponse<RoomTypeResponse>> result = controller.getById(userId, hotelId, roomTypeId, true);
+        ResponseEntity<ApiResponse<RoomTypeResponse>> result = controller.getById(userId, "USER", hotelId, roomTypeId, true);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -109,7 +109,7 @@ class RoomTypeControllerTest {
         RoomTypeResponse response = buildResponse(roomTypeId);
         when(roomTypeService.getByHotelId(hotelId, false)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<RoomTypeResponse>>> result = controller.getByHotelId(userId, hotelId, false);
+        ResponseEntity<ApiResponse<List<RoomTypeResponse>>> result = controller.getByHotelId(userId, "USER", hotelId, false);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
@@ -122,7 +122,7 @@ class RoomTypeControllerTest {
         RoomTypeResponse response = buildResponse(roomTypeId);
         when(roomTypeService.getByHotelId(hotelId, true)).thenReturn(List.of(response));
 
-        ResponseEntity<ApiResponse<List<RoomTypeResponse>>> result = controller.getByHotelId(userId, hotelId, true);
+        ResponseEntity<ApiResponse<List<RoomTypeResponse>>> result = controller.getByHotelId(userId, "USER", hotelId, true);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();

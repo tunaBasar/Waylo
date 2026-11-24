@@ -57,9 +57,12 @@ public class ReviewController {
     }
 
     @GetMapping("/api/hotels/{id}/reviews")
-    public ResponseEntity<ApiResponse<ReviewResponse.Page>> publicList(@PathVariable UUID id,
+    public ResponseEntity<ApiResponse<ReviewResponse.Page>> publicList(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                                                       @RequestHeader(value = "X-User-Role", required = false) String role,
+                                                                       @PathVariable UUID id,
                                                                        @RequestParam(defaultValue = "0") int page,
                                                                        @RequestParam(defaultValue = "10") int size) {
+        guard.requireReadable(userId, role, id);
         return ResponseEntity.ok(ApiResponse.of(service.listPublic(id, page, size)));
     }
 

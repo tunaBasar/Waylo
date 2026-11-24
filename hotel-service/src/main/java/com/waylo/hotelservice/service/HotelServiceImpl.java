@@ -2,6 +2,7 @@ package com.waylo.hotelservice.service;
 
 import com.waylo.hotelservice.client.ActiveOrganizationIdsCache;
 import com.waylo.hotelservice.domain.Hotel;
+import com.waylo.hotelservice.domain.PublicationStatus;
 import com.waylo.hotelservice.dto.HotelMapper;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
@@ -97,6 +98,8 @@ public class HotelServiceImpl implements HotelService {
     public HotelResponse update(UUID id, HotelRequest request) {
         Hotel hotel = findHotelOrThrow(id);
         hotelMapper.updateEntity(request, hotel);
+        // Only DRAFT/REJECTED hotels reach here (controller gate): live content edited in place.
+        hotel.setContentVersion(hotel.getContentVersion() + 1);
         hotel = hotelRepository.save(hotel);
         return hotelMapper.toResponse(hotel);
     }
@@ -112,6 +115,7 @@ public class HotelServiceImpl implements HotelService {
     @Override
     public HotelResponse deactivate(UUID id) {
         Hotel hotel = findHotelOrThrow(id);
+        rejectIfArchived(hotel);
         hotel.setActive(false);
         hotel = hotelRepository.save(hotel);
         return hotelMapper.toResponse(hotel);
@@ -120,6 +124,7 @@ public class HotelServiceImpl implements HotelService {
     @Override
     public HotelResponse activate(UUID id) {
         Hotel hotel = findHotelOrThrow(id);
+        rejectIfArchived(hotel);
         hotel.setActive(true);
         hotel = hotelRepository.save(hotel);
         return hotelMapper.toResponse(hotel);
@@ -161,7 +166,9 @@ public class HotelServiceImpl implements HotelService {
      * hotels of a possibly-suspended organization.
      */
     private List<Hotel> filterPublic(List<Hotel> hotels) {
-        List<Hotel> activeOnly = hotels.stream().filter(Hotel::isActive).toList();
+        List<Hotel> activeOnly = hotels.stream()
+                .filter(h -> h.getPublicationStatus() == PublicationStatus.PUBLISHED && h.isActive())
+                .toList();
 
         List<Hotel> legacy = new ArrayList<>();
         List<Hotel> orgOwned = new ArrayList<>();
@@ -197,6 +204,12 @@ public class HotelServiceImpl implements HotelService {
             }
         }
         return result;
+    }
+
+    private static void rejectIfArchived(Hotel hotel) {
+        if (hotel.getPublicationStatus() == PublicationStatus.ARCHIVED) {
+            throw com.waylo.hotelservice.exception.PublicationException.conflict("HOTEL_ARCHIVED", "Hotel is archived");
+        }
     }
 
     private Hotel findHotelOrThrow(UUID id) {

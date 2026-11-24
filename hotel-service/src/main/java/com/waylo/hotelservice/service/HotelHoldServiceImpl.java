@@ -100,6 +100,14 @@ public class HotelHoldServiceImpl implements HotelHoldService {
         HotelQuote lockedQuote = quoteRepository.findByIdForUpdate(request.quoteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", "id", request.quoteId()));
 
+        // 5b. A quote created before a suspension must not turn into a hold (publication re-check).
+        com.waylo.hotelservice.domain.Hotel quotedHotel = hotelRepository.findById(lockedQuote.getHotelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", lockedQuote.getHotelId()));
+        if (!quotedHotel.isActive()
+                || quotedHotel.getPublicationStatus() != com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) {
+            throw new BusinessRuleException("HOTEL_NOT_BOOKABLE", "Hotel is not bookable");
+        }
+
         // 6. Recheck idempotency after quote lock (only HELD can be returned/rejected here)
         Optional<HotelHold> postLockHold = holdRepository.findByIdempotencyKey(request.idempotencyKey());
         if (postLockHold.isPresent()) {

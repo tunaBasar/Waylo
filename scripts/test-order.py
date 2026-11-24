@@ -81,6 +81,13 @@ def lit(*ids):
     return ','.join(f"'{i}'" for i in ids)
 
 
+def publish_hotel(hotel_id, owner_token, admin_token):
+    # Publication workflow: owner submits, admin approves and publishes (org ACTIVE, hotel complete)
+    sub = must('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, owner_token)
+    must('POST', f'/api/admin/hotel-publications/{sub["id"]}/decisions',
+         {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': sub.get('version', 0)}, admin_token)
+
+
 def register(prefix):
     email = f'{prefix}-{uuid.uuid4().hex[:12]}@example.test'
     pw = secrets.token_urlsafe(20)
@@ -134,6 +141,7 @@ def main():
             {'roomTypeId': room['id'], 'ratePlanId': plan['id'], 'stayDate': n, 'occupancy': 2,
              'currency': 'EUR', 'amount': amt, 'expectedVersion': None}
             for n, amt in zip(nights, [120.25, 130.50])]}, tok_o)
+        publish_hotel(hotel_id, tok_o, tok_admin)
 
         def inventory():
             rows = psql('hotel_db', "SELECT stay_date||':'||allotment||':'||held||':'||confirmed FROM daily_inventory "
@@ -208,6 +216,8 @@ def cleanup(hotel_id, org_id, order_ids, emails):
         psql('package_booking_db', f'DELETE FROM orders WHERE id IN ({lit(*order_ids)})')  # items cascade
     if hotel_id:
         h = lit(hotel_id)
+        for t in ('hotel_publication_decisions', 'hotel_publication_requests'):
+            psql('hotel_db', f'DELETE FROM {t} WHERE hotel_id IN ({h})')
         psql('hotel_db', f'DELETE FROM hotel_holds WHERE hotel_id IN ({h})')
         psql('hotel_db', f'DELETE FROM hotel_quotes WHERE hotel_id IN ({h})')  # nights cascade
         psql('hotel_db', f'DELETE FROM inventory_adjustments WHERE hotel_id IN ({h})')

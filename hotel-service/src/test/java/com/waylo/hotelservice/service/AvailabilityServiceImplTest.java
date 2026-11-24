@@ -97,6 +97,7 @@ class AvailabilityServiceImplTest {
         hotel.setStarRating(4);
         hotel.setDescription("Test");
         hotel.setActive(active);
+        hotel.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
         hotel.setOrganizationId(orgId);
         hotel.setLatitude(BigDecimal.valueOf(41.0));
         hotel.setLongitude(BigDecimal.valueOf(29.0));
@@ -682,5 +683,20 @@ class AvailabilityServiceImplTest {
         assertThatThrownBy(() -> availabilityService.getAvailability(hotelId, checkIn, farFuture, 1, 1, List.of()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("30 nights");
+    }
+
+    @Test
+    void nonPublishedHotel_isNotBookable_forEveryStatus() {
+        for (com.waylo.hotelservice.domain.PublicationStatus status : com.waylo.hotelservice.domain.PublicationStatus.values()) {
+            if (status == com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) continue;
+            Hotel hotel = buildHotel(hotelId, true);
+            hotel.setPublicationStatus(status);
+            when(hotelRepository.findById(hotelId)).thenReturn(Optional.of(hotel));
+
+            assertThatThrownBy(() -> availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 2, List.of()))
+                    .as(status.name())
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Hotel is not bookable");
+        }
     }
 }

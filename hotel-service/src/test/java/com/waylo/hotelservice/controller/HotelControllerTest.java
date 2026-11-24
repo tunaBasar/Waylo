@@ -37,6 +37,8 @@ class HotelControllerTest {
     private final HotelRepository hotelRepository = mock(HotelRepository.class);
     private final com.waylo.hotelservice.service.ReviewService reviewService =
             mock(com.waylo.hotelservice.service.ReviewService.class, inv -> inv.getArguments()[0]);
+    private final com.waylo.hotelservice.publication.HotelPublicationService publicationService =
+            mock(com.waylo.hotelservice.publication.HotelPublicationService.class);
     @InjectMocks
     private HotelController controller;
 
@@ -281,5 +283,41 @@ class HotelControllerTest {
 
         assertThat(controller.getAll(userId, "USER", orgId).getBody().data()).hasSize(1);
         verify(hotelService, never()).getPublicByOrganization(any());
+    }
+
+    @Test
+    void update_publishedHotel_conflictRequiresRevision_serviceNotCalled() {
+        HotelRequest request = new HotelRequest("n", "c", "k", "a", 3, null, null, null, orgId);
+        doThrow(com.waylo.hotelservice.exception.PublicationException.conflict("CONTENT_REQUIRES_REVISION", "x"))
+                .when(publicationService).assertDirectEditable(hotelId, orgId);
+
+        assertThatThrownBy(() -> controller.update(userId, hotelId, request))
+                .isInstanceOfSatisfying(com.waylo.hotelservice.exception.PublicationException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("CONTENT_REQUIRES_REVISION"));
+        verify(hotelService, never()).update(any(), any());
+    }
+
+    @Test
+    void update_organizationChange_400_guardRunsFirst() {
+        UUID otherOrg = UUID.randomUUID();
+        HotelRequest request = new HotelRequest("n", "c", "k", "a", 3, null, null, null, otherOrg);
+        doThrow(new com.waylo.hotelservice.exception.PublicationException(400, "ORGANIZATION_CHANGE_NOT_ALLOWED", "x"))
+                .when(publicationService).assertDirectEditable(hotelId, otherOrg);
+
+        assertThatThrownBy(() -> controller.update(userId, hotelId, request))
+                .isInstanceOfSatisfying(com.waylo.hotelservice.exception.PublicationException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(400));
+        verify(accessGuard).requireHotelManage(userId, hotelId);
+    }
+
+    @Test
+    void delete_hotelWithHistory_409_notDeleted() {
+        doThrow(com.waylo.hotelservice.exception.PublicationException.conflict("HOTEL_HAS_HISTORY", "x"))
+                .when(publicationService).assertDeletable(hotelId);
+
+        assertThatThrownBy(() -> controller.delete(userId, hotelId))
+                .isInstanceOfSatisfying(com.waylo.hotelservice.exception.PublicationException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("HOTEL_HAS_HISTORY"));
+        verify(hotelService, never()).delete(any());
     }
 }

@@ -93,7 +93,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
 
-        if (!hotel.isActive()) {
+        if (!hotel.isActive() || hotel.getPublicationStatus() != com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED) {
             throw new BusinessRuleException("HOTEL_NOT_BOOKABLE", "Hotel is not bookable");
         }
 

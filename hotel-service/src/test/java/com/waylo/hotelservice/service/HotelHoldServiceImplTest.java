@@ -70,6 +70,11 @@ class HotelHoldServiceImplTest {
     void setUp() {
         service = new HotelHoldServiceImpl(quoteRepository, holdRepository, inventoryRepository, hotelRepository,
                 FIXED_CLOCK, HOLD_TTL_MINUTES);
+        com.waylo.hotelservice.domain.Hotel published = new com.waylo.hotelservice.domain.Hotel();
+        published.setActive(true);
+        published.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
+        org.mockito.Mockito.lenient().when(hotelRepository.findById(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.of(published));
     }
 
     // ==================== HELPERS ====================
@@ -145,6 +150,14 @@ class HotelHoldServiceImplTest {
 
     private void mockFullHoldFlow() {
         mockFullHoldFlow(QUOTE_ID, IDEMPOTENCY_KEY);
+    }
+
+    /** Stubs only what hold() reads before the post-lock hotel check (publication gate tests stop there). */
+    private void mockQuoteLockUpToHotelCheck() {
+        HotelQuote quote = createQuote(QUOTE_ID);
+        when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(holdRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.empty());
+        when(quoteRepository.findByIdForUpdate(QUOTE_ID)).thenReturn(Optional.of(quote));
     }
 
     private void mockFullHoldFlow(UUID quoteId, String idempKey) {
@@ -1157,5 +1170,61 @@ class HotelHoldServiceImplTest {
         // Verify inventory was NOT touched (no double release)
         verify(inventoryRepository, never()).lockNightsForHold(any(), any(), any(), any());
         verify(inventoryRepository, never()).saveAll(any());
+    }
+
+    // ==================== publication gate (U7, U8) ====================
+
+    @Test
+    void hold_hotelSuspendedAfterQuote_rejected_noInventoryHeld() {
+        mockQuoteLockUpToHotelCheck();
+        com.waylo.hotelservice.domain.Hotel suspended = new com.waylo.hotelservice.domain.Hotel();
+        suspended.setActive(true);
+        suspended.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.SUSPENDED);
+        when(hotelRepository.findById(HOTEL_ID)).thenReturn(Optional.of(suspended));
+
+        assertThatThrownBy(() -> service.hold(createHoldRequest()))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("ruleCode").isEqualTo("HOTEL_NOT_BOOKABLE");
+        verify(inventoryRepository, never()).saveAll(any());
+        verify(holdRepository, never()).save(any());
+    }
+
+    @Test
+    void hold_hotelDeactivatedAfterQuote_rejected() {
+        mockQuoteLockUpToHotelCheck();
+        com.waylo.hotelservice.domain.Hotel inactive = new com.waylo.hotelservice.domain.Hotel();
+        inactive.setActive(false);
+        inactive.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.PUBLISHED);
+        when(hotelRepository.findById(HOTEL_ID)).thenReturn(Optional.of(inactive));
+
+        assertThatThrownBy(() -> service.hold(createHoldRequest()))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("ruleCode").isEqualTo("HOTEL_NOT_BOOKABLE");
+    }
+
+    @Test
+    void confirmAndRelease_ignorePublicationStatus() {
+        // hotel became SUSPENDED/ARCHIVED after the hold was created: confirm and release never consult it
+        com.waylo.hotelservice.domain.Hotel archived = new com.waylo.hotelservice.domain.Hotel();
+        archived.setActive(false);
+        archived.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.ARCHIVED);
+        when(hotelRepository.findById(any())).thenReturn(Optional.of(archived));
+
+        UUID holdId = UUID.randomUUID();
+        HotelHold hold = createHeldHold(holdId, QUOTE_ID);
+        when(holdRepository.findById(holdId)).thenReturn(Optional.empty());
+        when(holdRepository.findByIdForUpdate(holdId)).thenReturn(Optional.of(hold));
+        when(inventoryRepository.lockNightsForHold(eq(HOTEL_ID), eq(ROOM_TYPE_ID), eq(CHECK_IN), eq(CHECK_OUT.minusDays(1))))
+                .thenReturn(List.of(createInventory(CHECK_IN, 1, 0, false), createInventory(CHECK_IN.plusDays(1), 1, 0, false)));
+        when(holdRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        assertThat(service.confirm(holdId).status()).isEqualTo(HoldStatus.CONFIRMED);
+
+        UUID holdId2 = UUID.randomUUID();
+        HotelHold held2 = createHeldHold(holdId2, QUOTE_ID);
+        when(holdRepository.findByIdForUpdate(holdId2)).thenReturn(Optional.of(held2));
+        // a still-held hold has its rooms counted in `held` on every night
+        when(inventoryRepository.lockNightsForHold(eq(HOTEL_ID), eq(ROOM_TYPE_ID), eq(CHECK_IN), eq(CHECK_OUT.minusDays(1))))
+                .thenReturn(List.of(createInventory(CHECK_IN, 1, 0, false), createInventory(CHECK_IN.plusDays(1), 1, 0, false)));
+        assertThat(service.release(holdId2).status()).isEqualTo(HoldStatus.RELEASED);
     }
 }

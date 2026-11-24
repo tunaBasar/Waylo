@@ -68,6 +68,13 @@ def must(method, path, body=None, token=None):
     return (d or {}).get('data', d)
 
 
+def publish_hotel(hotel_id, owner_token, admin_token):
+    # Publication workflow: owner submits, admin approves and publishes (org ACTIVE, hotel complete)
+    sub = must('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, owner_token)
+    must('POST', f'/api/admin/hotel-publications/{sub["id"]}/decisions',
+         {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': sub.get('version', 0)}, admin_token)
+
+
 def psql(db, sql):
     out = subprocess.run(['docker', 'exec', 'waylo-postgres', 'psql', '-U', 'waylo', '-d', db, '-tAc', sql],
                          capture_output=True, text=True)
@@ -124,6 +131,7 @@ def main():
         must('PUT', f'/api/hotels/{hotel_id}/rates', {'items': [
             {'roomTypeId': room['id'], 'ratePlanId': plan['id'], 'stayDate': n, 'occupancy': 2,
              'currency': 'TRY', 'amount': a} for n, a in zip(nights, [1000.00, 1500.00])]}, owner)
+        publish_hotel(hotel_id, owner, admin)
 
         def new_order(tok):
             q = must('POST', '/api/quotes', {'hotelId': hotel_id, 'roomTypeId': room['id'], 'ratePlanId': plan['id'],
@@ -279,7 +287,7 @@ def cleanup(hotel_id, org_id, order_ids, emails):
         psql('payment_db', f"DELETE FROM commission_rates WHERE supplier_organization_id='{org_id}'")
     if hotel_id:
         h = f"'{hotel_id}'"
-        for t in ('hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory',
+        for t in ('hotel_publication_decisions', 'hotel_publication_requests', 'hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory',
                   'rate_plans', 'room_types'):
             psql('hotel_db', f'DELETE FROM {t} WHERE hotel_id IN ({h})')
         psql('hotel_db', f'DELETE FROM hotels WHERE id IN ({h})')

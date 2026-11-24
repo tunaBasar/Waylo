@@ -14,6 +14,8 @@ import java.util.UUID;
 
 @Repository
 public interface DailyRateRepository extends JpaRepository<DailyRate, UUID> {
+    boolean existsByHotelId(UUID hotelId);
+
 
     @Query("SELECT DISTINCT r.currency FROM DailyRate r WHERE r.hotelId = :hotelId")
     List<String> findCurrenciesByHotelId(@Param("hotelId") UUID hotelId);
