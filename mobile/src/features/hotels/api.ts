@@ -6,6 +6,17 @@ export function stayQueryString(q: StayQuery): string {
   return p.toString();
 }
 
+export type HotelResult = { kind: 'ok'; hotel: Hotel } | { kind: 'notPublic' };
+
+/** 404 on the hotel detail means the hotel is not published (or gone): a state, not an error. */
+export async function getHotelOrNotPublic(id: string): Promise<HotelResult> {
+  try { return { kind: 'ok', hotel: await hotelsApi.get(id) }; }
+  catch (e) {
+    if (typeof e === 'object' && e !== null && (e as { status?: number }).status === 404) return { kind: 'notPublic' };
+    throw e;
+  }
+}
+
 export const hotelsApi = {
   search: (q: StayQuery, city?: string) =>
     api.get<Hotel[]>(`/api/hotels/search?${stayQueryString(q)}${city ? `&city=${encodeURIComponent(city)}` : ''}`),

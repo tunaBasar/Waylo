@@ -9,7 +9,7 @@ import { useOnline } from '@/features/network/NetworkContext';
 import { orderLinkOpened } from '@/features/deeplinks';
 import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
-import { fmtLocal, money, ORDER_STATUS_TR, policyText, refundText } from '@/features/format';
+import { fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, policyText, refundText } from '@/features/format';
 
 function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: OrderCheckin | undefined; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -92,7 +92,8 @@ export default function OrderDetail() {
           <>
             <Title>{`Siparis #${o.id.slice(0, 8)}`}</Title>
             <Card>
-              <Text style={{ fontWeight: '700' }}>{ORDER_STATUS_TR[o.status] ?? o.status}</Text>
+              <Text style={{ fontWeight: '700' }}>{orderStatusInfo(o.status).label}</Text>
+              {orderStatusInfo(o.status).note ? <Muted>{orderStatusInfo(o.status).note}</Muted> : null}
               <Text>{money(o.totalAmount, o.currency)}</Text>
               {(o.items ?? []).map((i) => (
                 <View key={i.id} style={{ gap: 4 }}>

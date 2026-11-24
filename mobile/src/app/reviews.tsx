@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
 import { ApiError } from '@/api';
-import { reviewsApi, validateReview, MAX_REVIEW_TEXT, type ReviewableItem } from '@/features/reviews/api';
+import { reviewsApi, reviewErrorMessage, REVIEW_WHEN_HINT, validateReview, MAX_REVIEW_TEXT, type ReviewableItem } from '@/features/reviews/api';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { StarPicker } from '@/components/StarPicker';
@@ -16,7 +16,7 @@ function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void
     if (err) { setError(err); return; }
     setBusy(true); setError(null);
     try { await reviewsApi.create(item.orderItemId, score, text); onDone(); }
-    catch (e) { setError(e instanceof ApiError ? e.message : 'Yorum gonderilemedi'); }
+    catch (e) { setError(e instanceof ApiError ? reviewErrorMessage(e) : 'Yorum gönderilemedi'); }
     finally { setBusy(false); }
   }
   return (
@@ -36,6 +36,7 @@ export default function Reviews() {
   return (
     <Screen>
       <Title>Yorum yazabilecegim konaklamalar</Title>
+      <Muted>{REVIEW_WHEN_HINT}</Muted>
       <AsyncView<ReviewableItem[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Yorum yazilacak konaklama yok.">
         {(list) => list.map((i) => <ReviewForm key={i.orderItemId} item={i} onDone={state.reload} />)}
       </AsyncView>

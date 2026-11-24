@@ -11,8 +11,16 @@ export function fmtLocal(iso: string | null | undefined): string {
 }
 
 export const ORDER_STATUS_TR: Record<string, string> = {
-  PENDING: 'Odeme bekleniyor', CONFIRMED: 'Onaylandi', CANCELLED: 'Iptal edildi', EXPIRED: 'Suresi doldu',
+  PENDING: 'Odeme bekleniyor', CONFIRMED: 'Onaylandi', CANCELLED: 'Iptal edildi', EXPIRED: 'Süresi doldu',
 };
+
+export const ORDER_EXPIRED_NOTE = 'Ödeme süresi içinde tamamlanmadığı için rezervasyon tutmaları sona erdi. Ödeme yapılamaz, lütfen yeniden arama yapın.';
+
+/** Known statuses get a Turkish label, unknown future ones show raw in a neutral badge. */
+export function orderStatusInfo(status: string): { label: string; known: boolean; note: string | null } {
+  const label = ORDER_STATUS_TR[status];
+  return { label: label ?? status, known: label !== undefined, note: status === 'EXPIRED' ? ORDER_EXPIRED_NOTE : null };
+}
 
 export function policyText(policy: string | null | undefined, hours: number | null | undefined): string {
   if (policy === 'NON_REFUNDABLE') return 'Iade edilemez';

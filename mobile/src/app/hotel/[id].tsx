@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import type { Availability, Hotel } from '@/api';
-import { hotelsApi } from '@/features/hotels/api';
+import type { Availability } from '@/api';
+import { getHotelOrNotPublic, hotelsApi, type HotelResult } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
 import { money } from '@/features/format';
@@ -15,9 +15,10 @@ export default function HotelDetail() {
   const p = useLocalSearchParams<{ id: string; checkIn: string; checkOut: string; rooms: string; adults: string; childrenAges?: string | string[] }>();
   const ages = ([] as string[]).concat(p.childrenAges ?? []).map(Number).filter((n) => !Number.isNaN(n));
   const stay = { checkIn: p.checkIn, checkOut: p.checkOut, rooms: Number(p.rooms) || 1, adults: Number(p.adults) || 1, childrenAges: ages };
-  const hotel = useAsync(() => hotelsApi.get(p.id), [p.id]);
-  const avail = useAsync(() => hotelsApi.availability(p.id, stay), [p.id, p.checkIn, p.checkOut]);
-  const reviews = useAsync(() => reviewsApi.list(p.id), [p.id]);
+  const hotel = useAsync(() => getHotelOrNotPublic(p.id), [p.id]);
+  const notPublic = hotel.data?.kind === 'notPublic';
+  const avail = useAsync(() => hotelsApi.availability(p.id, stay), [p.id, p.checkIn, p.checkOut], !notPublic && !hotel.loading);
+  const reviews = useAsync(() => reviewsApi.list(p.id), [p.id], !notPublic && !hotel.loading);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,9 +34,10 @@ export default function HotelDetail() {
 
   return (
     <Screen>
-      <AsyncView<Hotel> state={hotel} emptyText="Otel bulunamadi.">
-        {(h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}{h.reviewCount && h.averageScore != null ? <Text style={{ fontWeight: '700' }}>{`${scoreLabel(h.averageScore)} / 5 (${h.reviewCount} yorum)`}</Text> : null}</>)}
+      <AsyncView<HotelResult> state={hotel} emptyText="Otel bulunamadi.">
+        {(r) => r.kind === 'notPublic' ? (<><Title>Bu otel şu anda yayında değil</Title><Muted>Otel yayından kaldırılmış veya henüz yayına alınmamış olabilir.</Muted><Button title="Geri dön" kind="secondary" onPress={() => router.back()} /></>) : ((h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}{h.reviewCount && h.averageScore != null ? <Text style={{ fontWeight: '700' }}>{`${scoreLabel(h.averageScore)} / 5 (${h.reviewCount} yorum)`}</Text> : null}</>))(r.hotel)}
       </AsyncView>
+      {notPublic ? null : (<>
       <ErrorBanner message={error} />
       <AsyncView<Availability> state={avail} isEmpty={(a) => a.offers.length === 0} emptyText="Bu tarihlerde musait oda yok.">
         {(a) => a.offers.map((o) => {
@@ -61,6 +63,7 @@ export default function HotelDetail() {
           </Card>
         ))}
       </AsyncView>
+      </>)}
     </Screen>
   );
 }

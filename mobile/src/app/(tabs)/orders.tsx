@@ -6,18 +6,19 @@ import { ordersApi } from '@/features/orders/api';
 import { loadOrdersSnapshot, saveOrdersSnapshot } from '@/features/orders/cache';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Card, Muted, Screen, Title } from '@/components/ui';
-import { money, ORDER_STATUS_TR } from '@/features/format';
+import { money, orderStatusInfo } from '@/features/format';
 
 function OrderList({ orders }: { orders: Order[] }) {
   const router = useRouter();
   return orders.map((o) => {
-    const status = ORDER_STATUS_TR[o.status] ?? o.status;
+    const status = orderStatusInfo(o.status).label;
     return (
       <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Siparis ${o.id.slice(0, 8)}, ${status}, ${money(o.totalAmount, o.currency)}`}
         onPress={() => router.push(`/order/${o.id}`)}>
         <Card>
           <Text style={{ fontWeight: '700' }}>{`#${o.id.slice(0, 8)}`}</Text>
           <Muted>{status}</Muted>
+          {o.status === 'EXPIRED' ? <Muted>Ödeme süresi doldu, ödeme yapılamaz.</Muted> : null}
           <Text>{money(o.totalAmount, o.currency)}</Text>
         </Card>
       </Pressable>

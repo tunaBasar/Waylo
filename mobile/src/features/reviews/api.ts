@@ -15,6 +15,23 @@ export function validateReview(score: number, text: string): string | null {
   return null;
 }
 
+export const REVIEW_WHEN_HINT = 'Konaklamanız tamamlanıp çıkışınız (check-out) kaydedildikten sonra yorum yapabilirsiniz.';
+
+const REVIEW_REASONS: Record<string, string> = {
+  REVIEW_NOT_CHECKED_OUT: 'Bu konaklama için çıkışınız (check-out) henüz kaydedilmedi. ' + REVIEW_WHEN_HINT,
+  REVIEW_NOT_CHECKED_IN: 'Bu konaklama için giriş (check-in) kaydedilmediği için yorum yapılamıyor.',
+  REVIEW_CANCELLED_OR_NO_SHOW: 'İptal edilen veya gelinmeyen konaklamalar için yorum yapılamaz.',
+  REVIEW_ORDER_NOT_CONFIRMED: 'Siparişiniz onaylanmadığı için yorum yapılamıyor.',
+  ORG_MEMBER_CANNOT_REVIEW: 'Bu otelin işletmesinde çalışan hesaplar otele yorum yapamaz.',
+};
+
+/** Turkish message for a review submission error. Unknown codes fall back to the given text. */
+export function reviewErrorMessage(err: { status?: number; code?: string | null; message?: string }): string {
+  if (err.code && REVIEW_REASONS[err.code]) return REVIEW_REASONS[err.code];
+  if (err.status === 0) return 'Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+  return err.message || 'Yorum gönderilemedi';
+}
+
 export const scoreLabel = (s: number | null | undefined) => (s == null ? null : s.toFixed(1));
 
 export const reviewsApi = {
