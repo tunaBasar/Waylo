@@ -53,3 +53,19 @@ export const reviewApi = {
 export function scoreLabel(score: number | null | undefined): string | null {
   return score == null ? null : score.toFixed(1);
 }
+
+/** When a stay becomes reviewable (RM-29: a recorded check-out is required). */
+export const REVIEW_WHEN_HINT = 'Konaklamaniz tamamlanip cikisiniz (check-out) kaydedildikten sonra degerlendirme yapabilirsiniz.';
+
+export const REVIEW_REASON_MESSAGE: Record<string, string> = {
+  REVIEW_NOT_CHECKED_OUT: 'Bu konaklama icin cikisiniz (check-out) henuz kaydedilmedi. ' + REVIEW_WHEN_HINT,
+  REVIEW_NOT_CHECKED_IN: 'Bu konaklama icin giris (check-in) kaydedilmedigi icin degerlendirme yapilamiyor.',
+  REVIEW_CANCELLED_OR_NO_SHOW: 'Iptal edilen veya gelinmeyen konaklamalar degerlendirilemez.',
+  REVIEW_ORDER_NOT_CONFIRMED: 'Siparisiniz onaylanmadigi icin degerlendirme yapilamiyor.',
+  ORG_MEMBER_CANNOT_REVIEW: 'Bu otelin isletmesinde calisan hesaplar otele degerlendirme yapamaz.',
+};
+
+/** Turkish message for a failed review submission; unknown codes keep the server message. */
+export function reviewErrorMessage(code: string | null | undefined, fallback: string): string {
+  return (code && REVIEW_REASON_MESSAGE[code]) || fallback || 'Degerlendirme gonderilemedi';
+}

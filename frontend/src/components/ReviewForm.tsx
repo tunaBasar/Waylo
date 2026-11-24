@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { reviewApi, type ReviewableItem } from '@/lib/reviews';
+import { reviewApi, reviewErrorMessage, type ReviewableItem } from '@/lib/reviews';
 
 /** "Degerlendir" button and 1-5 + text form for one eligible hotel order item. */
 export function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void }) {
@@ -20,7 +20,7 @@ export function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () 
       await reviewApi.create(item.orderItemId, score, text);
       onDone();
     } catch (err) {
-      setMsg(err instanceof ApiError ? err.message : 'Degerlendirme gonderilemedi');
+      setMsg(err instanceof ApiError ? reviewErrorMessage(err.code, err.message) : 'Degerlendirme gonderilemedi');
     } finally {
       setBusy(false);
     }

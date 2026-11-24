@@ -6,7 +6,7 @@ import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 import { policyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
-import { reviewApi, type ReviewableItem } from '@/lib/reviews';
+import { REVIEW_WHEN_HINT, reviewApi, type ReviewableItem } from '@/lib/reviews';
 import { ReviewForm } from '@/components/ReviewForm';
 
 // ── Local types ───────────────────────────────────────────────────────────────
@@ -363,6 +363,11 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
           {fmt(order.holdExpiresAt)} saate kadar odeme yapin
         </p>
       )}
+      {order.status === 'EXPIRED' && (
+        <p className="text-xs text-on-surface-variant" data-testid="order-expired-note">
+          Odeme suresi icinde tamamlanmadigi icin rezervasyon tutmalari sona erdi. Odeme yapilamaz, lutfen yeniden arama yapin.
+        </p>
+      )}
       <p className="text-xs text-on-surface-variant">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
       {order.status === 'PENDING' && <PayPanel order={order} onPaid={onChanged} />}
       {(order.status === 'PENDING' || order.status === 'CONFIRMED') && <CancelPanel order={order} onChanged={onChanged} />}
@@ -395,6 +400,9 @@ function OrdersContent() {
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Siparislerim</h2>
       {createdId && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu. 15 dakika icinde odeme yapin.</p>}
       {error && <p className="rounded-xl bg-error-container p-3 text-sm text-on-error-container">{error}</p>}
+      {orders.some(o => o.status === 'CONFIRMED' && (o.items ?? []).some(i => i.vertical === 'HOTEL')) && (
+        <p className="text-xs text-on-surface-variant" data-testid="review-when-hint">{REVIEW_WHEN_HINT}</p>
+      )}
       {orders.length === 0 && !error ? (
         <p className="text-sm text-on-surface-variant">Siparis bulunamadi</p>
       ) : (
