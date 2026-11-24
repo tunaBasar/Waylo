@@ -72,6 +72,30 @@ export interface HotelPublicationDetail extends HotelPublicationItem {
   diff: PublicationDiffEntry[];
   decisions: PublicationDecisionRow[];
 }
+
+/** Wire shape of GET /api/admin/hotel-publications/{id}: request fields nested under `request` (id, not requestId). */
+export interface HotelPublicationDetailWire {
+  request: Omit<HotelPublicationItem, 'requestId' | 'hotelName'> & { id: string; revisionId?: string | null };
+  hotel: HotelPublicationDetail['hotel'];
+  revision: HotelPublicationDetail['revision'];
+  diff: PublicationDiffEntry[] | null;
+  decisions: PublicationDecisionRow[] | null;
+}
+
+/** Flatten the nested detail into the item shape the admin page uses. Already flat input is returned as is. */
+export function flattenPublicationDetail(w: HotelPublicationDetailWire | HotelPublicationDetail): HotelPublicationDetail {
+  if (!('request' in w) || !w.request) return w as HotelPublicationDetail;
+  const { id, ...rest } = w.request;
+  return {
+    ...rest,
+    requestId: id,
+    hotelName: (w.hotel as { name?: string } | null)?.name ?? '',
+    hotel: w.hotel,
+    revision: w.revision,
+    diff: w.diff ?? [],
+    decisions: w.decisions ?? [],
+  } as HotelPublicationDetail;
+}
 export type PublicationReviewDecision = 'APPROVE' | 'REJECT' | 'APPROVE_AND_PUBLISH';
 export type HotelStatusDecision = 'PUBLISH' | 'SUSPEND' | 'REINSTATE' | 'ARCHIVE';
 
@@ -121,8 +145,11 @@ export const adminApi = {
 
   hotelPublications: (status: PublicationRequestStatus, page = 0, size = 20) =>
     api.get<HotelPublicationPage>(`/api/admin/hotel-publications?status=${status}&page=${page}&size=${size}`),
-  hotelPublication: (requestId: string) =>
-    api.get<HotelPublicationDetail>(`/api/admin/hotel-publications/${enc(requestId)}`),
+  hotelPublication: async (requestId: string) => {
+    // The backend nests the request fields under "request" (AdminDetail record); the page works on a flat item.
+    const res = await api.get<HotelPublicationDetailWire>(`/api/admin/hotel-publications/${enc(requestId)}`);
+    return { ...res, data: flattenPublicationDetail(res.data) };
+  },
   decideHotelPublication: (requestId: string, body: { decision: PublicationReviewDecision; reason: string | null; expectedVersion: number }) =>
     api.post<HotelPublicationItem>(`/api/admin/hotel-publications/${enc(requestId)}/decisions`, body),
   setHotelPublicationStatus: (hotelId: string, body: { decision: HotelStatusDecision; reason: string | null }) =>
