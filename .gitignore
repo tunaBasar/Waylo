@@ -64,3 +64,4 @@ PRODUCT-DISCUSSION-NOTES.md
 .jcode/
 .aider*
 PROMPT.md
+scripts/acceptance/out/
