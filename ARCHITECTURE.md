@@ -191,6 +191,14 @@ onaylı fotoğrafları ve yalnız public otel için verir (aksi 404). `hotel_med
 onaylayamaz (trigger). Silme soft delete'tir (V12 `deleted_at`): append-only karar kayıtları fotoğrafa bağlı kalır, dosya
 volume'den silinir, silinmiş satır hiçbir okumada görünmez ve partner geri alamaz.
 
+**Destek talepleri (RM-36, crm-service):** müşteri yalnız kendi siparişi (ve isteğe bağlı kalemi) için talep açar; sipariş
+sahipliği ve tedarikçi kuruluş package-booking'ten servis kimliğiyle doğrulanır. Mesajlar append-only'dir (trigger).
+Partner yalnız kendi kuruluşuna bağlı talepleri görür ve yanıtlar (auth `/internal/access`); admin hepsini görür ve kapatır.
+Durum `OPEN <-> ANSWERED` (müşteri mesajı OPEN, partner/admin yanıtı ANSWERED yapar), her durumdan `CLOSED` (terminal);
+kapalı talebe yazılamaz (422 `CASE_CLOSED`), başkasının talebi 404. Canlı destek yoktur:
+`/api/support/capabilities` kanal ve saat kararı (RM-06) verilene kadar `decisionPending:true` döner, arayüzler saat uydurmaz.
+Web (müşteri `/support` ve sipariş sayfası, partner `/partner/support`, admin `/admin/support`) bu API'nin üzerindedir.
+
 ### 11. Spring Boot 4.x artifact değişiklikleri
 - `spring-boot-starter-web` -> `spring-boot-starter-webmvc`
 - `spring-boot-starter-kafka` (eski `spring-kafka` yerine)

@@ -169,8 +169,12 @@ export interface Notification {
   recipient: string;
   subject: string | null;
   body: string;
-  status: 'PENDING' | 'SENT' | 'FAILED' | 'RETRYING';
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'RETRYING' | 'SUPPRESSED' | 'GAVE_UP';
   retryCount: number;
+  /** RM-30: when the retry job will try a FAILED delivery again (null when not scheduled). */
+  nextAttemptAt?: string | null;
+  /** RM-30: last delivery error, trimmed by the backend. */
+  lastError?: string | null;
   sentAt: string | null;
   createdAt: string;
   updatedAt: string;
