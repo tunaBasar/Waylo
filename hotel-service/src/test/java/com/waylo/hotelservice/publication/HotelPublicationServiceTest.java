@@ -12,6 +12,11 @@ import com.waylo.hotelservice.exception.AccessDeniedException;
 import com.waylo.hotelservice.exception.AuthorizationUnavailableException;
 import com.waylo.hotelservice.exception.PublicationException;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
+import com.waylo.hotelservice.media.HotelMedia;
+import com.waylo.hotelservice.media.HotelMediaDecision;
+import com.waylo.hotelservice.media.HotelMediaDecisionRepository;
+import com.waylo.hotelservice.media.HotelMediaRepository;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.waylo.hotelservice.publication.HotelPublicationDecision.ActorRole;
 import com.waylo.hotelservice.publication.HotelPublicationDecision.Type;
 import com.waylo.hotelservice.publication.PublicationDtos.*;
@@ -63,6 +68,9 @@ class HotelPublicationServiceTest {
     @Mock DailyRateRepository rateRepository;
     @Mock AuthAccessClient authAccessClient;
     @Mock HotelMapper hotelMapper;
+    @Mock HotelPublicationRequestMediaRepository linkRepository;
+    @Mock HotelMediaRepository mediaRepository;
+    @Mock HotelMediaDecisionRepository mediaDecisionRepository;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-24T10:00:00Z"), ZoneOffset.UTC);
     private final UUID hotelId = UUID.randomUUID();
@@ -77,7 +85,7 @@ class HotelPublicationServiceTest {
     void setUp() {
         service = new HotelPublicationService(hotelRepository, requestRepository, decisionRepository, revisionRepository,
                 roomTypeRepository, ratePlanRepository, inventoryRepository, rateRepository, authAccessClient,
-                hotelMapper, clock);
+                hotelMapper, new PublicationMediaLinks(linkRepository, mediaRepository, mediaDecisionRepository), clock);
         hotel = hotel(PublicationStatus.DRAFT);
         when(hotelRepository.findById(hotelId)).thenAnswer(i -> Optional.of(hotel));
         when(hotelRepository.findByIdForUpdate(hotelId)).thenAnswer(i -> Optional.of(hotel));
@@ -148,7 +156,7 @@ class HotelPublicationServiceTest {
 
     @Test
     void submitInitial_movesDraftToSubmitted_andWritesSubmitDecision() {
-        RequestView view = service.submit(partnerId, hotelId, new SubmitRequest("hazir", null, null));
+        RequestView view = service.submit(partnerId, hotelId, new SubmitRequest("hazir", null, null, null));
 
         assertThat(hotel.getPublicationStatus()).isEqualTo(PublicationStatus.SUBMITTED);
         assertThat(view.kind()).isEqualTo("INITIAL");
@@ -225,7 +233,7 @@ class HotelPublicationServiceTest {
 
     @Test
     void submitInitial_rejectsRevisionFields() {
-        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, UUID.randomUUID(), 0L)))
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, UUID.randomUUID(), 0L, null)))
                 .isInstanceOfSatisfying(PublicationException.class, e -> assertThat(e.getStatus()).isEqualTo(400));
     }
 
@@ -245,7 +253,7 @@ class HotelPublicationServiceTest {
     @Test
     void submitContentChange_requiresRevisionFields() {
         hotel.setPublicationStatus(PublicationStatus.PUBLISHED);
-        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, null, null)))
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, null, null, null)))
                 .isInstanceOfSatisfying(PublicationException.class, e -> assertThat(e.getStatus()).isEqualTo(400));
     }
 
@@ -256,7 +264,7 @@ class HotelPublicationServiceTest {
         UUID revId = UUID.randomUUID();
         when(revisionRepository.findByIdAndHotelId(revId, hotelId)).thenReturn(Optional.of(rev));
 
-        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, revId, 7L)))
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, revId, 7L, null)))
                 .isInstanceOfSatisfying(PublicationException.class, e -> {
                     assertThat(e.getCode()).isEqualTo("VERSION_CONFLICT");
                     assertThat(e.getDetails()).containsEntry("currentVersion", 0L);
@@ -271,7 +279,7 @@ class HotelPublicationServiceTest {
         UUID revId = UUID.randomUUID();
         when(revisionRepository.findByIdAndHotelId(revId, hotelId)).thenReturn(Optional.of(rev));
 
-        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, revId, 0L)))
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, revId, 0L, null)))
                 .isInstanceOfSatisfying(PublicationException.class, e -> assertThat(e.getCode()).isEqualTo("REVISION_EMPTY"));
     }
 
@@ -282,7 +290,7 @@ class HotelPublicationServiceTest {
         UUID revId = UUID.randomUUID();
         when(revisionRepository.findByIdAndHotelId(revId, hotelId)).thenReturn(Optional.of(rev));
 
-        RequestView view = service.submit(partnerId, hotelId, new SubmitRequest("x", revId, 0L));
+        RequestView view = service.submit(partnerId, hotelId, new SubmitRequest("x", revId, 0L, null));
 
         assertThat(view.kind()).isEqualTo("CONTENT_CHANGE");
         assertThat(hotel.getPublicationStatus()).isEqualTo(PublicationStatus.PUBLISHED);
@@ -718,5 +726,128 @@ class HotelPublicationServiceTest {
         rev.put("latitude", new BigDecimal("36.50"));
         List<DiffEntry> diff = HotelPublicationService.diff(live, rev);
         assertThat(diff).extracting(DiffEntry::field).containsExactly("description");
+    }
+
+    // ---- media phase 3
+
+    private final java.util.Map<UUID, HotelMedia> photos = new java.util.LinkedHashMap<>();
+
+    private HotelMedia photo(HotelMedia.ReviewStatus status) {
+        HotelMedia m = new HotelMedia();
+        ReflectionTestUtils.setField(m, "id", UUID.randomUUID());
+        m.setHotelId(hotelId);
+        m.setOrganizationId(orgId);
+        m.setReviewStatus(status);
+        when(mediaRepository.findByIdAndHotelId(m.getId(), hotelId)).thenReturn(Optional.of(m));
+        if (photos.isEmpty()) {
+            // stubbed once: re-stubbing would call the previous answer with a null argument during when(...)
+            when(mediaRepository.findAllById(any())).thenAnswer(i -> {
+                List<HotelMedia> out = new java.util.ArrayList<>();
+                Iterable<UUID> ids = i.getArgument(0);
+                if (ids != null) ids.forEach(id -> { HotelMedia p = photos.get(id); if (p != null) out.add(p); });
+                return out;
+            });
+        }
+        photos.put(m.getId(), m);
+        return m;
+    }
+
+    private void linked(HotelMedia... linkedPhotos) {
+        when(linkRepository.findByRequestId(any())).thenReturn(java.util.Arrays.stream(linkedPhotos)
+                .map(m -> new HotelPublicationRequestMedia(UUID.randomUUID(), m.getId(), hotelId, orgId)).toList());
+    }
+
+    @Test
+    void submitInitial_withMediaIds_savesLinks() {
+        HotelMedia a = photo(HotelMedia.ReviewStatus.PENDING);
+        HotelMedia b = photo(HotelMedia.ReviewStatus.PENDING);
+
+        service.submit(partnerId, hotelId, new SubmitRequest(null, null, null, List.of(a.getId(), b.getId())));
+
+        ArgumentCaptor<Iterable<HotelPublicationRequestMedia>> c = ArgumentCaptor.forClass(Iterable.class);
+        verify(linkRepository).saveAll(c.capture());
+        assertThat(c.getValue()).extracting(HotelPublicationRequestMedia::getMediaId).containsExactly(a.getId(), b.getId());
+    }
+
+    @Test
+    void submit_mediaValidation_400_404_409() {
+        HotelMedia approved = photo(HotelMedia.ReviewStatus.APPROVED);
+        UUID id = UUID.randomUUID();
+        List<UUID> tooMany = java.util.stream.Stream.generate(UUID::randomUUID).limit(21).toList();
+        List<UUID> withNull = new java.util.ArrayList<>(java.util.Arrays.asList(id, null));
+
+        for (List<UUID> bad : List.of(tooMany, List.of(id, id), withNull)) {
+            assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, null, null, bad)))
+                    .isInstanceOfSatisfying(PublicationException.class, e -> {
+                        assertThat(e.getStatus()).isEqualTo(400);
+                        assertThat(e.getCode()).isEqualTo("VALIDATION_ERROR");
+                    });
+        }
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, null, null, List.of(id))))
+                .isInstanceOfSatisfying(PublicationException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(404);
+                    assertThat(e.getCode()).isEqualTo("MEDIA_NOT_FOUND");
+                });
+        assertThatThrownBy(() -> service.submit(partnerId, hotelId, new SubmitRequest(null, null, null, List.of(approved.getId()))))
+                .isInstanceOfSatisfying(PublicationException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(409);
+                    assertThat(e.getCode()).isEqualTo("MEDIA_NOT_PENDING");
+                    assertThat(e.getDetails()).containsEntry("mediaId", approved.getId().toString())
+                            .containsEntry("reviewStatus", "APPROVED");
+                });
+        verify(linkRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void adminApprove_cascadesPendingPhotos_skipsAlreadyRejected() {
+        hotel.setPublicationStatus(PublicationStatus.SUBMITTED);
+        openRequest(HotelPublicationRequest.Kind.INITIAL, null);
+        HotelMedia pending = photo(HotelMedia.ReviewStatus.PENDING);
+        HotelMedia rejected = photo(HotelMedia.ReviewStatus.REJECTED);
+        linked(pending, rejected);
+
+        service.adminDecide(adminId, UUID.randomUUID(), new AdminDecisionRequest("APPROVE_AND_PUBLISH", null, 0L));
+
+        assertThat(pending.getReviewStatus()).isEqualTo(HotelMedia.ReviewStatus.APPROVED);
+        assertThat(pending.getScanStatus()).isEqualTo(HotelMedia.ScanStatus.CLEAN);
+        assertThat(pending.getReviewedBy()).isEqualTo(adminId);
+        assertThat(pending.getReviewedAt()).isEqualTo(Instant.now(clock));
+        assertThat(pending.getReviewReason()).isNull();
+        assertThat(rejected.getReviewStatus()).isEqualTo(HotelMedia.ReviewStatus.REJECTED);
+        ArgumentCaptor<HotelMediaDecision> c = ArgumentCaptor.forClass(HotelMediaDecision.class);
+        verify(mediaDecisionRepository).save(c.capture());
+        assertThat(c.getValue().getMediaId()).isEqualTo(pending.getId());
+        assertThat(c.getValue().getDecision()).isEqualTo("APPROVE");
+        assertThat(c.getValue().getFromStatus()).isEqualTo("PENDING");
+        assertThat(c.getValue().getToStatus()).isEqualTo("APPROVED");
+        assertThat(c.getValue().getActorUserId()).isEqualTo(adminId);
+    }
+
+    @Test
+    void adminReject_leavesLinkedPhotosPending() {
+        hotel.setPublicationStatus(PublicationStatus.SUBMITTED);
+        openRequest(HotelPublicationRequest.Kind.INITIAL, null);
+        HotelMedia pending = photo(HotelMedia.ReviewStatus.PENDING);
+        linked(pending);
+
+        service.adminDecide(adminId, UUID.randomUUID(), new AdminDecisionRequest("REJECT", "Adres eksik", 0L));
+
+        assertThat(pending.getReviewStatus()).isEqualTo(HotelMedia.ReviewStatus.PENDING);
+        verify(mediaDecisionRepository, never()).save(any());
+    }
+
+    @Test
+    void adminApprove_contentChange_cascades() {
+        hotel.setPublicationStatus(PublicationStatus.PUBLISHED);
+        HotelContentRevision rev = revision(HotelContentRevision.Status.SUBMITTED, 0);
+        openRequest(HotelPublicationRequest.Kind.CONTENT_CHANGE, UUID.randomUUID());
+        when(revisionRepository.findById(any())).thenReturn(Optional.of(rev));
+        HotelMedia pending = photo(HotelMedia.ReviewStatus.PENDING);
+        linked(pending);
+
+        service.adminDecide(adminId, UUID.randomUUID(), new AdminDecisionRequest("APPROVE", null, 0L));
+
+        assertThat(pending.getReviewStatus()).isEqualTo(HotelMedia.ReviewStatus.APPROVED);
+        verify(mediaDecisionRepository).save(any(HotelMediaDecision.class));
     }
 }

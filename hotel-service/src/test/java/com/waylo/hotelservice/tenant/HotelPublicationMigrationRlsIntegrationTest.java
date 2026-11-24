@@ -51,6 +51,8 @@ class HotelPublicationMigrationRlsIntegrationTest {
     static final UUID REQ_B = UUID.randomUUID();
     static final UUID REV_A = UUID.randomUUID();
     static final UUID REV_B = UUID.randomUUID();
+    static final UUID MEDIA_A = UUID.randomUUID();
+    static final UUID MEDIA_B = UUID.randomUUID();
 
     static long legacyBefore;
     static long hotelsBefore;
@@ -96,6 +98,15 @@ class HotelPublicationMigrationRlsIntegrationTest {
                     + HOTEL_B + "','" + ORG_B + "','" + REQ_B + "','SUBMIT','SUBMITTED','" + USER + "','PARTNER')");
         }
 
+        try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
+            insertMedia(s, MEDIA_A, HOTEL_A, ORG_A);
+            insertMedia(s, MEDIA_B, HOTEL_B, ORG_B);
+            s.execute("INSERT INTO hotel_publication_request_media (request_id, media_id, hotel_id, organization_id) VALUES ('"
+                    + REQ_A + "','" + MEDIA_A + "','" + HOTEL_A + "','" + ORG_A + "')");
+            s.execute("INSERT INTO hotel_publication_request_media (request_id, media_id, hotel_id, organization_id) VALUES ('"
+                    + REQ_B + "','" + MEDIA_B + "','" + HOTEL_B + "','" + ORG_B + "')");
+        }
+
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
         factory.setPersistenceProvider(new HibernatePersistenceProvider());
@@ -112,6 +123,11 @@ class HotelPublicationMigrationRlsIntegrationTest {
     private static void insertHotel(Statement s, UUID id, String org, boolean active) throws SQLException {
         s.execute("INSERT INTO hotels (id, name, city, country, address, star_rating, active, organization_id) VALUES ('"
                 + id + "', 'H', 'Antalya', 'TR', 'x', 3, " + active + ", " + org + ")");
+    }
+
+    private static void insertMedia(Statement s, UUID id, UUID hotel, UUID org) throws SQLException {
+        s.execute("INSERT INTO hotel_media (id, hotel_id, organization_id, rights_source, storage_key, content_type, size_bytes, width, height, uploaded_by) VALUES ('"
+                + id + "','" + hotel + "','" + org + "','OWNED','" + UUID.randomUUID() + "','image/jpeg',1000,800,600,'" + USER + "')");
     }
 
     private static void insertRequest(Statement s, UUID id, UUID hotel, UUID org) throws SQLException {
@@ -294,5 +310,41 @@ class HotelPublicationMigrationRlsIntegrationTest {
         assertThat(ids("hotel_publication_requests")).containsExactlyInAnyOrder(REQ_A, REQ_B);
         TenantContext.set(TenantContext.Mode.PUBLIC);
         assertThat(ids("hotel_publication_requests")).isEmpty();
+    }
+
+    // ---- V13 link table
+
+    @Test
+    void requestMedia_partnerSeesOwnOrgOnly_publicSeesNothing() {
+        partner(ORG_A);
+        assertThat(countRows("SELECT count(*) FROM hotel_publication_request_media")).isEqualTo(1);
+        partner(ORG_A);
+        assertThat(countRows("SELECT count(*) FROM hotel_publication_request_media WHERE media_id = '" + MEDIA_B + "'")).isZero();
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        assertThat(countRows("SELECT count(*) FROM hotel_publication_request_media")).isZero();
+        TenantContext.set(TenantContext.Mode.ADMIN);
+        assertThat(countRows("SELECT count(*) FROM hotel_publication_request_media")).isEqualTo(2);
+    }
+
+    @Test
+    void requestMedia_partnerCannotInsertForAnotherOrg_publicCannotInsert() {
+        String insertForB = "INSERT INTO hotel_publication_request_media (request_id, media_id, hotel_id, organization_id) VALUES ('"
+                + REQ_B + "','" + MEDIA_A + "','" + HOTEL_B + "','" + ORG_B + "')";
+        partner(ORG_A);
+        assertThatThrownBy(() -> exec(insertForB)).hasMessageContaining("row-level security");
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        assertThatThrownBy(() -> exec(insertForB)).hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void requestMedia_rowsAreImmutable_deleteOnlyByService() {
+        partner(ORG_A);
+        assertThat(exec("UPDATE hotel_publication_request_media SET created_at = now()")).isZero();
+        partner(ORG_A);
+        assertThat(exec("DELETE FROM hotel_publication_request_media")).isZero();
+        TenantContext.set(TenantContext.Mode.ADMIN);
+        assertThat(exec("UPDATE hotel_publication_request_media SET created_at = now()")).isZero();
+        TenantContext.set(TenantContext.Mode.ADMIN);
+        assertThat(exec("DELETE FROM hotel_publication_request_media")).isZero();
     }
 }

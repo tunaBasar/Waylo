@@ -66,6 +66,7 @@ public class HotelPublicationService {
     private final DailyRateRepository rateRepository;
     private final AuthAccessClient authAccessClient;
     private final HotelMapper hotelMapper;
+    private final PublicationMediaLinks mediaLinks;
     private final Clock clock;
 
     public HotelPublicationService(HotelRepository hotelRepository,
@@ -78,6 +79,7 @@ public class HotelPublicationService {
                                    DailyRateRepository rateRepository,
                                    AuthAccessClient authAccessClient,
                                    HotelMapper hotelMapper,
+                                   PublicationMediaLinks mediaLinks,
                                    Clock clock) {
         this.hotelRepository = hotelRepository;
         this.requestRepository = requestRepository;
@@ -89,6 +91,7 @@ public class HotelPublicationService {
         this.rateRepository = rateRepository;
         this.authAccessClient = authAccessClient;
         this.hotelMapper = hotelMapper;
+        this.mediaLinks = mediaLinks;
         this.clock = clock;
     }
 
@@ -127,12 +130,14 @@ public class HotelPublicationService {
                 throw PublicationException.conflict("REVISION_EMPTY", "Revision is identical to the live content");
             }
             requireOrganizationActive(orgId);
+            List<UUID> mediaIds = mediaLinks.validate(hotelId, body.mediaIds());
             request.setKind(Kind.CONTENT_CHANGE);
             request.setRevisionId(revision.getId());
             revision.setStatus(HotelContentRevision.Status.SUBMITTED);
             revision.setUpdatedAt(now);
             revisionRepository.save(revision);
             request = saveRequest(request);
+            mediaLinks.link(request.getId(), hotelId, orgId, mediaIds);
             recordDecision(hotel, request.getId(), Type.SUBMIT, status, status, userId, ActorRole.PARTNER, null);
             return requestView(request, status);
         }
@@ -144,8 +149,10 @@ public class HotelPublicationService {
         }
         requireComplete(hotelId);
         requireOrganizationActive(orgId);
+        List<UUID> mediaIds = mediaLinks.validate(hotelId, body == null ? null : body.mediaIds());
         request.setKind(Kind.INITIAL);
         request = saveRequest(request);
+        mediaLinks.link(request.getId(), hotelId, orgId, mediaIds);
         hotel.setPublicationStatus(to);
         hotelRepository.save(hotel);
         recordDecision(hotel, request.getId(), Type.SUBMIT, status, to, userId, ActorRole.PARTNER, null);
@@ -162,7 +169,7 @@ public class HotelPublicationService {
                     .map(d -> new DecisionView(d.getDecision().name(), d.getReason(), d.getActorRole().name(), d.getCreatedAt()))
                     .orElse(null);
             return new PartnerRequestItem(r.getId(), r.getKind().name(), r.getStatus().name(), r.getSubmittedAt(),
-                    r.getDecidedAt(), latest);
+                    r.getDecidedAt(), latest, mediaLinks.mediaIds(r.getId()).size());
         }).toList();
     }
 
@@ -327,7 +334,8 @@ public class HotelPublicationService {
             Hotel h = hotels.get(r.getHotelId());
             return new AdminItem(r.getId(), r.getHotelId(), h == null ? null : h.getName(), r.getOrganizationId(),
                     r.getKind().name(), r.getStatus().name(), r.getSubmittedBy(), r.getSubmittedAt(), r.getSubmitNote(),
-                    h == null ? null : h.getPublicationStatus().name(), r.getVersion());
+                    h == null ? null : h.getPublicationStatus().name(), r.getVersion(),
+                    mediaLinks.mediaIds(r.getId()).size());
         }).toList();
         return new AdminPage(items, safePage, safeSize, result.getTotalElements());
     }
@@ -352,7 +360,7 @@ public class HotelPublicationService {
                         d.getActorUserId(), d.getActorRole().name(), d.getReason(), d.getCreatedAt()))
                 .toList();
         return new AdminDetail(requestView(request, hotel.getPublicationStatus()), hotelMapper.toResponse(hotel),
-                revision, diff, decisions);
+                revision, diff, decisions, mediaLinks.views(requestId));
     }
 
     public RequestView adminDecide(UUID adminId, UUID requestId, AdminDecisionRequest body) {
@@ -440,6 +448,9 @@ public class HotelPublicationService {
                 recordDecision(hotel, requestId, Type.APPROVE, from, from, adminId, ActorRole.ADMIN, reason);
             }
             revisionRepository.save(revision);
+        }
+        if (command != Command.REJECT) {
+            mediaLinks.approvePending(requestId, adminId, now);
         }
         request.setDecidedAt(now);
         hotelRepository.save(hotel);
@@ -565,10 +576,10 @@ public class HotelPublicationService {
         return new PublicationException(409, "VERSION_CONFLICT", "Version is stale", Map.of("currentVersion", current));
     }
 
-    private static RequestView requestView(HotelPublicationRequest r, PublicationStatus hotelStatus) {
+    private RequestView requestView(HotelPublicationRequest r, PublicationStatus hotelStatus) {
         return new RequestView(r.getId(), r.getHotelId(), r.getOrganizationId(), r.getKind().name(), r.getStatus().name(),
                 r.getRevisionId(), r.getSubmittedBy(), r.getSubmittedAt(), r.getSubmitNote(), r.getVersion(),
-                hotelStatus.name());
+                hotelStatus.name(), mediaLinks.mediaIds(r.getId()));
     }
 
     private RevisionView revisionView(HotelContentRevision r) {

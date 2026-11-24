@@ -12,7 +12,7 @@ public final class MediaDtos {
     public record MediaView(UUID id, UUID hotelId, String caption, int sortOrder, String rightsSource, String rightsNote,
                             String contentType, long sizeBytes, int width, int height, String scanStatus,
                             String reviewStatus, String reviewReason, Instant createdAt) {
-        static MediaView of(HotelMedia m) {
+        public static MediaView of(HotelMedia m) {
             return new MediaView(m.getId(), m.getHotelId(), m.getCaption(), m.getSortOrder(), m.getRightsSource(),
                     m.getRightsNote(), m.getContentType(), m.getSizeBytes(), m.getWidth(), m.getHeight(),
                     m.getScanStatus().name(), m.getReviewStatus().name(), m.getReviewReason(), m.getCreatedAt());

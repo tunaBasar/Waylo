@@ -1,6 +1,7 @@
 package com.waylo.hotelservice.publication;
 
 import com.waylo.hotelservice.dto.HotelResponse;
+import com.waylo.hotelservice.media.MediaDtos.MediaView;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
@@ -14,7 +15,8 @@ public final class PublicationDtos {
     private PublicationDtos() {
     }
 
-    public record SubmitRequest(@Size(max = 1000) String note, UUID revisionId, Long expectedVersion) {}
+    public record SubmitRequest(@Size(max = 1000) String note, UUID revisionId, Long expectedVersion,
+                                List<UUID> mediaIds) {}
 
     public record PatchContentRequest(Long expectedVersion, Map<String, Object> content) {}
 
@@ -26,12 +28,12 @@ public final class PublicationDtos {
 
     public record RequestView(UUID id, UUID hotelId, UUID organizationId, String kind, String status, UUID revisionId,
                               UUID submittedBy, Instant submittedAt, String note, long version,
-                              String hotelPublicationStatus) {}
+                              String hotelPublicationStatus, List<UUID> mediaIds) {}
 
     public record DecisionView(String decision, String reason, String actorRole, Instant createdAt) {}
 
     public record PartnerRequestItem(UUID id, String kind, String status, Instant submittedAt, Instant decidedAt,
-                                     DecisionView decision) {}
+                                     DecisionView decision, int mediaCount) {}
 
     public record RevisionView(UUID id, int revisionNo, String status, long version, long baseContentVersion,
                                Map<String, Object> content) {}
@@ -41,7 +43,7 @@ public final class PublicationDtos {
 
     public record AdminItem(UUID requestId, UUID hotelId, String hotelName, UUID organizationId, String kind,
                             String status, UUID submittedBy, Instant submittedAt, String note,
-                            String hotelPublicationStatus, long version) {}
+                            String hotelPublicationStatus, long version, int mediaCount) {}
 
     public record AdminPage(List<AdminItem> items, int page, int size, long total) {}
 
@@ -51,5 +53,5 @@ public final class PublicationDtos {
                                      UUID actorUserId, String actorRole, String reason, Instant createdAt) {}
 
     public record AdminDetail(RequestView request, HotelResponse hotel, RevisionView revision, List<DiffEntry> diff,
-                              List<AdminDecisionEntry> decisions) {}
+                              List<AdminDecisionEntry> decisions, List<MediaView> media) {}
 }
