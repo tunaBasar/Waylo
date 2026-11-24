@@ -386,7 +386,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
   }, [order.id, order.status]);
 
   return (
-    <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+    <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm" data-testid="order-card" data-order-id={order.id}>
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-on-surface">#{order.id}</span>
         <span className="text-xs text-on-surface-variant">{statusLabel(order.status)}</span>
