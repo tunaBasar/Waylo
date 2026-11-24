@@ -166,13 +166,25 @@ def main():
     s, b, _ = raw("GET", f"/api/hotels/{hotel}/media/{mid}")
     ok(s == 404, f"approved photo of unpublished hotel is 404 ({s})")
 
-    # publish the hotel (submit, admin approve and publish)
+    # publish the hotel: publication needs one room type, rate plan and inventory row (HOTEL_INCOMPLETE otherwise)
+    s, d = js("POST", f"/api/hotels/{hotel}/room-types", {"code": "MD_DBL", "name": "Media double",
+                                                         "maxAdults": 2, "maxChildren": 0, "maxOccupancy": 2}, ta)
+    ok(s == 201, f"room type created ({s})")
+    room = d["data"]["id"]
+    s, d = js("POST", f"/api/hotels/{hotel}/rate-plans", {"code": "MD_FLEX", "name": "Media flex", "mealPlan": "BREAKFAST",
+                                                         "cancellationPolicy": "FREE_CANCELLATION",
+                                                         "freeCancellationDaysBefore": 2}, ta)
+    ok(s == 201, f"rate plan created ({s})")
+    night = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 40 * 86400))
+    s, d = js("PUT", f"/api/hotels/{hotel}/inventory", {"items": [{"roomTypeId": room, "stayDate": night, "allotment": 1,
+                                                                  "expectedVersion": None}],
+                                                       "reason": "media acceptance fixture"}, ta)
+    ok(s == 200, f"inventory set ({s})")
     s, d = js("POST", f"/api/hotels/{hotel}/publication-requests", {}, ta)
     ok(s in (200, 201), f"submit publication ({s})")
-    s, d = js("GET", "/api/admin/hotel-publications?status=SUBMITTED&hotelId=" + hotel, None, admin)
-    item = d["data"]["items"][0]
-    s, d = js("POST", f"/api/admin/hotel-publications/{item['requestId']}/decisions",
-              {"decision": "APPROVE_AND_PUBLISH", "reason": None, "expectedVersion": item["version"]}, admin)
+    req = d.get("data") or {}
+    s, d = js("POST", f"/api/admin/hotel-publications/{req.get('id')}/decisions",
+              {"decision": "APPROVE_AND_PUBLISH", "reason": None, "expectedVersion": req.get("version", 0)}, admin)
     ok(s == 200, f"hotel published ({s})")
 
     s, b, h = raw("GET", f"/api/hotels/{hotel}/media/{mid}")

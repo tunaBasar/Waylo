@@ -10,12 +10,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "hotel_media")
+@SQLRestriction("deleted_at IS NULL") // soft-deleted photos are invisible to every JPA read (list, count, public, admin)
 public class HotelMedia {
 
     public enum ScanStatus { PENDING, CLEAN, REJECTED }
@@ -89,6 +91,10 @@ public class HotelMedia {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Soft delete (V12): reviewed photos keep their append-only decision history, so they are never hard-deleted. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
@@ -137,4 +143,6 @@ public class HotelMedia {
     public void setUploadedBy(UUID uploadedBy) { this.uploadedBy = uploadedBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
 }

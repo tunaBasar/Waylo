@@ -242,4 +242,51 @@ class HotelMediaRlsIntegrationTest {
                     .isInstanceOf(java.sql.SQLException.class);
         }
     }
+
+    /** V12: a reviewed photo keeps its decision rows, so deletion is a soft delete that the partner cannot undo. */
+    @Test
+    void softDelete_keepsDecisionHistory_hidesFromPublic_andCannotBeUndoneByPartner() throws Exception {
+        UUID reviewed = UUID.randomUUID();
+        UUID approvedDeleted = UUID.randomUUID();
+        try {
+            try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
+                media(s, reviewed, HOTEL_A, ORG_A, "CLEAN", "REJECTED", "Bulanik foto");
+            }
+            TenantContext.set(TenantContext.Mode.ADMIN);
+            exec("INSERT INTO hotel_media_decisions (id, media_id, hotel_id, organization_id, decision, from_status, to_status, reason, actor_user_id) "
+                    + "VALUES (gen_random_uuid(),'" + reviewed + "','" + HOTEL_A + "','" + ORG_A + "','REJECT','PENDING','REJECTED','Bulanik foto','" + USER + "')");
+
+            // the append-only history blocks a hard delete (ON DELETE RESTRICT), which is why the service soft-deletes
+            partner(ORG_A);
+            assertThatThrownBy(() -> exec("DELETE FROM hotel_media WHERE id = '" + reviewed + "'")).isNotNull();
+
+            partner(ORG_A);
+            assertThat(exec("UPDATE hotel_media SET deleted_at = now() WHERE id = '" + reviewed + "'")).isEqualTo(1);
+            partner(ORG_A);
+            assertThatThrownBy(() -> exec("UPDATE hotel_media SET deleted_at = NULL WHERE id = '" + reviewed + "'"))
+                    .hasMessageContaining("partner may not change");
+            TenantContext.set(TenantContext.Mode.ADMIN);
+            assertThat(count("SELECT count(*) FROM hotel_media_decisions WHERE media_id = '" + reviewed + "'")).isEqualTo(1);
+
+            // a live photo (APPROVED on a PUBLISHED hotel) cannot be soft-deleted by the partner either
+            partner(ORG_A);
+            assertThatThrownBy(() -> exec("UPDATE hotel_media SET deleted_at = now() WHERE id = '" + M_A_APPROVED + "'"))
+                    .hasMessageContaining("live photo");
+
+            // public never sees a deleted row, even an approved one
+            try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
+                media(s, approvedDeleted, HOTEL_A, ORG_A, "CLEAN", "APPROVED", null);
+                s.execute("UPDATE hotel_media SET deleted_at = now() WHERE id = '" + approvedDeleted + "'");
+            }
+            TenantContext.set(TenantContext.Mode.PUBLIC);
+            assertThat(ids()).doesNotContain(approvedDeleted, reviewed);
+        } finally {
+            // other cases count rows: remove this test's rows as the container superuser (bypasses RLS)
+            TenantContext.clear();
+            try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
+                s.execute("DELETE FROM hotel_media_decisions WHERE media_id = '" + reviewed + "'");
+                s.execute("DELETE FROM hotel_media WHERE id IN ('" + reviewed + "','" + approvedDeleted + "')");
+            }
+        }
+    }
 }

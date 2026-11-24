@@ -10,8 +10,10 @@ RUN --mount=type=cache,id=waylo-gradle,target=/root/.gradle,sharing=locked \
 FROM eclipse-temurin:21-jre-alpine AS runtime
 ARG SERVICE
 WORKDIR /app
+# Upload dirs must exist in the image owned by waylo: a new named volume copies this ownership, otherwise it is root-owned.
 RUN addgroup -S waylo && adduser -S waylo -G waylo \
-    && mkdir -p /data/car-documents /data/bus-documents && chown waylo:waylo /data/car-documents /data/bus-documents
+    && mkdir -p /data/car-documents /data/bus-documents /data/hotel-media \
+    && chown waylo:waylo /data/car-documents /data/bus-documents /data/hotel-media
 COPY --from=build --chown=waylo:waylo /workspace/${SERVICE}/build/libs/*-SNAPSHOT.jar app.jar
 USER waylo
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -222,21 +222,24 @@ class HotelMediaServiceTest {
     }
 
     @Test
-    void liveApprovedPhotoOfPublishedHotelCannotBeDeleted_butOthersCan() throws Exception {
+    void liveApprovedPhotoOfPublishedHotelCannotBeDeleted_butOthersAreSoftDeleted() throws Exception {
         UUID mediaId = UUID.randomUUID();
         HotelMedia approved = stored(HotelMedia.ScanStatus.CLEAN, HotelMedia.ReviewStatus.APPROVED);
         when(media.findByIdAndHotelId(mediaId, hotelId)).thenReturn(Optional.of(approved));
         assertThatThrownBy(() -> service.delete(hotelId, mediaId, true))
                 .isInstanceOfSatisfying(PublicationException.class, e -> assertThat(e.getCode()).isEqualTo("MEDIA_LIVE"));
-        verify(media, never()).delete(any(HotelMedia.class));
+        assertThat(approved.getDeletedAt()).isNull();
 
         service.delete(hotelId, mediaId, false);
-        verify(media).delete(approved);
+        assertThat(approved.getDeletedAt()).isNotNull(); // soft delete keeps the row for its review decisions
+        verify(media).saveAndFlush(approved);
+        verify(media, never()).delete(any(HotelMedia.class));
 
         HotelMedia rejected = stored(HotelMedia.ScanStatus.CLEAN, HotelMedia.ReviewStatus.REJECTED);
         Files.write(dir.resolve(rejected.getStorageKey().toString()), new byte[] {1});
         when(media.findByIdAndHotelId(mediaId, hotelId)).thenReturn(Optional.of(rejected));
         service.delete(hotelId, mediaId, true);
+        assertThat(rejected.getDeletedAt()).isNotNull();
         assertThat(Files.exists(dir.resolve(rejected.getStorageKey().toString()))).isFalse();
     }
 

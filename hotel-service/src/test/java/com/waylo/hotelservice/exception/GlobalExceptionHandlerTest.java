@@ -23,6 +23,20 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
+    void handleUploadTooLarge_returns413FileTooLarge_neverA500() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/hotels/h1/media");
+
+        ResponseEntity<ErrorResponse> response = handler.handleUploadTooLarge(
+                new org.springframework.web.multipart.MaxUploadSizeExceededException(5L * 1024 * 1024), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().error()).isEqualTo("FILE_TOO_LARGE");
+        assertThat(response.getBody().path()).isEqualTo("/api/hotels/h1/media");
+    }
+
+    @Test
     void handleResourceNotFound_returns404() {
         ResourceNotFoundException ex = new ResourceNotFoundException("Hotel", "id", "123");
         HttpServletRequest request = mock(HttpServletRequest.class);

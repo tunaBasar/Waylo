@@ -157,8 +157,9 @@ public class HotelMediaService {
         if (hotelPublished && m.getReviewStatus() == HotelMedia.ReviewStatus.APPROVED) {
             throw PublicationException.conflict("MEDIA_LIVE", "An approved photo of a published hotel cannot be deleted");
         }
-        media.delete(m);
-        media.flush();
+        // Soft delete: the append-only review decisions keep pointing at this row (V12). The file itself is removed.
+        m.setDeletedAt(java.time.Instant.now());
+        media.saveAndFlush(m);
         deleteQuietly(m.getStorageKey());
     }
 

@@ -42,6 +42,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(response);
     }
 
+    /** Multipart above spring.servlet.multipart limits (photo upload): a clear 413, never a 500. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex,
+                                                              HttpServletRequest request) {
+        var response = new ErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE.value(), "FILE_TOO_LARGE",
+                "Photo exceeds the 5 MB limit", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(response);
+    }
+
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationRequired(AuthenticationRequiredException ex,
                                                                        HttpServletRequest request) {
