@@ -3,6 +3,10 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import ts from 'typescript';
 
+// formatDateTime renders in the local time zone. Pin it so CI (UTC) and local (Europe/Istanbul) runs agree.
+// node --test runs each file in its own process, so this does not leak into other test files.
+process.env.TZ = 'Europe/Istanbul';
+
 // Compile car.ts, strip the api and partner-car imports, and import via data: URL.
 let sequence = 0;
 async function mod() {
