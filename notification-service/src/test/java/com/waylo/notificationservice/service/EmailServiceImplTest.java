@@ -7,8 +7,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.mockito.ArgumentCaptor;
 import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.IContext;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class EmailServiceImplTest {
@@ -64,5 +70,32 @@ class EmailServiceImplTest {
         service.sendGenericEmail("not-an-email", "subject", "body");
 
         verifyNoInteractions(mailSender);
+    }
+
+    // Regression: the old setting already ended in /verify and the code appended /verify again (/verify/verify -> 404).
+    @ParameterizedTest
+    @ValueSource(strings = {"http://localhost:3000", "http://localhost:3000/", "https://waylo.example.app//"})
+    void verificationAndResetLinksAreBuiltFromTheBaseUrl(String base) {
+        TemplateEngine engine = mock(TemplateEngine.class);
+        service = new EmailServiceImpl(mailSender, engine);
+        ReflectionTestUtils.setField(service, "fromEmail", "sender@waylo.com");
+        ReflectionTestUtils.setField(service, "fromName", "Waylo");
+        ReflectionTestUtils.setField(service, "suppressedDomains", "example.com");
+        ReflectionTestUtils.setField(service, "appBaseUrl", base);
+        when(engine.process(anyString(), any(IContext.class))).thenReturn("<p>x</p>");
+        when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
+        String root = base.replaceAll("/+$", "");
+
+        service.sendVerificationEmail("user@gmail.com", "Ada", "tok123");
+        service.sendPasswordResetEmail("user@gmail.com", "Ada", "rst456");
+        service.sendWelcomeEmail("user@gmail.com", "Ada");
+
+        ArgumentCaptor<IContext> ctx = ArgumentCaptor.forClass(IContext.class);
+        verify(engine).process(eq("email-verification"), ctx.capture());
+        assertThat(ctx.getValue().getVariable("verificationLink")).isEqualTo(root + "/verify?token=tok123");
+        verify(engine).process(eq("password-reset"), ctx.capture());
+        assertThat(ctx.getValue().getVariable("resetLink")).isEqualTo(root + "/reset-password?token=rst456");
+        verify(engine).process(eq("welcome"), ctx.capture());
+        assertThat(ctx.getValue().getVariable("appUrl")).isEqualTo(root + "/");
     }
 }

@@ -30,8 +30,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${waylo.mail.from-name}")
     private String fromName;
 
-    @Value("${waylo.mail.verification-url}")
-    private String verificationBaseUrl;
+    /** Public base URL of the web app (no trailing path): links are base + "/verify?token=", base + "/reset-password?token=". */
+    @Value("${waylo.mail.app-base-url:http://localhost:3000}")
+    private String appBaseUrl;
 
     @Value("${waylo.mail.suppressed-domains:example.com,example.net,example.org,email.com}")
     private String suppressedDomains;
@@ -45,7 +46,7 @@ public class EmailServiceImpl implements EmailService {
     public void sendVerificationEmail(String to, String name, String verificationToken) {
         Context ctx = new Context();
         ctx.setVariable("name", name);
-        ctx.setVariable("verificationLink", verificationBaseUrl + "/verify?token=" + verificationToken);
+        ctx.setVariable("verificationLink", appUrl("/verify?token=") + verificationToken);
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("email-verification", ctx);
@@ -58,7 +59,7 @@ public class EmailServiceImpl implements EmailService {
     public void sendPasswordResetEmail(String to, String name, String resetToken) {
         Context ctx = new Context();
         ctx.setVariable("name", name);
-        ctx.setVariable("resetLink", verificationBaseUrl + "/reset-password?token=" + resetToken);
+        ctx.setVariable("resetLink", appUrl("/reset-password?token=") + resetToken);
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("password-reset", ctx);
@@ -71,6 +72,7 @@ public class EmailServiceImpl implements EmailService {
     public void sendWelcomeEmail(String to, String name) {
         Context ctx = new Context();
         ctx.setVariable("name", name);
+        ctx.setVariable("appUrl", appUrl("/"));
         ctx.setVariable("year", java.time.Year.now().getValue());
 
         String html = templateEngine.process("welcome", ctx);
@@ -99,6 +101,13 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public Delivery deliver(String to, String subject, String htmlContent) {
         return sendHtmlMail(to, subject, htmlContent) ? Delivery.SENT : Delivery.SUPPRESSED;
+    }
+
+    /** base URL without trailing slash + path (path starts with "/"). */
+    String appUrl(String path) {
+        String base = appBaseUrl == null ? "" : appBaseUrl.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + path;
     }
 
     private boolean sendHtmlMail(String to, String subject, String htmlContent) {

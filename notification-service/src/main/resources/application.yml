@@ -51,7 +51,9 @@ waylo:
   mail:
     from: waylo353241@gmail.com
     from-name: Waylo Travel
-    verification-url: http://localhost:3000/verify
+    # public base URL of the web app; e-mail links are <base>/verify?token=..., <base>/reset-password?token=...
+    # (the old verification-url already ended in /verify, which produced /verify/verify?token=... and a 404)
+    app-base-url: ${WAYLO_APP_BASE_URL:http://localhost:3000}
     suppressed-domains: example.com,example.net,example.org,email.com
   push:
     expo:
