@@ -41,6 +41,11 @@ test('admin reviews moderation: verified review is listed and can be hidden', as
   expect(s.hotelItemId, 'spec 1 order and spec 3 redeem are required').toBeTruthy();
   // Fixture only: the stay of spec 1 (redeemed in spec 3) is moved into the past so the guest may review it.
   psql('package_booking_db', `UPDATE order_items SET check_in=current_date-3, check_out=current_date-1 WHERE id='${s.hotelItemId}'`);
+  // RM-29: a review needs a recorded check-out. The partner records it through the real API (voucher version from the DB).
+  const voucherVersion = Number(psql('package_booking_db', `SELECT coalesce(version,0) FROM vouchers WHERE order_item_id='${s.hotelItemId}'`).trim() || '0');
+  const hp = (await login(s.hotelPartner)).token;
+  const co = await api('POST', `/api/partner/organizations/${s.hotelOrgId}/order-items/${s.hotelItemId}/check-out`, { expectedVersion: voucherVersion }, hp);
+  expect([200, 409]).toContain(co.status); // 409 VERSION_CONFLICT only when a kept fixture was already checked out
   const cust = (await login(s.customer)).token;
   const text = `E2E yorum ${s.hotelItemId!.slice(0, 8)}`;
   const r = await api('POST', '/api/me/hotel-reviews', { orderItemId: s.hotelItemId, score: 4, text }, cust);
@@ -93,7 +98,8 @@ test('admin hotel publications page lists the review queue', async ({ page }) =>
   await expect(page.getByText(name)).toBeVisible();
   await expectNoRawIcons(page);
   await page.getByText(name).click();
-  const reject = page.getByRole('button', { name: 'Reddet', exact: true });
+  // the button carries a Material icon ligature, so its accessible name is "close Reddet"
+  const reject = page.getByRole('button', { name: /^(close )?Reddet$/ });
   await expect(reject).toBeDisabled();
   await page.getByRole('textbox').fill('E2E eksik bilgi');
   await expect(reject).toBeEnabled();

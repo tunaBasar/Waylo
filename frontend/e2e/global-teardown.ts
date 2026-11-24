@@ -27,12 +27,33 @@ export default async function globalTeardown(force = false) {
   for (const t of ['rentals', 'documents', 'one_way_routes', 'category_rates', 'vehicles', 'branches']) {
     psql('car_rental_db', `DELETE FROM ${t} WHERE organization_id IN (${orgs})`);
   }
-  psql('hotel_db', `DELETE FROM hotel_review_moderation_events WHERE review_id IN (SELECT id FROM hotel_reviews WHERE hotel_id='${s.hotelId}')`);
-  psql('hotel_db', `DELETE FROM hotel_reviews WHERE hotel_id='${s.hotelId}'`);
-  for (const t of ['hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory', 'rate_plans', 'room_types']) {
-    psql('hotel_db', `DELETE FROM ${t} WHERE hotel_id='${s.hotelId}'`);
+  // Hotel photos uploaded by 06-partner-payouts-media (rows, decisions and the files on the hotel-service volume).
+  const mediaKeys = psql('hotel_db', `SELECT storage_key FROM hotel_media WHERE hotel_id='${s.hotelId}'`).split(/\s+/);
+  psql('hotel_db', `DELETE FROM hotel_media_decisions WHERE hotel_id='${s.hotelId}'`);
+  psql('hotel_db', `DELETE FROM hotel_media WHERE hotel_id='${s.hotelId}'`);
+  for (const k of mediaKeys) {
+    if (/^[0-9a-f-]+$/.test(k)) execFileSync('docker', ['exec', 'waylo-hotel-service', 'rm', '-f', `/data/hotel-media/${k}`]);
   }
-  psql('hotel_db', `DELETE FROM hotels WHERE id='${s.hotelId}'`);
+  // Bank account and wallet rows of the fixture orgs (06-partner-payouts-media). The change log is append-only, so its trigger is lifted briefly.
+  psql('payment_db', 'ALTER TABLE partner_bank_account_changes DISABLE TRIGGER trg_bank_changes_row');
+  psql('payment_db', `DELETE FROM partner_bank_account_changes WHERE organization_id IN (${orgs})`);
+  psql('payment_db', 'ALTER TABLE partner_bank_account_changes ENABLE TRIGGER trg_bank_changes_row');
+  psql('payment_db', `DELETE FROM partner_bank_accounts WHERE organization_id IN (${orgs})`);
+  psql('payment_db', `DELETE FROM payout_wallets WHERE organization_id IN (${orgs})`);
+  // Every hotel of the fixture orgs (the main fixture hotel and the review-queue hotel of 04-admin), children first.
+  const hotels = `SELECT id FROM hotels WHERE organization_id IN (${orgs}) OR id='${s.hotelId}'`;
+  psql('hotel_db', `DELETE FROM hotel_review_moderation_events WHERE review_id IN (SELECT id FROM hotel_reviews WHERE hotel_id IN (${hotels}))`);
+  psql('hotel_db', `DELETE FROM hotel_reviews WHERE hotel_id IN (${hotels})`);
+  for (const t of ['hotel_holds', 'hotel_quotes', 'inventory_adjustments', 'daily_rates', 'daily_inventory', 'rate_plans', 'room_types']) {
+    psql('hotel_db', `DELETE FROM ${t} WHERE hotel_id IN (${hotels})`);
+  }
+  // Publication rows (V10) reference the hotel with ON DELETE RESTRICT: decisions -> requests -> revisions, in FK order.
+  psql('hotel_db', `UPDATE hotels SET published_revision_id=NULL WHERE id IN (${hotels})`);
+  psql('hotel_db', `DELETE FROM hotel_publication_decisions WHERE hotel_id IN (${hotels})`);
+  psql('hotel_db', `UPDATE hotel_publication_requests SET revision_id=NULL WHERE hotel_id IN (${hotels})`);
+  psql('hotel_db', `DELETE FROM hotel_publication_requests WHERE hotel_id IN (${hotels})`);
+  psql('hotel_db', `DELETE FROM hotel_content_revisions WHERE hotel_id IN (${hotels})`);
+  psql('hotel_db', `DELETE FROM hotels WHERE organization_id IN (${orgs}) OR id='${s.hotelId}'`);
   psql('auth_db', `DELETE FROM role_assignments WHERE organization_id IN (${orgs})`);
   psql('auth_db', `DELETE FROM organization_memberships WHERE organization_id IN (${orgs})`);
   psql('auth_db', `DELETE FROM organizations WHERE id IN (${orgs})`);

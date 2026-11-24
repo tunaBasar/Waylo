@@ -218,11 +218,11 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
   return (
     <Card className="p-4">
       <p className="mb-2 text-xs font-medium text-on-surface-variant">{cur}</p>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <div><p className="text-xs text-on-surface-variant">Cekilebilir bakiye</p><p className="text-xl font-semibold">{money(b.payable, cur)}</p></div>
-        <div><p className="text-xs text-on-surface-variant">Beklemede (tahmini)</p><p className="text-xl font-semibold">{money(b.held, cur)}</p></div>
-        <div><p className="text-xs text-on-surface-variant">Odeme surecinde</p><p className="text-xl font-semibold">{money(b.reserved, cur)}</p></div>
-        <div><p className="text-xs text-on-surface-variant">Odenen toplam</p><p className="text-xl font-semibold">{money(b.paidTotal, cur)}</p></div>
+      <div className="grid gap-3 sm:grid-cols-4" data-testid={`payout-balance-${cur}`}>
+        <div><p className="text-xs text-on-surface-variant">Cekilebilir bakiye</p><p className="text-xl font-semibold" data-testid="payout-payable">{money(b.payable, cur)}</p></div>
+        <div><p className="text-xs text-on-surface-variant">Beklemede (tahmini)</p><p className="text-xl font-semibold" data-testid="payout-held">{money(b.held, cur)}</p></div>
+        <div><p className="text-xs text-on-surface-variant">Odeme surecinde</p><p className="text-xl font-semibold" data-testid="payout-reserved">{money(b.reserved, cur)}</p></div>
+        <div><p className="text-xs text-on-surface-variant">Odenen toplam</p><p className="text-xl font-semibold" data-testid="payout-paid-total">{money(b.paidTotal, cur)}</p></div>
       </div>
       {toAmount(b.releasedNotYetPayable) > 0 && (
         <p className="mt-2 text-xs text-on-surface-variant">Bekleme suresinde: {money(b.releasedNotYetPayable, cur)}</p>
@@ -310,7 +310,7 @@ function BankSection({ bank, orgId, owner, onDone, onError }: { bank: PartnerBan
     <Card className="p-4">
       <h3 className="mb-3 font-semibold text-on-surface">Banka hesabi</h3>
       {bank && bank.status !== 'DISABLED' && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm" data-testid="bank-account-current">
           <div>
             <p className="font-mono text-on-surface">{bank.maskedIban}</p>
             <p className="text-xs text-on-surface-variant">{bank.accountHolderName}</p>
