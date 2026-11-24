@@ -31,6 +31,9 @@ function Routes() {
         <Stack.Screen name="reviews" options={{ title: 'Yorumlar' }} />
         <Stack.Screen name="notifications" options={{ title: 'Bildirimler' }} />
         <Stack.Screen name="settings" options={{ title: 'Ayarlar' }} />
+        <Stack.Screen name="support/index" options={{ title: 'Destek taleplerim' }} />
+        <Stack.Screen name="support/new" options={{ title: 'Destek talebi' }} />
+        <Stack.Screen name="support/[id]" options={{ title: 'Destek talebi' }} />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)/login" options={{ title: 'Giris' }} />

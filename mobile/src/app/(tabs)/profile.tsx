@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { profileApi, validateName, validatePasswordChange, PASSWORD_HINT } from '@/features/profile/api';
@@ -63,6 +63,7 @@ export default function ProfileScreen() {
       <Button title="Sifreyi guncelle" disabled={busy} onPress={savePassword} />
       <Button kind="secondary" title="Yorum yazabilecegim konaklamalar" onPress={() => router.push('/reviews')} />
       <Button kind="secondary" title="Bildirimler" onPress={() => router.push('/notifications')} />
+      <Button kind="secondary" title="Destek taleplerim" onPress={() => router.push('/support' as Href)} />
       <Button kind="secondary" title="Ayarlar" onPress={() => router.push('/settings')} />
       <Button kind="danger" title="Cikis yap" onPress={() => { void logout(); }} />
     </Screen>

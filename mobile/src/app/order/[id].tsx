@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { ApiError, type CancellationPreview, type Order, type OrderItem, type Voucher } from '@/api';
 import { checkoutErrorMessage, ordersApi, paySandbox } from '@/features/orders/api';
@@ -52,6 +52,7 @@ function Vouchers({ orderId, checkedInItemIds }: { orderId: string; checkedInIte
 
 export default function OrderDetail() {
   const online = useOnline();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useAsync(() => ordersApi.get(id), [id]);
   // Cleared only once the order is shown: right after login the router guard can unmount this screen once.
@@ -116,6 +117,7 @@ export default function OrderDetail() {
                 <Button kind="secondary" title="Reddedilen test odemesi" disabled={busy || !online} onPress={() => pay('TEST_DECLINE')} />
               </>
             )}
+            <Button kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
             {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} />}
             {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && (
               <Button kind="secondary" title="Siparisi iptal et" disabled={busy} onPress={loadPreview} />
