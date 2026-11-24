@@ -301,12 +301,17 @@ public class HotelHoldServiceImpl implements HotelHoldService {
         HotelHold hold = holdRepository.findByIdForUpdate(holdId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hold", "id", holdId));
 
-        if (hold.getStatus() != HoldStatus.HELD) {
-            throw new BusinessRuleException("HOLD_INVALID_STATE",
-                    "Hold " + holdId + " is not in HELD state, current status: " + hold.getStatus());
+        if (hold.getStatus() == HoldStatus.RELEASED || hold.getStatus() == HoldStatus.EXPIRED) {
+            return toResponse(hold); // released concurrently while we waited for the lock
         }
+        if (hold.getStatus() != HoldStatus.HELD && hold.getStatus() != HoldStatus.CONFIRMED) {
+            throw new BusinessRuleException("HOLD_INVALID_STATE",
+                    "Hold " + holdId + " cannot be released, current status: " + hold.getStatus());
+        }
+        // HELD: the room was only reserved. CONFIRMED: a paid stay was cancelled (package-booking cancel), so the sold
+        // room goes back on sale (RM-28). Either way the matching counter is decremented under the inventory row lock.
+        boolean wasConfirmed = hold.getStatus() == HoldStatus.CONFIRMED;
 
-        // Mutate inventory: decrement held counter
         LocalDate lastNight = hold.getCheckOut().minusDays(1);
         List<DailyInventory> inventory = inventoryRepository.lockNightsForHold(
                 hold.getHotelId(),
@@ -316,10 +321,17 @@ public class HotelHoldServiceImpl implements HotelHoldService {
 
         int rooms = hold.getRooms();
         for (DailyInventory inv : inventory) {
-            if (inv.getHeld() < rooms) {
-                throw new IllegalStateException("Held count " + inv.getHeld() + " < rooms " + rooms + " for date " + inv.getStayDate());
+            if (wasConfirmed) {
+                if (inv.getConfirmed() < rooms) {
+                    throw new IllegalStateException("Confirmed count " + inv.getConfirmed() + " < rooms " + rooms + " for date " + inv.getStayDate());
+                }
+                inv.setConfirmed(inv.getConfirmed() - rooms);
+            } else {
+                if (inv.getHeld() < rooms) {
+                    throw new IllegalStateException("Held count " + inv.getHeld() + " < rooms " + rooms + " for date " + inv.getStayDate());
+                }
+                inv.setHeld(inv.getHeld() - rooms);
             }
-            inv.setHeld(inv.getHeld() - rooms);
         }
         inventoryRepository.saveAll(inventory);
 
@@ -328,7 +340,7 @@ public class HotelHoldServiceImpl implements HotelHoldService {
         hold.setReleasedAt(Instant.now(clock));
         HotelHold saved = holdRepository.save(hold);
 
-        log.info("Hold released: id={}", saved.getId());
+        log.info("Hold released: id={}, wasConfirmed={}", saved.getId(), wasConfirmed);
         return toResponse(saved);
     }
 

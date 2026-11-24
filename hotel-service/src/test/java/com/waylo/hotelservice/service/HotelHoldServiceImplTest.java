@@ -835,18 +835,45 @@ class HotelHoldServiceImplTest {
     }
 
     @Test
-    void release_confirmedHold_throws() {
+    void release_confirmedHold_returnsSoldRoomToSale() {
+        // RM-28: a paid stay cancelled by package-booking releases its CONFIRMED hold: confirmed -1, held unchanged
         UUID holdId = UUID.randomUUID();
-        HotelHold hold = new HotelHold();
-        hold.setId(holdId);
+        HotelHold hold = createHeldHold(holdId, QUOTE_ID);
         hold.setStatus(HoldStatus.CONFIRMED);
-        hold.setCreatedAt(FIXED_CLOCK.instant());
         when(holdRepository.findById(holdId)).thenReturn(Optional.of(hold));
         when(holdRepository.findByIdForUpdate(holdId)).thenReturn(Optional.of(hold));
+        when(inventoryRepository.lockNightsForHold(eq(HOTEL_ID), eq(ROOM_TYPE_ID),
+                eq(CHECK_IN), eq(CHECK_OUT.minusDays(1))))
+                .thenReturn(List.of(createInventory(CHECK_IN, 2, 1, false),
+                        createInventory(CHECK_IN.plusDays(1), 2, 1, false)));
+        when(holdRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.release(holdId))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("not in HELD state");
+        HotelHoldResponse response = service.release(holdId);
+
+        assertThat(response.status()).isEqualTo(HoldStatus.RELEASED);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DailyInventory>> invCaptor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryRepository).saveAll(invCaptor.capture());
+        assertThat(invCaptor.getValue()).allSatisfy(inv -> {
+            assertThat(inv.getConfirmed()).isZero();   // 1 - 1
+            assertThat(inv.getHeld()).isEqualTo(2);    // other customers' holds untouched
+        });
+    }
+
+    @Test
+    void release_confirmedHold_withoutConfirmedCount_failsLoudly() {
+        UUID holdId = UUID.randomUUID();
+        HotelHold hold = createHeldHold(holdId, QUOTE_ID);
+        hold.setStatus(HoldStatus.CONFIRMED);
+        when(holdRepository.findById(holdId)).thenReturn(Optional.of(hold));
+        when(holdRepository.findByIdForUpdate(holdId)).thenReturn(Optional.of(hold));
+        when(inventoryRepository.lockNightsForHold(eq(HOTEL_ID), eq(ROOM_TYPE_ID),
+                eq(CHECK_IN), eq(CHECK_OUT.minusDays(1))))
+                .thenReturn(List.of(createInventory(CHECK_IN, 0, 0, false)));
+
+        assertThatThrownBy(() -> service.release(holdId)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Confirmed count");
+        verify(holdRepository, never()).save(any());
     }
 
     @Test
