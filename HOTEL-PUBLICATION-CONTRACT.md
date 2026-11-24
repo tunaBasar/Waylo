@@ -405,6 +405,10 @@ Checked `api-gateway/src/main/resources/application.yml`, route `hotel-service` 
 
 ## 5. Photos and media (phase 2, optional)
 
+> Status 2026-11-24: implemented. Phase 2 (upload, review, public serving, soft delete) in V11/V12, API-DOCS 16.5.
+> Phase 3 (a request carries `mediaIds`, approval of the request approves its still-pending photos, rejection leaves them
+> pending) in V13, API-DOCS 16.9.
+
 Phase 1 ships without photos. Reason: no hotel image field exists today (no `images`/`photos` column, `HotelResponse` has none), the car-rental storage code is document-oriented (PDF/JPEG/PNG, 10 MB, auth-only download), and there is no virus scanner anywhere in the stack. Building media doubles the slice. Phase 2 spec so it is not re-debated:
 
 - Table `hotel_media(id, hotel_id, organization_id, kind PHOTO, sort_order int, caption varchar(200), rights_source varchar(30) CHECK in ('OWNED','LICENSED','PARTNER_ATTESTED'), rights_note varchar(500), storage_key uuid-name, content_type, size_bytes, width, height, scan_status CHECK in ('PENDING','CLEAN','REJECTED'), review_status CHECK in ('PENDING','APPROVED','REJECTED'), uploaded_by, created_at)`. Same RLS shape as `hotel_content_revisions`, delete only when not published.

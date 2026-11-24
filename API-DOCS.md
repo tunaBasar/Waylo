@@ -2103,3 +2103,24 @@ Status: `OPEN` (customer wrote last), `ANSWERED` (partner or admin wrote last), 
 - Admin (ADMIN only, else 403): `GET /api/admin/support-cases?status=`, `GET .../{id}`, `POST .../{id}/messages`, `POST .../{id}/close`.
 - Posting to a CLOSED case: 422 `CASE_CLOSED`.
 - Public: `GET /api/support/capabilities` -> `{liveChat:false, channels:[], hours:null, decisionPending:true}` until the RM-06 operations playbook is decided.
+- UI: web customer `/support` (plus "Destek talebi ac" on each order), partner `/partner/support`, admin `/admin/support`;
+  mobile `support/index`, `support/[id]`, `support/new?orderId=` (entry points on the order detail and the profile tab).
+
+### 16.9 Photos in publication requests (hotel-service, media phase 3, V13)
+
+A publication request (INITIAL or CONTENT_CHANGE, section 16.1) can carry the hotel's PENDING photos, so one admin
+decision covers the content and the photo set (HOTEL-PUBLICATION-CONTRACT.md section 5). Table
+`hotel_publication_request_media(request_id, media_id, hotel_id, organization_id, created_at)`, RLS like
+`hotel_publication_requests`, rows immutable (no UPDATE policy, delete only in service mode).
+
+- `POST /api/hotels/{hotelId}/publication-requests` body gains optional `mediaIds: uuid[]` (null or empty: no photos).
+  Errors: 400 `VALIDATION_ERROR` (more than 20, duplicates, null entries), 404 `MEDIA_NOT_FOUND` (`details.mediaId`;
+  not a non-deleted photo of this hotel), 409 `MEDIA_NOT_PENDING` (`details.mediaId`, `details.reviewStatus`).
+- Responses: the request view gains `mediaIds` (linked non-deleted photos by sort order); the partner history item and the
+  admin list item gain `mediaCount`; the admin detail gains top-level `media` (MediaView list as in `.../media/mine`).
+- Admin `APPROVE` / `APPROVE_AND_PUBLISH` approves every linked photo that is still PENDING (review APPROVED, scan CLEAN,
+  one `hotel_media_decisions` row each). `REJECT` and withdraw leave photos PENDING so they can join the next request.
+  To drop one bad photo the admin rejects it first with `POST /api/admin/hotel-media/{mediaId}/decisions`; photos decided
+  that way are skipped by the cascade. Photos not attached to any request keep using the per-photo queue (16.5).
+- UI: the partner submit panel lists PENDING photos as a checklist (all checked); the admin request detail shows the
+  photos with thumbnails and a per-photo reject.

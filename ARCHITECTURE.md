@@ -189,7 +189,8 @@ EXIF/XMP/IPTC silinir, dosya rastgele anahtarla `hotel_media` volume'ünde sakla
 Harici virüs tarayıcı yoktur: yapısal çözümleme tarama yerine geçer, fotoğraf admin onayına kadar görünmez. Public servis yalnız
 onaylı fotoğrafları ve yalnız public otel için verir (aksi 404). `hotel_media` RLS altındadır; partner kendi fotoğrafını
 onaylayamaz (trigger). Silme soft delete'tir (V12 `deleted_at`): append-only karar kayıtları fotoğrafa bağlı kalır, dosya
-volume'den silinir, silinmiş satır hiçbir okumada görünmez ve partner geri alamaz.
+volume'den silinir, silinmiş satır hiçbir okumada görünmez ve partner geri alamaz. Yayın talebi bekleyen fotoğrafları taşıyabilir
+(V13, faz 3): admin talebi onaylayınca hâlâ bekleyen bağlı fotoğraflar da onaylanır; ret fotoğraflara dokunmaz.
 
 **Destek talepleri (RM-36, crm-service):** müşteri yalnız kendi siparişi (ve isteğe bağlı kalemi) için talep açar; sipariş
 sahipliği ve tedarikçi kuruluş package-booking'ten servis kimliğiyle doğrulanır. Mesajlar append-only'dir (trigger).
