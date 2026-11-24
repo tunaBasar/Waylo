@@ -14,6 +14,8 @@ notification-service consumes Kafka events and stores one `notifications` row pe
 | `FLIGHT_CANCELLED` (flight-events) | flight-service | "Ucusunuz iptal edildi" | customers of CONFIRMED flight items | existing (row 10) |
 | `EMAIL_VERIFICATION`, `PASSWORD_RESET`, welcome (auth-events) | auth-service | `email-verification.html`, `password-reset.html`, `welcome.html` | the user | existing |
 | `PAYMENT_COMPLETED` / `PAYMENT_REFUNDED` (payment-events) | payment-service | log only, no mail: the order mail covers it | - | existing, unchanged |
+| `supportCaseUpdated` kind `ANSWERED` (support-events) | crm-service outbox, partner or admin reply on an RM-36 case | "Destek talebiniz yanıtlandı": case subject + hint to open the Destek page (the reply text is not mailed) | case customer (crm e-mail lookup) | added 2026-11-24 |
+| `supportCaseUpdated` kind `CLOSED` (support-events) | crm-service outbox, admin close | "Destek talebiniz kapatıldı" | case customer | added 2026-11-24; customer messages and the customer's own close send nothing |
 | `BOOKING_CREATED` / `BOOKING_CANCELLED` (booking-events) | old PackageBooking model | "Rezervasyonunuz alindi/iptal edildi" | booking customer | **LEGACY**, kept, harmless when no events arrive |
 | Check-in reminder | - | not built | - | skipped (optional) |
 

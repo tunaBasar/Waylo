@@ -140,7 +140,7 @@ kaydeder. IBAN AES-GCM ile şifreli saklanır (`WAYLO_PAYOUT_IBAN_KEY`), her yer
 denetim kaydı bırakan admin uç noktasından görülür. Merchant-of-record kararı açıktır.
 
 ### 8. Olaylar: transactional outbox + idempotent consumer
-auth-service, package-booking-service ve payment-service domain değişikliğini ve olayı aynı local transaction'da
+auth-service, package-booking-service, payment-service ve crm-service (destek olayları, V3/V4) domain değişikliğini ve olayı aynı local transaction'da
 `outbox_event` tablosuna yazar. `OutboxRelay` olayları Kafka'ya taşır, backlog metrik olarak izlenir.
 Consumer tarafında `processed_events` tablosu tekrar işlemeyi engeller ve yalnız başarılı işlemden sonra yazılır.
 Kafka exactly-once iş etkisi garantisi olarak sunulmaz. `X-Request-Id` HTTP ve Kafka üzerinden uçtan uca taşınır.

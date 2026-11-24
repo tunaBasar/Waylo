@@ -2022,6 +2022,7 @@ and were not re-expanded here.
 | `booking-events` | `BookingCancelledEvent` | package-booking-service | notification-service, crm-service |
 | `payment-events` | `PaymentCompletedEvent` | payment-service | saga-orchestrator, notification-service |
 | `payment-events` | `PaymentRefundedEvent` | payment-service | saga-orchestrator, notification-service |
+| `support-events` | `SupportCaseUpdatedEvent` (`supportCaseUpdated`, kind ANSWERED/CLOSED) | crm-service (outbox) | notification-service (customer e-mail) |
 
 ---
 
