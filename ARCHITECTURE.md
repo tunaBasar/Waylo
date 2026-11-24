@@ -120,28 +120,53 @@ doğruluk kaynağı olmaması için devreden çıkarıldı (`SAGA-DECISION.md`).
 İptal kuralları kalem bazında saklanan **politika snapshot'ından** hesaplanır, sonradan fiyat veya otel düzenlemesi bunu değiştirmez.
 `GET /api/orders/{id}/cancellation-preview` sonucu önceden gösterir. Para iadesi, escrow ve stok serbest bırakma ayrı sonuçlarla izlenir.
 Komisyon, işletme alacağı ve iade etkisi payment-service'te **append-only ledger** kayıtlarıdır. Partner kazanç ekranı
-escrow kalemlerinden beslenir (HELD / RELEASED / REFUNDED toplamları). Payout (işletmeye ödeme) akışı henüz yok.
+escrow kalemlerinden beslenir, para birimi başına toplamlarla.
+
+**Partner payout** (`PAYOUT-CONTRACT.md`): ödenebilir bakiye saklanmaz, her seferinde hesaplanır:
+RELEASED escrow'un komisyon düşülmüş tutarı (holdback süresi geçmiş) + payout ledger delta'ları. HELD escrow sadece tahmin olarak
+gösterilir. Akış `REQUESTED -> APPROVED -> PROCESSING -> PAID / FAILED`, `CANCELLED`; talepte para ayrılır, başarısız
+veya iptal edilen talepte geri döner. Çift ödemeye karşı kuruluş+para birimi başına kilit satırı, açık talep tekilliği,
+idempotency key ve benzersiz banka referansı vardır. Para hareketi Waylo içinde yapılmaz: admin havaleyi yapıp referansı
+kaydeder. IBAN AES-GCM ile şifreli saklanır (`WAYLO_PAYOUT_IBAN_KEY`), her yerde maskelenir, tam hali yalnız
+denetim kaydı bırakan admin uç noktasından görülür. Merchant-of-record kararı açıktır.
 
 ### 8. Olaylar: transactional outbox + idempotent consumer
 auth-service, package-booking-service ve payment-service domain değişikliğini ve olayı aynı local transaction'da
 `outbox_event` tablosuna yazar. `OutboxRelay` olayları Kafka'ya taşır, backlog metrik olarak izlenir.
-Consumer tarafında `processed_events` tablosu tekrar işlemeyi engeller. Kafka exactly-once iş etkisi garantisi olarak sunulmaz.
-`X-Request-Id` HTTP ve Kafka üzerinden uçtan uca taşınır.
+Consumer tarafında `processed_events` tablosu tekrar işlemeyi engeller ve yalnız başarılı işlemden sonra yazılır.
+Kafka exactly-once iş etkisi garantisi olarak sunulmaz. `X-Request-Id` HTTP ve Kafka üzerinden uçtan uca taşınır.
 
-### 9. Kiracı izolasyonu: kod + PostgreSQL RLS (hotel-service)
+**Dead-letter** (`observability-common/dlt`): crm, notification ve flight-seat-inventory consumer'ları hatayı yutmaz.
+`DefaultErrorHandler` 3 kez dener (1s/2s/4s), sonra kaydı orijinal key, value ve header'larıyla `<topic>.DLT`'ye yazar.
+Offset yalnız DLT yazımı başarılı olunca commit edilir. Deserialization ve doğrulama hataları denenmeden DLT'ye gider.
+Admin `GET /api/admin/kafka-dlt` ile bakar (maskeli, kısaltılmış), `POST /api/admin/kafka-dlt/replay` ile tek kaydı
+orijinal topic'e geri yollar; idempotent consumer tekrar işlemeyi önler. Sayaç: `waylo.kafka.dlt.published`.
+
+### 9. Kiracı izolasyonu: kod + PostgreSQL RLS (hotel, car-rental, bus)
 Kod katmanı: her mutasyon `HotelAccessGuard` ile auth-service'e sorulur, child kayıtlar `hotelId + childId` ile bağlanır.
 DB katmanı (V9): uygulama her transaction'da `SET LOCAL ROLE waylo_app` (NOLOGIN, BYPASSRLS yok) ve transaction-local
 `app.mode` / `app.org_ids` ayarlar. Partner modunda yalnız yetkili kuruluşların satırları okunur ve yazılır. Public, servis ve admin
 okumaları bugünkü gibi kalır. Mod başlangıçta en düşük yetkidir (`/internal` ve `/internal/...` -> SERVICE, ADMIN rolü -> ADMIN,
 geri kalan -> PUBLIC). PARTNER modu yalnız başarılı erişim kontrolünden sonra açılır. Bağlam transaction sonunda düşer, pool'da sızmaz.
-RLS şimdilik yalnız hotel-service'te. Quote, hold ve outbox gibi transaction tabloları kapsam dışındadır.
+Aynı model car-rental-service (şube, araç, tarife, tek yön, belge) ve bus-service (otobüs, sefer, durak, ücret, belge) için de
+kuruludur. Rezervasyon, hold, quote ve outbox gibi işlem tabloları kapsam dışıdır; package-booking henüz RLS'siz.
 
-### 10. Public projeksiyon ve satış kapısı
-Public otel listesi ve araması yalnız aktif otelleri ve `ACTIVE` kuruluşa ait otelleri gösterir. Kuruluş durumu
-auth-service'ten kısa süreli cache'lenir. auth-service erişilemezse kuruluş otelleri gizlenir (fail-closed).
-Kuruluşu olmayan 22 legacy otel salt-okunur görünür (sahiplik kararı kullanıcıda). Otel yayın akışı
-(`DRAFT -> SUBMITTED -> APPROVED -> PUBLISHED`) henüz kodda yok, sözleşmesi `HOTEL-PUBLICATION-CONTRACT.md`'de.
-Bus satışları hukuki maddeler kapanana kadar kapalıdır.
+### 10. Otel yayın akışı, public projeksiyon ve satış kapısı
+Otel `DRAFT -> SUBMITTED -> APPROVED -> PUBLISHED` akışından geçer (`REJECTED`, `SUSPENDED`, `ARCHIVED` de var,
+`HOTEL-PUBLICATION-CONTRACT.md`). Kayıt olmak satışa açılmak değildir: partner yayın talebi gönderir (kuruluş ACTIVE olmalı,
+en az bir oda tipi, rate plan ve stok gerekir), platform admini onaylar veya gerekçeyle reddeder; kendi kuruluşunun otelini
+onaylayamaz. Yayındaki otelin içerik değişikliği revizyon olarak bekler, onaylanmadan yayına çıkmaz. Her geçiş append-only
+karar kaydı bırakır.
+
+Public liste, arama, detay, müsaitlik, anonim alt kayıt okumaları ve yeni quote/hold yalnız PUBLISHED, aktif ve `ACTIVE`
+kuruluşa ait oteller içindir; diğerleri public için 404, quote için 422 `HOTEL_NOT_BOOKABLE`. Mevcut hold'ların
+confirm/release'i yayın durumuna bakmaz. Kuruluş durumu auth-service'ten 30 sn cache'lenir; auth-service erişilemezse
+kuruluş otelleri gizlenir (fail-closed). V10 öncesindeki bütün oteller PUBLISHED olarak devralındı. Kuruluşu olmayan
+22 legacy otel salt-okunur görünür (sahiplik kararı kullanıcıda). Bus satışları hukuki maddeler kapanana kadar kapalıdır.
+
+**Konaklama tamamlama (RM-29):** QR okutma check-in sayılır ve escrow'u serbest bırakır. Partner check-out'u ayrıca kaydeder
+(`.../order-items/{id}/check-out`). Yorum hakkı yalnız kayıtlı check-out'tan sonra doğar; tarih geçmesi yetmez, NO_SHOW ve
+iptal hak vermez.
 
 ### 11. Spring Boot 4.x artifact değişiklikleri
 - `spring-boot-starter-web` -> `spring-boot-starter-webmvc`

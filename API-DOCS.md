@@ -26,9 +26,10 @@
 14. [Auth Service and Account](#13-auth-service-and-account)
 15. [Bus Service](#14-bus-service)
 16. [Service-to-service (internal) endpoints](#15-service-to-service-internal-endpoints)
-17. [Enums Reference](#enums-reference)
-18. [Kafka Events](#kafka-events)
-19. [Architecture](#architecture)
+17. [Added 2026-11-24: hotel publication, stay check-out, partner payouts, Kafka DLT admin](#16-added-2026-11-24)
+18. [Enums Reference](#enums-reference)
+19. [Kafka Events](#kafka-events)
+20. [Architecture](#architecture)
 
 ---
 
@@ -1756,6 +1757,102 @@ Response: list of `{bus: BusResponse, organizationName}`.
 #### `PUT /api/admin/bus-terminals/{id}` - Update terminal (ADMIN)
 
 Body (`TerminalRequest`): `city` (required, max 100), `name` (required, max 150), `active` (Boolean, optional). Response: `TerminalResponse`.
+
+---
+
+## 16. Added 2026-11-24
+
+Full rules: `HOTEL-PUBLICATION-CONTRACT.md` (hotel publication) and `PAYOUT-CONTRACT.md` (payouts). Error bodies use the
+usual `{status, error, message, path, timestamp}` envelope with the machine code in `error`; some carry `details`.
+
+### 16.1 Hotel publication (hotel-service)
+
+A hotel is `DRAFT -> SUBMITTED -> APPROVED -> PUBLISHED` (plus `REJECTED`, `SUSPENDED`, `ARCHIVED`). Only PUBLISHED,
+active hotels of ACTIVE organizations are public: list, search, detail, availability, anonymous child reads
+(room types, rate plans, rates, reviews) and new quotes/holds. Anything else is 404 for the public, and a quote on it is
+**422 `HOTEL_NOT_BOOKABLE`**. Hotels that existed before V10 were backfilled as PUBLISHED.
+
+Partner (permission `HOTEL_MANAGE` on the hotel; `HOTEL_STAFF` cannot):
+
+| Method | Path | Body / notes |
+|---|---|---|
+| POST | `/api/hotels/{hotelId}/publication-requests` | `{note?, revisionId?, expectedVersion?}`. 201 `{id, status: SUBMITTED, hotelPublicationStatus, version}`. 409 `ORGANIZATION_NOT_ACTIVE`, `HOTEL_INCOMPLETE` (message names ROOM_TYPE / RATE_PLAN / INVENTORY), `REQUEST_ALREADY_OPEN`, `INVALID_STATE_TRANSITION` |
+| GET | `/api/hotels/{hotelId}/publication-requests` | history, newest first, with decisions (reason, decision; never the admin's id) |
+| POST | `/api/hotels/{hotelId}/publication-requests/{requestId}/withdraw` | 200, request `WITHDRAWN` |
+| GET | `/api/hotels/{hotelId}/content` | live content + working revision + versions |
+| PATCH | `/api/hotels/{hotelId}/content` | `{expectedVersion, content:{...}}`; edits of a PUBLISHED hotel go to a revision that needs review. 409 `VERSION_CONFLICT`, `HOTEL_LOCKED_FOR_REVIEW` |
+| DELETE | `/api/hotels/{hotelId}/content/revision` | discard a DRAFT revision, 204 |
+| POST | `/api/hotels/{hotelId}/archive` | `{reason}` (DRAFT or REJECTED hotels only) |
+
+Admin (`ADMIN` role; an admin who is a member of the hotel's organization gets 403 `SELF_REVIEW_NOT_ALLOWED`):
+
+| Method | Path | Body / notes |
+|---|---|---|
+| GET | `/api/admin/hotel-publications?status=&kind=&page=&size=` | `{items, page, size, total}` |
+| GET | `/api/admin/hotel-publications/{requestId}` | request fields + `hotel`, `revision`, `diff[{field,from,to}]`, `decisions[]` |
+| POST | `/api/admin/hotel-publications/{requestId}/decisions` | `{decision: APPROVE \| REJECT \| APPROVE_AND_PUBLISH, reason?, expectedVersion}`; reason (>= 5 chars) required for REJECT |
+| POST | `/api/admin/hotels/{hotelId}/publication-status` | `{decision: PUBLISH \| SUSPEND \| REINSTATE \| ARCHIVE, reason}`; reason required except PUBLISH |
+
+Every transition writes an append-only row in `hotel_publication_decisions`.
+
+### 16.2 Stay check-out (package-booking-service)
+
+`POST /api/partner/organizations/{organizationId}/order-items/{orderItemId}/check-out` (partner, same permission as
+voucher redeem). Body `{expectedVersion, checkedOutAt?}` (`checkedOutAt` defaults to now, not in the future, not before
+the redemption). Allowed only from voucher `REDEEMED`; repeating it returns 200 with the same `checkedOutAt`.
+Response `{orderItemId, voucherStatus, checkedOutAt, version}`. 409 `INVALID_STATE_TRANSITION` (ACTIVE, NO_SHOW, VOID),
+409 `VERSION_CONFLICT`. Partner order items expose `checkedOutAt`.
+
+**Reviews now need a recorded check-out:** `POST /api/me/hotel-reviews` returns 422 `REVIEW_NOT_CHECKED_OUT` for a
+redeemed stay without check-out (other reasons: `REVIEW_NOT_CHECKED_IN`, `REVIEW_CANCELLED_OR_NO_SHOW`,
+`REVIEW_ORDER_NOT_CONFIRMED`; 403 `ORG_MEMBER_CANNOT_REVIEW`).
+
+### 16.3 Partner payouts (payment-service)
+
+No money moves through Waylo here: an admin pays by bank transfer and records the reference. Payable balance =
+released escrow (net of commission, past the holdback) + payout ledger deltas; held escrow is shown as an estimate only.
+Lists return `{items, page, size, total}`. IBANs are always masked except in the audited admin reveal.
+
+Partner (balance and lists: `RESERVATION_READ`; writes: organization owner, else 403 `NOT_OWNER`):
+
+| Method | Path | Body / notes |
+|---|---|---|
+| GET | `/api/partner/organizations/{organizationId}/payouts/balance` | per currency: payable, held estimate, reserved, paid, owed, minimum, `canRequest`, `blockedReason` |
+| GET | `/api/partner/organizations/{organizationId}/payouts?status=&page=&size=` | history |
+| GET | `/api/partner/organizations/{organizationId}/payouts/{payoutId}` | 404 if not this organization's |
+| POST | `/api/partner/organizations/{organizationId}/payouts` | header `Idempotency-Key`; `{currency, amount}`. 201 first use, 200 replay, 409 `IDEMPOTENCY_KEY_REUSED` (other body), `BELOW_MINIMUM`, `INSUFFICIENT_PAYABLE_BALANCE`, `NEGATIVE_BALANCE`, `OPEN_PAYOUT`, bank account missing/unverified |
+| POST | `/api/partner/organizations/{organizationId}/payouts/{payoutId}/cancel` | only REQUESTED |
+| GET / PUT / DELETE | `/api/partner/organizations/{organizationId}/bank-account` | PUT `{accountHolderName, iban}` (TR IBAN, mod-97 checked); a change resets verification; 409 `IBAN_ALREADY_IN_USE` |
+
+Admin (`ADMIN`):
+
+| Method | Path | Body / notes |
+|---|---|---|
+| GET | `/api/admin/payouts?status=&organizationId=&currency=&page=&size=` | `status` accepts a comma list |
+| GET | `/api/admin/payouts/{id}` | detail with events and masked IBAN |
+| GET | `/api/admin/payouts/{id}/bank-details` | full IBAN, audited, `Cache-Control: no-store` |
+| POST | `/api/admin/payouts/{id}/approve`, `/processing` | `{expectedVersion?}` |
+| POST | `/api/admin/payouts/{id}/paid` | `{reference (unique), paidAt? (not future), expectedVersion?}` |
+| POST | `/api/admin/payouts/{id}/failed`, `/cancel` | `{reason, expectedVersion?}`; reserved money returns to the balance |
+| GET | `/api/admin/bank-accounts?status=PENDING_VERIFICATION` | verification queue (masked) |
+| POST | `/api/admin/bank-accounts/{id}/verify`, `/reject` | reject needs `{reason}`; an admin cannot verify an account they changed |
+| GET | `/api/admin/organizations/{organizationId}/payout-balance` | partner balance + `adjustmentsNet`, `reconciles` |
+| POST | `/api/admin/organizations/{organizationId}/payout-adjustments` | `{currency, amount, direction: DEBIT \| CREDIT, reason, orderItemId?, idempotencyKey}` (e.g. chargeback after release) |
+
+Status flow `REQUESTED -> APPROVED -> PROCESSING -> PAID | FAILED`, `CANCELLED` from REQUESTED/APPROVED. Every
+transition writes append-only payout ledger and event rows; `PAYOUT_PAID` / `PAYOUT_FAILED` e-mail the partner.
+
+### 16.4 Kafka dead-letter admin (crm, notification, flight-seat-inventory)
+
+Consumers retry 3 times (1s, 2s, 4s), then publish the record to `<topic>.DLT` (original key, value and headers plus
+exception/offset headers); deserialization and validation errors skip the retries.
+
+- `GET /api/admin/kafka-dlt?service={crm-service|notification-service|flight-seat-inventory-service}&topic=&limit=`
+  (ADMIN): bounded peek, payload truncated to 300 chars, e-mails masked.
+- `POST /api/admin/kafka-dlt/replay?service=...` `{topic, partition, offset}` (ADMIN): republishes one record to its
+  original topic; consumer idempotency (`processed_events`) makes a replay safe.
+
+The gateway picks the service by the `service` query parameter. CLI fallback: `scripts/kafka-dlt.py`.
 
 ---
 
