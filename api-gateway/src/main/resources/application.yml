@@ -46,7 +46,7 @@ spring:
             - id: hotel-service
               uri: lb://hotel-service
               predicates:
-                - Path=/api/hotels/**,/api/rooms/**,/api/quotes/**,/api/me/hotel-reviews,/api/me/reviewable-hotel-items,/api/partner/organizations/*/hotel-reviews,/api/partner/organizations/*/hotel-reviews/**,/api/admin/hotel-reviews,/api/admin/hotel-reviews/**
+                - Path=/api/hotels/**,/api/rooms/**,/api/quotes/**,/api/me/hotel-reviews,/api/me/reviewable-hotel-items,/api/partner/organizations/*/hotel-reviews,/api/partner/organizations/*/hotel-reviews/**,/api/admin/hotel-reviews,/api/admin/hotel-reviews/**,/api/admin/hotel-publications,/api/admin/hotel-publications/**,/api/admin/hotels/*/publication-status
             - id: car-rental-service
               uri: lb://car-rental-service
               predicates:
@@ -58,7 +58,7 @@ spring:
             - id: package-booking-service
               uri: lb://package-booking-service
               predicates:
-                - Path=/api/bookings/**,/api/orders/**,/api/admin/orders,/api/partner/organizations/*/order-items,/api/partner/organizations/*/vouchers/redeem
+                - Path=/api/bookings/**,/api/orders/**,/api/admin/orders,/api/partner/organizations/*/order-items,/api/partner/organizations/*/order-items/*/check-out,/api/partner/organizations/*/vouchers/redeem
             - id: pricing-service
               uri: lb://pricing-service
               predicates:
@@ -66,7 +66,7 @@ spring:
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/payments/**,/api/partner/organizations/*/earnings,/api/admin/commission-rates,/api/admin/ledger,/api/admin/supplier-accounts,/api/admin/supplier-accounts/**
+                - Path=/api/payments/**,/api/partner/organizations/*/earnings,/api/admin/commission-rates,/api/admin/ledger,/api/admin/supplier-accounts,/api/admin/supplier-accounts/**,/api/partner/organizations/*/payouts,/api/partner/organizations/*/payouts/**,/api/partner/organizations/*/bank-account,/api/admin/payouts,/api/admin/payouts/**,/api/admin/bank-accounts,/api/admin/bank-accounts/**,/api/admin/organizations/*/payout-balance,/api/admin/organizations/*/payout-adjustments
             - id: crm-service
               uri: lb://crm-service
               predicates:
@@ -79,6 +79,21 @@ spring:
               uri: lb://notification-service
               predicates:
                 - Path=/api/notifications/**,/api/me/devices,/api/me/devices/**
+            - id: kafka-dlt-crm
+              uri: lb://crm-service
+              predicates:
+                - Path=/api/admin/kafka-dlt,/api/admin/kafka-dlt/replay
+                - Query=service,crm-service
+            - id: kafka-dlt-notification
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/admin/kafka-dlt,/api/admin/kafka-dlt/replay
+                - Query=service,notification-service
+            - id: kafka-dlt-flight-seat-inventory
+              uri: lb://flight-seat-inventory-service
+              predicates:
+                - Path=/api/admin/kafka-dlt,/api/admin/kafka-dlt/replay
+                - Query=service,flight-seat-inventory-service
             - id: auth-service
               uri: lb://auth-service
               predicates:

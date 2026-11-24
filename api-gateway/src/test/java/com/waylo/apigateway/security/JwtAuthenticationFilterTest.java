@@ -81,6 +81,23 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void kafkaDltAdminPathsRequireToken() {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(new JwtVerifier(SECRET), new ObjectMapper());
+        for (String path : java.util.List.of("/api/admin/kafka-dlt?service=crm-service",
+                "/api/admin/kafka-dlt/replay?service=notification-service")) {
+            AtomicReference<ServerHttpRequest> forwarded = new AtomicReference<>();
+            GatewayFilterChain chain = exchange -> {
+                forwarded.set(exchange.getRequest());
+                return Mono.empty();
+            };
+            var anonymous = MockServerWebExchange.from(MockServerHttpRequest.get(path).build());
+            filter.filter(anonymous, chain).block();
+            assertThat(anonymous.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(forwarded.get()).isNull();
+        }
+    }
+
+    @Test
     void noTokenOnBookings_returns401AndChainNotCalled() {
         AtomicReference<ServerHttpRequest> capturedRequest = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
