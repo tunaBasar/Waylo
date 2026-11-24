@@ -32,6 +32,9 @@ export default async function globalSetup() {
   await must('PUT', `/api/hotels/${hotelId}/inventory`, { items: nights.map(n => ({ roomTypeId: room.id, stayDate: n, allotment: 5, expectedVersion: null })), reason: 'e2e fixture' }, hp);
   const amounts = [1000, 1500];
   await must('PUT', `/api/hotels/${hotelId}/rates`, { items: nights.map((n, i) => ({ roomTypeId: room.id, ratePlanId: plan.id, stayDate: n, occupancy: 2, currency: 'TRY', amount: amounts[i] })) }, hp);
+  // Hotels start as DRAFT: submit and publish (needs the org ACTIVE and room type, plan, inventory and rates in place).
+  const pubReq = await must('POST', `/api/hotels/${hotelId}/publication-requests`, {}, hp);
+  await must('POST', `/api/admin/hotel-publications/${pubReq.id}/decisions`, { decision: 'APPROVE_AND_PUBLISH', expectedVersion: pubReq.version }, admin.token);
   await must('POST', '/api/admin/commission-rates', { vertical: 'HOTEL', supplierOrganizationId: hotelOrg, rate: 0.125 }, admin.token);
 
   const carCity = `E2ECar${suffix}`;

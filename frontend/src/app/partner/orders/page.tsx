@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
-  ORDER_STATUS_LABEL, VOUCHER_STATUS_LABEL, partnerErrorMessage, partnerApi,
+  ORDER_STATUS_LABEL, VOUCHER_STATUS_LABEL, partnerErrorMessage, partnerApi, checkOutOrderItem, checkOutErrorMessage,
   type PartnerOrderItem, type PartnerOrderPage, type PartnerOrderStatus,
 } from '@/lib/partner';
 import { formatMoney } from '@/lib/partner-car';
@@ -33,7 +33,8 @@ export default function PartnerOrdersPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
-  const key = `${organizationId}|${status}|${from}|${to}|${page}`;
+  const [reloadTick, setReloadTick] = useState(0);
+  const key = `${organizationId}|${status}|${from}|${to}|${page}|${reloadTick}`;
   const [result, setResult] = useState<{ key: string; data: PartnerOrderPage | null; error: string | null } | null>(null);
 
   useEffect(() => {
@@ -44,6 +45,23 @@ export default function PartnerOrdersPage() {
       .catch(e => { if (alive) setResult({ key, data: null, error: partnerErrorMessage(e, 'Siparisler yuklenemedi') }); });
     return () => { alive = false; };
   }, [organizationId, status, from, to, page, key]);
+
+  const [busyItem, setBusyItem] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function checkOut(i: PartnerOrderItem) {
+    if (!organizationId) return;
+    setBusyItem(i.orderItemId);
+    setActionError(null);
+    try {
+      await checkOutOrderItem(organizationId, i.orderItemId, i.stayVersion ?? 0);
+    } catch (e) {
+      setActionError(checkOutErrorMessage(e));
+    } finally {
+      setBusyItem(null);
+      setReloadTick(n => n + 1);
+    }
+  }
 
   const loading = result?.key !== key;
   const data = result?.key === key ? result.data : null;
@@ -74,6 +92,8 @@ export default function PartnerOrdersPage() {
           </Field>
         </div>
       </Card>
+
+      {actionError && <p role="alert" className="text-sm text-error">{actionError}</p>}
 
       {loading ? <LoadingRows /> : error ? (
         <EmptyState icon="error" title="Yuklenemedi" description={error} />
@@ -111,6 +131,19 @@ export default function PartnerOrdersPage() {
                   <span className="text-outline">Tutar</span>
                   <span className="font-semibold text-on-surface">{formatMoney(i.amount, i.currency)}</span>
                 </div>
+                {i.vertical === 'HOTEL' && i.checkedOutAt && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-outline">Check-out</span>
+                    <span>{formatDate(i.checkedOutAt)}</span>
+                  </div>
+                )}
+                {i.vertical === 'HOTEL' && i.voucherStatus === 'REDEEMED' && !i.checkedOutAt && (
+                  <div className="mt-2 flex justify-end">
+                    <Button variant="secondary" disabled={busyItem === i.orderItemId} onClick={() => checkOut(i)}>
+                      {busyItem === i.orderItemId ? 'Isleniyor...' : 'Check-out yap'}
+                    </Button>
+                  </div>
+                )}
                 {i.refundAmount != null && i.refundAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-outline">Iade</span>

@@ -86,6 +86,10 @@ export interface PartnerHotel {
   latitude: number | null;
   longitude: number | null;
   active: boolean;
+  /** Publication workflow state (hotel-service V10). Only PUBLISHED hotels are public. */
+  publicationStatus: PublicationStatus;
+  /** Optimistic version of the live content, used as expectedVersion when opening a content revision. */
+  contentVersion: number;
   roomCount: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -101,6 +105,70 @@ export interface HotelRequest {
   latitude?: number | null;
   longitude?: number | null;
   organizationId: string;
+}
+
+export type PublicationStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED' | 'ARCHIVED';
+export type PublicationRequestKind = 'INITIAL' | 'CONTENT_CHANGE';
+export type PublicationRequestStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+export type RevisionStatus = 'DRAFT' | 'SUBMITTED' | 'APPLIED' | 'REJECTED' | 'SUPERSEDED';
+
+export interface PublicationSubmitRequest {
+  note?: string;
+  /** CONTENT_CHANGE only (hotel PUBLISHED or SUSPENDED). */
+  revisionId?: string;
+  expectedVersion?: number;
+}
+
+export interface PublicationRequestCreated {
+  id: string;
+  hotelId: string;
+  organizationId: string;
+  kind: PublicationRequestKind;
+  status: PublicationRequestStatus;
+  revisionId: string | null;
+  submittedBy: string;
+  submittedAt: string;
+  note: string | null;
+  version: number;
+  hotelPublicationStatus: PublicationStatus;
+}
+
+export interface PublicationRequestSummary {
+  id: string;
+  kind: PublicationRequestKind;
+  status: PublicationRequestStatus;
+  submittedAt: string;
+  decidedAt: string | null;
+  decision: { decision: string; reason: string | null; actorRole: string; createdAt: string } | null;
+}
+
+/** Allowlisted editable hotel content (contract 3.2). */
+export interface HotelContent {
+  name: string;
+  city: string;
+  country: string;
+  address: string;
+  starRating: number;
+  description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface ContentRevision {
+  id: string;
+  revisionNo: number;
+  status: RevisionStatus;
+  version: number;
+  baseContentVersion: number;
+  content: HotelContent;
+}
+
+export interface HotelContentView {
+  hotelId: string;
+  publicationStatus: PublicationStatus;
+  contentVersion: number;
+  live: HotelContent;
+  revision: ContentRevision | null;
 }
 
 export interface RoomType {
@@ -304,6 +372,10 @@ export interface PartnerOrderItem {
   voucherStatus: VoucherStatus | null;
   cancelOutcome: string | null;
   refundAmount: Money | null;
+  /** Recorded hotel check-out (RM-29); null until the partner checks the guest out. */
+  checkedOutAt?: string | null;
+  /** Optimistic version of the stay record, sent back as expectedVersion. */
+  stayVersion?: number | null;
 }
 
 export interface PartnerOrderPage {
@@ -324,13 +396,19 @@ export interface EarningsRow {
   commission: Money;
   partnerNet: Money;
   escrowState: EscrowState;
+  /** Not in the contract's earnings spec: used when present, else the single response currency. */
+  currency?: string | null;
   heldAt: string | null;
   releasedAt: string | null;
 }
 
+export interface EarningsCurrencyTotals { currency: string; held: Money; released: Money; refunded: Money }
+
 export interface PartnerEarnings {
-  currency: string;
-  totals: { held: Money; released: Money; refunded: Money };
+  /** Only present when exactly one currency exists (backward compatibility). Totals are per currency. */
+  currency?: string | null;
+  totalsByCurrency: EarningsCurrencyTotals[];
+  /** Row currency is not in the contract, so rows are shown with the single currency when it is known. */
   items: EarningsRow[];
 }
 
@@ -348,6 +426,21 @@ export const partnerApi = {
     api.get<PartnerOrderPage>(`/api/partner/organizations/${enc(organizationId)}/order-items${qs(f)}`),
   earnings: (organizationId: string, f: { from?: string; to?: string }) =>
     api.get<PartnerEarnings>(`/api/partner/organizations/${enc(organizationId)}/earnings${qs(f)}`),
+  // partner payouts (PAYOUT-CONTRACT.md sec. 6.1)
+  payoutBalance: (organizationId: string) =>
+    api.get<PartnerPayoutBalance>(`/api/partner/organizations/${enc(organizationId)}/payouts/balance`),
+  payouts: (organizationId: string, f: { status?: string; page?: number; size?: number } = {}) =>
+    api.get<PartnerPayoutPage>(`/api/partner/organizations/${enc(organizationId)}/payouts${qs(f)}`),
+  requestPayout: (organizationId: string, body: { currency: string; amount: number }, idempotencyKey: string) =>
+    api.post<PartnerPayout>(`/api/partner/organizations/${enc(organizationId)}/payouts`, body, { 'Idempotency-Key': idempotencyKey }),
+  cancelPayout: (organizationId: string, payoutId: string) =>
+    api.post<PartnerPayout>(`/api/partner/organizations/${enc(organizationId)}/payouts/${enc(payoutId)}/cancel`, {}),
+  bankAccount: (organizationId: string) =>
+    api.get<PartnerBankAccount>(`/api/partner/organizations/${enc(organizationId)}/bank-account`),
+  saveBankAccount: (organizationId: string, body: { accountHolderName: string; iban: string }) =>
+    api.put<PartnerBankAccount>(`/api/partner/organizations/${enc(organizationId)}/bank-account`, body),
+  deleteBankAccount: (organizationId: string) =>
+    api.del(`/api/partner/organizations/${enc(organizationId)}/bank-account`),
   // organizations and memberships
   myMemberships: () => api.get<Membership[]>('/api/me/memberships'),
   createOrganization: (body: CreateOrganizationRequest) =>
@@ -363,6 +456,19 @@ export const partnerApi = {
   hotel: (hotelId: string) => api.get<PartnerHotel>(`/api/hotels/${enc(hotelId)}`),
   createHotel: (body: HotelRequest) => api.post<PartnerHotel>('/api/hotels', body),
   updateHotel: (hotelId: string, body: HotelRequest) => api.put<PartnerHotel>(`/api/hotels/${enc(hotelId)}`, body),
+
+  // publication workflow (contract 4.1, 4.2)
+  submitPublication: (hotelId: string, body: PublicationSubmitRequest) =>
+    api.post<PublicationRequestCreated>(`/api/hotels/${enc(hotelId)}/publication-requests`, body),
+  publicationRequests: (hotelId: string) =>
+    api.get<PublicationRequestSummary[]>(`/api/hotels/${enc(hotelId)}/publication-requests`),
+  withdrawPublication: (hotelId: string, requestId: string) =>
+    api.post<PublicationRequestCreated>(`/api/hotels/${enc(hotelId)}/publication-requests/${enc(requestId)}/withdraw`, {}),
+  getContent: (hotelId: string) => api.get<HotelContentView>(`/api/hotels/${enc(hotelId)}/content`),
+  patchContent: (hotelId: string, body: { expectedVersion: number; content: Partial<HotelContent> }) =>
+    api.patch<ContentRevision>(`/api/hotels/${enc(hotelId)}/content`, body),
+  archiveHotel: (hotelId: string, reason: string) =>
+    api.post<PartnerHotel>(`/api/hotels/${enc(hotelId)}/archive`, { reason }),
 
   // room types (includeInactive=true lists deactivated ones too, so they can be re-activated;
   // the backend requires ROOM_MANAGE permission for it, which partner users have)
@@ -426,6 +532,61 @@ export function partnerErrorMessage(err: unknown, fallback: string): string {
   return (err instanceof Error && err.message) || fallback;
 }
 
+export const PUBLICATION_STATUS_LABEL: Record<PublicationStatus, string> = {
+  DRAFT: 'Taslak',
+  SUBMITTED: 'Incelemede',
+  APPROVED: 'Onaylandi, yayin bekliyor',
+  PUBLISHED: 'Yayinda',
+  REJECTED: 'Reddedildi',
+  SUSPENDED: 'Askiya alindi',
+  ARCHIVED: 'Arsivlendi',
+};
+
+export const PUBLICATION_STATUS_TONE: Record<PublicationStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
+  DRAFT: 'neutral',
+  SUBMITTED: 'warning',
+  APPROVED: 'warning',
+  PUBLISHED: 'success',
+  REJECTED: 'error',
+  SUSPENDED: 'error',
+  ARCHIVED: 'neutral',
+};
+
+export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
+  DRAFT: 'Taslak degisiklik',
+  SUBMITTED: 'Incelemede',
+  APPLIED: 'Uygulandi',
+  REJECTED: 'Reddedildi',
+  SUPERSEDED: 'Yenisiyle degisti',
+};
+
+/** HOTEL_MANAGE holders: organization owner, or owner/manager granted on this very hotel (HOTEL_STAFF cannot). */
+export function canManageHotel(roles: RoleGrant[], hotelId: string): boolean {
+  return roles.some(r =>
+    r.role === 'ORGANIZATION_OWNER' ||
+    ((r.role === 'HOTEL_OWNER' || r.role === 'HOTEL_MANAGER') && r.scopeType === 'HOTEL' && r.scopeId === hotelId));
+}
+
+/** Why the "Yayin icin gonder" button must be disabled, or null when submitting is allowed. */
+export function submitBlockReason(orgStatus: OrganizationStatus | undefined, canManage: boolean): string | null {
+  if (!canManage) return 'Yayin icin gondermek otel yonetim yetkisi gerektirir.';
+  if (orgStatus !== 'ACTIVE') return 'Isletmeniz platform tarafindan onaylanmadan otel yayin icin gonderilemez.';
+  return null;
+}
+
+/** Only the fields that differ from the base, so PATCH carries a minimal partial content. */
+export function contentDiff(base: HotelContent, next: HotelContent): Partial<HotelContent> {
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(next) as Array<keyof HotelContent>) {
+    if ((base[k] ?? null) !== (next[k] ?? null)) out[k] = next[k];
+  }
+  return out as Partial<HotelContent>;
+}
+
+export function isErrorCode(err: unknown, status: number, code: string): boolean {
+  return err instanceof ApiError && err.status === status && err.code === code;
+}
+
 export const ORGANIZATION_STATUS_LABEL: Record<OrganizationStatus, string> = {
   PENDING: 'Onay bekliyor',
   ACTIVE: 'Aktif',
@@ -472,3 +633,222 @@ export const CANCELLATION_POLICY_LABEL: Record<CancellationPolicy, string> = {
   FREE_CANCELLATION: 'Ucretsiz iptal',
   NON_REFUNDABLE: 'Iade edilemez',
 };
+
+// ---------- partner payouts (PAYOUT-CONTRACT.md sec. 4, 6) ----------
+
+/** The contract shows money as strings, existing DTOs use numbers: accept both. */
+export type Amount = number | string;
+
+export type PayoutStatus = 'REQUESTED' | 'APPROVED' | 'PROCESSING' | 'PAID' | 'FAILED' | 'CANCELLED';
+export type BankAccountStatus = 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED' | 'DISABLED';
+export type PayoutBlockedReason =
+  | 'NO_BANK_ACCOUNT' | 'BANK_NOT_VERIFIED' | 'BELOW_MINIMUM' | 'OPEN_PAYOUT' | 'NEGATIVE_BALANCE'
+  | 'CURRENCY_NOT_SUPPORTED' | 'NOT_OWNER' | 'ORGANIZATION_NOT_ACTIVE';
+
+export interface PayoutCurrencyBalance {
+  currency: string;
+  payable: Amount;
+  releasedNotYetPayable: Amount;
+  /** ESTIMATED: still in escrow and may be refunded. Never part of payable. */
+  held: Amount;
+  reserved: Amount;
+  paidTotal: Amount;
+  owed: Amount;
+  minimumPayout: Amount;
+  canRequest: boolean;
+  blockedReason: PayoutBlockedReason | null;
+}
+
+export interface PartnerPayoutBalance {
+  organizationId: string;
+  holdbackDays: number;
+  balances: PayoutCurrencyBalance[];
+  bankAccount: { status: BankAccountStatus; maskedIban: string } | null;
+}
+
+export interface PartnerPayout {
+  id: string;
+  organizationId: string;
+  currency: string;
+  amount: Amount;
+  status: PayoutStatus;
+  maskedIban: string;
+  accountHolderName: string;
+  requestedAt: string;
+  approvedAt: string | null;
+  processingAt: string | null;
+  paidAt: string | null;
+  paymentReference: string | null;
+  failureReason: string | null;
+  cancelReason: string | null;
+  cancelledByType: 'PARTNER' | 'ADMIN' | null;
+  version: number;
+}
+export interface PartnerPayoutPage { items: PartnerPayout[]; page: number; size: number; total: number }
+
+export interface PartnerBankAccount {
+  id: string;
+  accountHolderName: string;
+  ibanLast4: string;
+  maskedIban: string;
+  status: BankAccountStatus;
+  verifiedAt: string | null;
+  rejectReason: string | null;
+  updatedAt: string;
+  version: number;
+}
+
+export const PAYOUT_STATUS_LABEL: Record<PayoutStatus, string> = {
+  REQUESTED: 'Talep edildi',
+  APPROVED: 'Onaylandi',
+  PROCESSING: 'Isleniyor',
+  PAID: 'Odendi',
+  FAILED: 'Basarisiz',
+  CANCELLED: 'Iptal edildi',
+};
+
+export const PAYOUT_STATUS_TONE: Record<PayoutStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
+  REQUESTED: 'warning',
+  APPROVED: 'warning',
+  PROCESSING: 'warning',
+  PAID: 'success',
+  FAILED: 'error',
+  CANCELLED: 'neutral',
+};
+
+export const BANK_STATUS_LABEL: Record<BankAccountStatus, string> = {
+  PENDING_VERIFICATION: 'Onay bekliyor',
+  VERIFIED: 'Onayli',
+  REJECTED: 'Reddedildi',
+  DISABLED: 'Devre disi',
+};
+
+export const BANK_STATUS_TONE: Record<BankAccountStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
+  PENDING_VERIFICATION: 'warning',
+  VERIFIED: 'success',
+  REJECTED: 'error',
+  DISABLED: 'neutral',
+};
+
+export const PAYOUT_BLOCKED_LABEL: Record<PayoutBlockedReason, string> = {
+  NO_BANK_ACCOUNT: 'Once bir banka hesabi ekleyin.',
+  BANK_NOT_VERIFIED: 'Banka hesabiniz henuz onaylanmadi.',
+  BELOW_MINIMUM: 'Bakiye asgari odeme tutarinin altinda.',
+  OPEN_PAYOUT: 'Bu para birimi icin devam eden bir odeme talebi var.',
+  NEGATIVE_BALANCE: 'Borcunuz var. Yeni kazanclar borcu kapatana kadar odeme talep edilemez.',
+  CURRENCY_NOT_SUPPORTED: 'Bu para birimi icin odeme yapilmiyor.',
+  NOT_OWNER: 'Odeme talebini yalnizca isletme sahibi yapabilir.',
+  ORGANIZATION_NOT_ACTIVE: 'Isletmeniz aktif olmadigi icin odeme talep edilemez.',
+};
+
+/** Turkish text per backend error code (PAYOUT-CONTRACT.md sec. 6.3). */
+export const PAYOUT_ERROR_LABEL: Record<string, string> = {
+  INVALID_IBAN: 'IBAN gecersiz. Gecerli bir TR IBAN girin.',
+  PAYOUT_OWNER_ONLY: 'Bu islemi yalnizca isletme sahibi yapabilir.',
+  INVALID_STATE_TRANSITION: 'Odeme bu durumda bu islem icin uygun degil. Sayfayi yenileyin.',
+  VERSION_CONFLICT: 'Kayit baska biri tarafindan degistirildi. Sayfayi yenileyip tekrar deneyin.',
+  OPEN_PAYOUT_EXISTS: 'Bu para birimi icin devam eden bir odeme var.',
+  IDEMPOTENCY_KEY_REUSED: 'Bu talep anahtari farkli bir tutarla kullanilmis. Formu kapatip yeniden acin.',
+  IBAN_ALREADY_IN_USE: 'Bu IBAN baska bir hesapta kullaniliyor.',
+  BANK_ACCOUNT_CHANGED: 'Banka hesabi talepten sonra degisti. Talebi iptal edip yeniden olusturun.',
+  ORGANIZATION_NOT_ACTIVE: 'Isletme aktif degil.',
+  PAYMENT_REFERENCE_IN_USE: 'Bu banka referansi baska bir odemede kullanilmis.',
+  INSUFFICIENT_PAYABLE_BALANCE: 'Tutar cekilebilir bakiyeyi asiyor.',
+  PAYOUT_BELOW_MINIMUM: 'Tutar asgari odeme tutarinin altinda.',
+  PAYOUT_CURRENCY_NOT_SUPPORTED: 'Bu para birimi icin odeme yapilmiyor.',
+  BANK_ACCOUNT_REQUIRED: 'Once bir banka hesabi ekleyin.',
+  BANK_ACCOUNT_NOT_VERIFIED: 'Banka hesabi henuz onaylanmadi.',
+  DEPENDENCY_UNAVAILABLE: 'Servis gecici olarak kullanilamiyor, biraz sonra tekrar deneyin.',
+  ACCESS_DENIED: 'Bu islem icin yetkiniz yok.',
+};
+
+export function isPayoutVersionConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && err.code === 'VERSION_CONFLICT';
+}
+
+/** Turkish message for a failed payout call: by error code first, then backend text, then fallback. */
+export function payoutErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.code && PAYOUT_ERROR_LABEL[err.code]) return PAYOUT_ERROR_LABEL[err.code];
+  return partnerErrorMessage(err, fallback);
+}
+
+/** Numeric value of a money field that may arrive as number or decimal string. */
+export function toAmount(v: Amount | null | undefined): number {
+  if (v == null) return 0;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Strips spaces and hyphens, uppercases. */
+export function normalizeIban(raw: string): string {
+  return raw.replace(/[\s-]/g, '').toUpperCase();
+}
+
+/** Turkish IBAN: TR + 24 digits and ISO 13616 mod-97 check. The server stays authoritative. */
+export function isValidTrIban(raw: string): boolean {
+  const iban = normalizeIban(raw);
+  if (!/^TR[0-9]{24}$/.test(iban)) return false;
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let remainder = 0;
+  for (const ch of rearranged) {
+    const code = ch.charCodeAt(0);
+    const digits = code >= 65 ? String(code - 55) : ch;
+    for (const d of digits) remainder = (remainder * 10 + (d.charCodeAt(0) - 48)) % 97;
+  }
+  return remainder === 1;
+}
+
+/** Same format as the backend IbanMask: check digits and middle never shown, last 2 digits only. */
+export function maskIbanFromLast4(last4: string): string {
+  return `TR** **** **** **** **** **${last4.slice(2)}`;
+}
+
+/** Groups a normalized IBAN in blocks of four for display (only used on the admin reveal). */
+export function formatIbanGroups(iban: string): string {
+  return normalizeIban(iban).replace(/(.{4})/g, '$1 ').trim();
+}
+
+/** Parses "1.000,50", "1000.5" style input to a number with max 2 decimals, or null. */
+export function parseAmountInput(input: string): number | null {
+  const t = input.trim().replace(/\s/g, '');
+  if (!t) return null;
+  let norm = t;
+  if (t.includes(',')) norm = t.replace(/\./g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(norm)) return null;
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Client-side amount check for a payout request. Returns a Turkish error or null when acceptable. */
+export function validatePayoutAmount(input: string, payable: Amount, minimum: Amount): string | null {
+  const value = parseAmountInput(input);
+  if (value == null) return 'Gecerli bir tutar girin (en fazla 2 ondalik).';
+  if (value <= 0) return 'Tutar sifirdan buyuk olmali.';
+  if (value > 10000000) return 'Tutar en fazla 10.000.000 olabilir.';
+  const min = toAmount(minimum);
+  if (Math.round(value * 100) < Math.round(min * 100)) return `Asgari odeme tutari ${min.toFixed(2)}.`;
+  if (Math.round(value * 100) > Math.round(toAmount(payable) * 100)) return 'Tutar cekilebilir bakiyeyi asiyor.';
+  return null;
+}
+
+// ---------- stay operations (RM-29) ----------
+
+export interface StayOperationResult {
+  orderItemId: string;
+  voucherStatus: VoucherStatus;
+  checkedOutAt: string | null;
+  version: number;
+}
+
+/** Records the hotel check-out of a REDEEMED order item. 409 INVALID_STATE_TRANSITION / VERSION_CONFLICT on bad state. */
+export const checkOutOrderItem = (organizationId: string, orderItemId: string, expectedVersion: number) =>
+  api.post<StayOperationResult>(
+    `/api/partner/organizations/${encodeURIComponent(organizationId)}/order-items/${encodeURIComponent(orderItemId)}/check-out`,
+    { expectedVersion });
+
+export function checkOutErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 409) {
+    return 'Check-out yapilamadi: konaklama kaydi bu islem icin uygun durumda degil veya baska biri tarafindan degistirildi. Liste yenilendi.';
+  }
+  return partnerErrorMessage(err, 'Check-out yapilamadi');
+}

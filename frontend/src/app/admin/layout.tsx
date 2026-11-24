@@ -6,11 +6,13 @@ import { SurfaceGuard } from '@/components/SurfaceGuard';
 const nav: NavItem[] = [
   { href: '/admin', label: 'Genel Bakis', icon: 'dashboard', exact: true },
   { href: '/admin/organizations', label: 'Isletmeler', icon: 'domain' },
+  { href: '/admin/hotel-publications', label: 'Otel Yayinlari', icon: 'storefront' },
   { href: '/admin/users', label: 'Kullanicilar', icon: 'manage_accounts' },
   { href: '/admin/flights', label: 'Ucuslar', icon: 'flight' },
   { href: '/admin/airports', label: 'Havalimanlari', icon: 'flight_takeoff' },
   { href: '/admin/seats', label: 'Koltuklar', icon: 'airline_seat_recline_normal' },
   { href: '/admin/supplier-balance', label: 'Tedarikci Bakiyesi', icon: 'account_balance_wallet' },
+  { href: '/admin/payouts', label: 'Ödemeler (payout)', icon: 'account_balance' },
   { href: '/admin/vehicles', label: 'Araclar', icon: 'directions_car' },
   { href: '/admin/car-documents', label: 'Arac Belgeleri', icon: 'assignment_turned_in' },
   { href: '/admin/bus-documents', label: 'Otobus Belgeleri', icon: 'assignment_turned_in' },

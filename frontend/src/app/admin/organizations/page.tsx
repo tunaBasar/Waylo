@@ -60,6 +60,7 @@ export default function AdminOrganizationsPage() {
   return (
     <div className="space-y-space-md">
       <PageHeader title="Isletmeler" subtitle="Partner isletme basvurularini onaylayin veya askiya alin." />
+      <p className="text-xs text-on-surface-variant">Isletme onayi oteli yayinlamaz, otel yayin onayi ayri verilir.</p>
       <div className="flex flex-wrap gap-1.5">
         {STATUSES.map(s => (
           <button key={s.key} onClick={() => setStatus(s.key)}
