@@ -40,6 +40,10 @@ class TenantRlsPoolLeakIntegrationTest {
     static final UUID TRIP_A = UUID.randomUUID();
     static final UUID TRIP_B = UUID.randomUUID();
     static final UUID TERMINAL = UUID.randomUUID();
+    static final UUID BOOKING_A = UUID.randomUUID();
+    static final UUID BOOKING_B = UUID.randomUUID();
+    static final UUID TICKET_A = UUID.randomUUID();
+    static final UUID TICKET_B = UUID.randomUUID();
 
     static HikariDataSource dataSource;
     static EntityManagerFactory emf;
@@ -62,6 +66,8 @@ class TenantRlsPoolLeakIntegrationTest {
             insertBus(s, BUS_B, ORG_B, "34B001");
             insertTrip(s, TRIP_A, ORG_A, BUS_A, "A1");
             insertTrip(s, TRIP_B, ORG_B, BUS_B, "B1");
+            insertBooking(s, BOOKING_A, TICKET_A, ORG_A, TRIP_A);
+            insertBooking(s, BOOKING_B, TICKET_B, ORG_B, TRIP_B);
             for (UUID trip : new UUID[] {TRIP_A, TRIP_B}) {
                 s.execute("INSERT INTO trip_stops (id, trip_id, seq, terminal_id) VALUES ('" + UUID.randomUUID() + "', '" + trip + "', 0, '" + TERMINAL + "')");
                 s.execute("INSERT INTO trip_fares (id, trip_id, from_seq, to_seq, price) VALUES ('" + UUID.randomUUID() + "', '" + trip + "', 0, 1, 100)");
@@ -89,6 +95,15 @@ class TenantRlsPoolLeakIntegrationTest {
     private static void insertTrip(Statement s, UUID id, UUID org, UUID bus, String code) throws Exception {
         s.execute("INSERT INTO trips (id, organization_id, bus_id, code, status, departure_at, currency) VALUES ('"
                 + id + "', '" + org + "', '" + bus + "', '" + code + "', 'DRAFT', now(), 'TRY')");
+    }
+
+    private static void insertBooking(Statement s, UUID id, UUID ticket, UUID org, UUID trip) throws Exception {
+        s.execute("INSERT INTO bookings (id, organization_id, customer_id, trip_id, from_seq, to_seq, currency, total_amount, "
+                + "status, hold_expires_at, idempotency_key) VALUES ('" + id + "', '" + org + "', '" + UUID.randomUUID()
+                + "', '" + trip + "', 0, 1, 'TRY', 100, 'HELD', now() + interval '1 hour', 'rls-" + id + "')");
+        s.execute("INSERT INTO tickets (id, booking_id, trip_id, seat_no, from_seq, to_seq, passenger_name, gender, price, "
+                + "status, hold_expires_at) VALUES ('" + ticket + "', '" + id + "', '" + trip
+                + "', 1, 0, 1, 'Pax', 'MALE', 100, 'HELD', now() + interval '1 hour')");
     }
 
     @AfterAll
@@ -202,5 +217,57 @@ class TenantRlsPoolLeakIntegrationTest {
         int service = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
                 .createNativeQuery("UPDATE buses SET brand = 'Mercedes'").executeUpdate());
         assertThat(service).isEqualTo(2);
+    }
+
+    @Test
+    void partnerSeesAndUpdatesOnlyOwnBookingsAndTicketsWithoutWhereClause() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        assertThat(visible("bookings", "id")).containsExactly(BOOKING_A);
+        assertThat(visible("tickets", "id")).containsExactly(TICKET_A);
+        int bookings = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE bookings SET status = 'CANCELLED'").executeUpdate());
+        assertThat(bookings).isEqualTo(1);
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        int tickets = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE tickets SET status = 'CANCELLED'").executeUpdate());
+        assertThat(tickets).isEqualTo(1);
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        int other = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE tickets SET status = 'HELD' WHERE booking_id = ?1")
+                .setParameter(1, BOOKING_B).executeUpdate());
+        assertThat(other).isZero();
+
+        TenantContext.set(TenantContext.Mode.SERVICE);
+        tx.executeWithoutResult(status -> {
+            var em = EntityManagerFactoryUtils.getTransactionalEntityManager(emf);
+            em.createNativeQuery("UPDATE bookings SET status = 'HELD'").executeUpdate();
+            em.createNativeQuery("UPDATE tickets SET status = 'HELD'").executeUpdate();
+        });
+    }
+
+    @Test
+    void publicServiceAndAdminSeeAllBookingsAndTickets() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        assertThat(visible("bookings", "id")).containsExactlyInAnyOrder(BOOKING_A, BOOKING_B);
+        assertThat(visible("tickets", "id")).containsExactlyInAnyOrder(TICKET_A, TICKET_B);
+        TenantContext.set(TenantContext.Mode.ADMIN);
+        assertThat(visible("bookings", "id")).containsExactlyInAnyOrder(BOOKING_A, BOOKING_B);
+        TenantContext.clear(); // no context = SERVICE (HoldExpiryScheduler)
+        assertThat(visible("bookings", "id")).containsExactlyInAnyOrder(BOOKING_A, BOOKING_B);
+        assertThat(visible("tickets", "id")).containsExactlyInAnyOrder(TICKET_A, TICKET_B);
+    }
+
+    @Test
+    void partnerCannotInsertBookingOrTicketForAnotherOrganization() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("INSERT INTO tickets (id, booking_id, trip_id, seat_no, from_seq, to_seq, passenger_name, "
+                        + "gender, price, status, hold_expires_at) VALUES (?1, ?2, ?3, 2, 0, 1, 'Evil', 'MALE', 1, 'HELD', now())")
+                .setParameter(1, UUID.randomUUID()).setParameter(2, BOOKING_B).setParameter(3, TRIP_B).executeUpdate()))
+                .hasMessageContaining("row-level security");
     }
 }

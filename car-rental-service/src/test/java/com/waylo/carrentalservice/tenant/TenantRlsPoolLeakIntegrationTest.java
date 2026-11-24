@@ -39,6 +39,8 @@ class TenantRlsPoolLeakIntegrationTest {
     static final UUID BRANCH_B = UUID.randomUUID();
     static final UUID VEHICLE_A = UUID.randomUUID();
     static final UUID VEHICLE_B = UUID.randomUUID();
+    static final UUID RENTAL_A = UUID.randomUUID();
+    static final UUID RENTAL_B = UUID.randomUUID();
 
     static HikariDataSource dataSource;
     static EntityManagerFactory emf;
@@ -60,6 +62,8 @@ class TenantRlsPoolLeakIntegrationTest {
             insertBranch(s, BRANCH_B, ORG_B);
             insertVehicle(s, VEHICLE_A, ORG_A, BRANCH_A, "34AAA01");
             insertVehicle(s, VEHICLE_B, ORG_B, BRANCH_B, "34BBB01");
+            insertRental(s, RENTAL_A, ORG_A, VEHICLE_A, BRANCH_A);
+            insertRental(s, RENTAL_B, ORG_B, VEHICLE_B, BRANCH_B);
         }
 
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
@@ -84,6 +88,15 @@ class TenantRlsPoolLeakIntegrationTest {
         s.execute("INSERT INTO vehicles (id, organization_id, home_branch_id, plate_number, brand, model, year, category, "
                 + "transmission, fuel_type, seat_count) VALUES ('" + id + "', '" + org + "', '" + branch + "', '" + plate
                 + "', 'Fiat', 'Egea', 2022, 'ECONOMY', 'MANUAL', 'DIESEL', 5)");
+    }
+
+    private static void insertRental(Statement s, UUID id, UUID org, UUID vehicle, UUID branch) throws Exception {
+        s.execute("INSERT INTO rentals (id, organization_id, customer_id, vehicle_id, pickup_branch_id, return_branch_id, "
+                + "category, transmission, pickup_at, return_at, chargeable_days, daily_rate, one_way_fee, total_amount, "
+                + "currency, deposit_amount, driver_age, status, hold_expires_at, idempotency_key) VALUES ('" + id + "', '"
+                + org + "', '" + UUID.randomUUID() + "', '" + vehicle + "', '" + branch + "', '" + branch + "', 'ECONOMY', "
+                + "'MANUAL', now() + interval '1 day', now() + interval '3 day', 2, 100, 0, 200, 'TRY', 500, 30, 'HELD', "
+                + "now() + interval '1 hour', 'rls-" + id + "')");
     }
 
     @AfterAll
@@ -199,6 +212,52 @@ class TenantRlsPoolLeakIntegrationTest {
                 .createNativeQuery("INSERT INTO branches (id, organization_id, name, city, address, open_time, close_time) "
                         + "VALUES (?1, ?2, 'x', 'x', 'x', '08:00', '20:00')")
                 .setParameter(1, UUID.randomUUID()).setParameter(2, ORG_B).executeUpdate()))
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void partnerSeesAndUpdatesOnlyOwnRentalsWithoutWhereClause() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        assertThat(visible("rentals")).containsExactly(RENTAL_A);
+        int updated = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE rentals SET status = 'CANCELLED'").executeUpdate());
+        assertThat(updated).isEqualTo(1);
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        int other = tx.execute(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE rentals SET status = 'HELD' WHERE id = ?1")
+                .setParameter(1, RENTAL_B).executeUpdate());
+        assertThat(other).isZero();
+
+        TenantContext.set(TenantContext.Mode.SERVICE);
+        tx.executeWithoutResult(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("UPDATE rentals SET status = 'HELD'").executeUpdate());
+    }
+
+    @Test
+    void publicServiceAndAdminSeeAllRentals() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        assertThat(visible("rentals")).containsExactlyInAnyOrder(RENTAL_A, RENTAL_B);
+        TenantContext.set(TenantContext.Mode.ADMIN);
+        assertThat(visible("rentals")).containsExactlyInAnyOrder(RENTAL_A, RENTAL_B);
+        TenantContext.clear(); // no context = SERVICE (HoldExpiryScheduler)
+        assertThat(visible("rentals")).containsExactlyInAnyOrder(RENTAL_A, RENTAL_B);
+    }
+
+    @Test
+    void partnerCannotInsertRentalForAnotherOrganization() {
+        TenantContext.set(TenantContext.Mode.PUBLIC);
+        TenantContext.authorizePartner(ORG_A);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> EntityManagerFactoryUtils.getTransactionalEntityManager(emf)
+                .createNativeQuery("INSERT INTO rentals (id, organization_id, customer_id, vehicle_id, pickup_branch_id, "
+                        + "return_branch_id, category, transmission, pickup_at, return_at, chargeable_days, daily_rate, "
+                        + "one_way_fee, total_amount, currency, deposit_amount, driver_age, status, hold_expires_at, "
+                        + "idempotency_key) VALUES (?1, ?2, ?3, ?4, ?5, ?5, 'ECONOMY', 'MANUAL', now() + interval '1 day', "
+                        + "now() + interval '2 day', 1, 1, 0, 1, 'TRY', 1, 30, 'HELD', now(), ?6)")
+                .setParameter(1, UUID.randomUUID()).setParameter(2, ORG_B).setParameter(3, UUID.randomUUID())
+                .setParameter(4, VEHICLE_B).setParameter(5, BRANCH_B).setParameter(6, "evil-" + UUID.randomUUID())
+                .executeUpdate()))
                 .hasMessageContaining("row-level security");
     }
 }

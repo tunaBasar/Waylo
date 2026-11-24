@@ -175,6 +175,23 @@ try:
                "SELECT current_user || '|' || coalesce(current_setting('app.mode', true), '')", db) == ['waylo|'],
           'car DB: role and app.mode are gone after COMMIT')
 
+    # V7: rentals (transactional, partner mode only). Fixtures are inserted as the owner and deleted in the finally block.
+    rental_a, rental_b = str(uuid.uuid4()), str(uuid.uuid4())
+    cleanup.append(('rentals', rental_a, rental_b))
+    for rid, org, veh, br in ((rental_a, car_a, veh_a, branch_a), (rental_b, car_b, veh_b, branch_b)):
+        psql("INSERT INTO rentals (id, organization_id, customer_id, vehicle_id, pickup_branch_id, return_branch_id, category, "
+             "transmission, pickup_at, return_at, chargeable_days, daily_rate, one_way_fee, total_amount, currency, deposit_amount, "
+             f"driver_age, status, hold_expires_at, idempotency_key) VALUES ('{rid}', '{org}', gen_random_uuid(), '{veh}', '{br}', '{br}', "
+             "'ECONOMY', 'MANUAL', now() + interval '1 day', now() + interval '2 day', 1, 1, 0, 1, 'TRY', 1, 30, 'CANCELLED', now(), "
+             f"'rls-{rid}')", db)
+    check(as_partner(db, car_a, f"SELECT id FROM rentals WHERE id IN ('{rental_a}','{rental_b}')") == [rental_a], 'car DB: partner A sees only rental A')
+    check(as_partner(db, car_a, f"SELECT count(*) FROM rentals WHERE organization_id = '{car_b}'") == ['0'], 'car DB: A sees no B rentals')
+    check(as_partner(db, car_a, f"WITH u AS (UPDATE rentals SET status='CANCELLED' WHERE id='{rental_b}' RETURNING 1) SELECT count(*) FROM u") == ['0'],
+          'car DB: A UPDATE on B rental affects 0 rows')
+    check(as_mode(db, 'service', f"SELECT count(*) FROM rentals WHERE id IN ('{rental_a}','{rental_b}')") == ['2'], 'car DB: service mode sees both rentals')
+    check(as_mode(db, 'public', f"SELECT count(*) FROM rentals WHERE id IN ('{rental_a}','{rental_b}')") == ['2'], 'car DB: public mode sees both rentals')
+    check(psql("SELECT relforcerowsecurity FROM pg_class WHERE relname = 'rentals'", db) == ['t'], 'car DB: FORCE ROW LEVEL SECURITY on rentals')
+
     # ---------------- bus ----------------
     bus_a, bus_b = org_for(token_a, admin, 'A', 'BUS'), org_for(token_b, admin, 'B', 'BUS')
     ba, bb = f'/api/bus-partner/organizations/{bus_a}', f'/api/bus-partner/organizations/{bus_b}'
@@ -231,10 +248,34 @@ try:
           'bus DB: public mode cannot update trips')
     check(psql("SELECT bool_and(relforcerowsecurity) FROM pg_class WHERE relname IN ('buses','trips','trip_stops','trip_fares','documents')", db) == ['t'],
           'bus DB: FORCE ROW LEVEL SECURITY on all tenant tables')
+    # V3: bookings and tickets (tickets follow their booking), partner mode only.
+    book_a, book_b, tick_a, tick_b = (str(uuid.uuid4()) for _ in range(4))
+    cleanup.append(('bookings', book_a, book_b, tick_a, tick_b))
+    for bid, tid, org, trip in ((book_a, tick_a, bus_a, trip_a), (book_b, tick_b, bus_b, trip_b)):
+        psql("INSERT INTO bookings (id, organization_id, customer_id, trip_id, from_seq, to_seq, currency, total_amount, status, "
+             f"hold_expires_at, idempotency_key) VALUES ('{bid}', '{org}', gen_random_uuid(), '{trip}', 0, 1, 'TRY', 1, 'CANCELLED', now(), 'rls-{bid}');"
+             "INSERT INTO tickets (id, booking_id, trip_id, seat_no, from_seq, to_seq, passenger_name, gender, price, status, hold_expires_at) "
+             f"VALUES ('{tid}', '{bid}', '{trip}', 1, 0, 1, 'Pax', 'MALE', 1, 'CANCELLED', now())", db)
+    check(as_partner(db, bus_a, f"SELECT id FROM bookings WHERE id IN ('{book_a}','{book_b}')") == [book_a], 'bus DB: partner A sees only booking A')
+    check(as_partner(db, bus_a, f"SELECT id FROM tickets WHERE id IN ('{tick_a}','{tick_b}')") == [tick_a], 'bus DB: partner A sees only ticket A')
+    check(as_partner(db, bus_a, f"SELECT count(*) FROM bookings WHERE organization_id = '{bus_b}'") == ['0'], 'bus DB: A sees no B bookings')
+    check(as_partner(db, bus_a, f"SELECT count(*) FROM tickets WHERE booking_id = '{book_b}'") == ['0'], 'bus DB: A sees no B tickets')
+    check(as_partner(db, bus_a, f"WITH u AS (UPDATE bookings SET status='CANCELLED' WHERE id='{book_b}' RETURNING 1) SELECT count(*) FROM u") == ['0'],
+          'bus DB: A UPDATE on B booking affects 0 rows')
+    check(as_partner(db, bus_a, f"WITH u AS (UPDATE tickets SET status='CANCELLED' WHERE id='{tick_b}' RETURNING 1) SELECT count(*) FROM u") == ['0'],
+          'bus DB: A UPDATE on B ticket affects 0 rows')
+    check(as_mode(db, 'service', f"SELECT count(*) FROM tickets WHERE id IN ('{tick_a}','{tick_b}')") == ['2'], 'bus DB: service mode sees both tickets')
+    check(as_mode(db, 'public', f"SELECT count(*) FROM bookings WHERE id IN ('{book_a}','{book_b}')") == ['2'], 'bus DB: public mode sees both bookings')
+    check(psql("SELECT bool_and(relforcerowsecurity) FROM pg_class WHERE relname IN ('bookings','tickets')", db) == ['t'],
+          'bus DB: FORCE ROW LEVEL SECURITY on bookings and tickets')
 finally:
     for item in cleanup:
         try:
-            if item[0] == 'car':
+            if item[0] == 'rentals':
+                psql(f"DELETE FROM rentals WHERE id IN ('{item[1]}','{item[2]}')", 'car_rental_db')
+            elif item[0] == 'bookings':
+                psql(f"DELETE FROM tickets WHERE id IN ('{item[3]}','{item[4]}'); DELETE FROM bookings WHERE id IN ('{item[1]}','{item[2]}')", 'bus_db')
+            elif item[0] == 'car':
                 for v, tok, org in ((item[1], token_a, car_a), (item[2], token_b, car_b)):
                     request('POST', f'/api/partner/organizations/{org}/vehicles/{v}/deactivate', token=tok)
             else:
