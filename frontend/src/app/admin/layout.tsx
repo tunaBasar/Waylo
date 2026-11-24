@@ -23,6 +23,7 @@ const nav: NavItem[] = [
   { href: '/admin/payments', label: 'Odemeler', icon: 'payments' },
   { href: '/admin/notifications', label: 'Bildirimler', icon: 'notifications' },
   { href: '/admin/checkins', label: 'Check-in', icon: 'check_circle' },
+  { href: '/admin/support', label: 'Destek', icon: 'support_agent' },
   { href: '/admin/reviews', label: 'Degerlendirmeler', icon: 'reviews' },
 ];
 

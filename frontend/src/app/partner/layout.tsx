@@ -106,6 +106,7 @@ const hotelNav: NavItem[] = [
   { href: '/partner/calendar', label: 'Takvim', icon: 'calendar_month' },
   { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
   { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
+  { href: '/partner/support', label: 'Destek', icon: 'support_agent' },
   { href: '/partner/reviews', label: 'Yorumlar', icon: 'reviews' },
   { href: '/partner/team', label: 'Ekip', icon: 'group' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
@@ -122,6 +123,7 @@ const carNav: NavItem[] = [
   { href: '/partner/car/rentals', label: 'Kiralamalar', icon: 'receipt_long' },
   { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
   { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
+  { href: '/partner/support', label: 'Destek', icon: 'support_agent' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
@@ -132,6 +134,7 @@ const busNav: NavItem[] = [
   { href: '/partner/bus/bookings', label: 'Biletler', icon: 'confirmation_number' },
   { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
   { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
+  { href: '/partner/support', label: 'Destek', icon: 'support_agent' },
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 

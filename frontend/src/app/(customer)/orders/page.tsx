@@ -8,6 +8,8 @@ import { policyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
 import { REVIEW_WHEN_HINT, reviewApi, type ReviewableItem } from '@/lib/reviews';
 import { ReviewForm } from '@/components/ReviewForm';
+import { Field, inputClass } from '@/components/partner/ui';
+import { supportApi, validateNewCase, SUBJECT_MAX, BODY_MAX } from '@/lib/support';
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -300,6 +302,70 @@ function FlightCheckinPanel({ item, checkin, onDone }: { item: OrderItem; checki
   );
 }
 
+function SupportCasePanel({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [itemId, setItemId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<{ subject: string | null; message: string | null }>({ subject: null, message: null });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const submit = async () => {
+    const v = validateNewCase(subject, message);
+    setErrors(v);
+    if (v.subject || v.message) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await supportApi.open({ orderId: order.id, ...(itemId ? { orderItemId: itemId } : {}), subject: subject.trim(), message: message.trim() });
+      setDone(true);
+      setOpen(false);
+      setSubject('');
+      setMessage('');
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'Talep olusturulamadi');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 space-y-2">
+      {done && <p className="text-xs font-semibold text-secondary" data-testid="support-case-success">Destek talebiniz olusturuldu. Yanitlari Destek sayfasindan takip edebilirsiniz.</p>}
+      {!open ? (
+        <button type="button" onClick={() => { setOpen(true); setDone(false); }} data-testid="support-case-open"
+          className="rounded-xl bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface">Destek talebi ac</button>
+      ) : (
+        <div className="space-y-2 rounded-xl bg-surface-container p-3" data-testid="support-case-form">
+          {(order.items?.length ?? 0) > 0 && (
+            <Field label="Kalem (istege bagli)">
+              <select className={inputClass} value={itemId} onChange={e => setItemId(e.target.value)} data-testid="support-case-item">
+                <option value="">Tum siparis</option>
+                {order.items?.map(i => <option key={i.id} value={i.id}>{i.description}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="Konu" error={errors.subject}>
+            <input className={inputClass} maxLength={SUBJECT_MAX} value={subject} onChange={e => setSubject(e.target.value)} data-testid="support-case-subject" />
+          </Field>
+          <Field label="Mesaj" error={errors.message}>
+            <textarea className={inputClass} rows={3} maxLength={BODY_MAX} value={message} onChange={e => setMessage(e.target.value)} data-testid="support-case-message" />
+          </Field>
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} onClick={() => void submit()} data-testid="support-case-submit"
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">Gonder</button>
+            <button type="button" disabled={busy} onClick={() => setOpen(false)}
+              className="rounded-xl bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-on-surface">Vazgec</button>
+          </div>
+          {msg && <p className="text-xs text-error">{msg}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order; onChanged: () => void; reviewable: ReviewableItem[]; onReviewed: () => void }) {
   const [testMode, setTestMode] = useState(false);
   const [checkins, setCheckins] = useState<FlightCheckin[]>([]);
@@ -371,6 +437,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
       <p className="text-xs text-on-surface-variant">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
       {order.status === 'PENDING' && <PayPanel order={order} onPaid={onChanged} />}
       {(order.status === 'PENDING' || order.status === 'CONFIRMED') && <CancelPanel order={order} onChanged={onChanged} />}
+      <SupportCasePanel order={order} />
       {order.status === 'CONFIRMED' && <VoucherList orderId={order.id} testMode={testMode} />}
     </div>
   );

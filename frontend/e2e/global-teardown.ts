@@ -58,6 +58,15 @@ export default async function globalTeardown(force = false) {
   psql('auth_db', `DELETE FROM organization_memberships WHERE organization_id IN (${orgs})`);
   psql('auth_db', `DELETE FROM organizations WHERE id IN (${orgs})`);
   const emails = q(s.emails);
+  // Support cases of the fixture users (09-support). Messages are append-only, so the row trigger is lifted briefly.
+  const custIds = `SELECT id::text FROM users WHERE email IN (${emails})`;
+  const crmCustomers = psql('auth_db', custIds).split(/\s+/).filter(x => /^[0-9a-f-]{36}$/.test(x)).map(x => `'${x}'`).join(',');
+  if (crmCustomers) {
+    psql('crm_db', 'ALTER TABLE support_messages DISABLE TRIGGER trg_support_messages_row');
+    psql('crm_db', `DELETE FROM support_messages WHERE case_id IN (SELECT id FROM support_cases WHERE customer_id IN (${crmCustomers}))`);
+    psql('crm_db', 'ALTER TABLE support_messages ENABLE TRIGGER trg_support_messages_row');
+    psql('crm_db', `DELETE FROM support_cases WHERE customer_id IN (${crmCustomers})`);
+  }
   psql('crm_db', `DELETE FROM customers WHERE email IN (${emails})`);
   psql('auth_db', `DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email IN (${emails}))`);
   psql('auth_db', `DELETE FROM users WHERE email IN (${emails})`);
