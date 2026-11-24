@@ -10,10 +10,11 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.FixedBackOff;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.waylo.observability.dlt.DltAdminController;
+import com.waylo.observability.dlt.DltBrowser;
+import com.waylo.observability.dlt.DltErrorHandlers;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +22,6 @@ import java.util.Map;
 @Configuration
 public class KafkaConsumerConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerConfig.class);
     private static final String TYPE_MAPPINGS =
             "flightCancelled:com.waylo.flightseatinventoryservice.event.FlightCancelledEvent";
 
@@ -48,16 +48,25 @@ public class KafkaConsumerConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /**
+     * Retry 3 times (1s/2s/4s, max 10s), then publish to <topic>.DLT (see DltErrorHandlers). The offset is committed
+     * only after the DLT publish succeeded. Poison records (deserialization, IllegalArgument, validation) go straight to the DLT.
+     */
     @Bean
     public DefaultErrorHandler kafkaErrorHandler() {
-        DefaultErrorHandler handler = new DefaultErrorHandler(
-                (record, exception) -> log.error("Skipping unprocessable Kafka record: topic={}, offset={}, error={}",
-                        record.topic(), record.offset(), exception.getMessage()),
-                new FixedBackOff(1000L, 2L));
-        handler.addNotRetryableExceptions(
-                org.springframework.kafka.support.serializer.DeserializationException.class);
-        handler.setCommitRecovered(true);
-        return handler;
+        JsonSerializer<Object> json = new JsonSerializer<>();
+        json.setAddTypeInfo(false); // original headers (incl. __TypeId__) are copied by the recoverer
+        return DltErrorHandlers.create(bootstrapServers, json);
+    }
+
+    @Bean
+    public DltBrowser dltBrowser() {
+        return new DltBrowser(bootstrapServers, "flight-seat-inventory-service");
+    }
+
+    @Bean
+    public DltAdminController dltAdminController(DltBrowser dltBrowser) {
+        return new DltAdminController(dltBrowser);
     }
 
     @Bean

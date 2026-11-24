@@ -87,4 +87,13 @@ class SeatAccessFilterTest {
     void otherPathsUntouched() throws Exception {
         run("POST", "/actuator/x", null, null, true);
     }
+
+    @Test
+    void kafkaDltRequiresAdminForAllMethods() throws Exception {
+        run("GET", "/api/admin/kafka-dlt", uid, "ADMIN", true);
+        run("POST", "/api/admin/kafka-dlt/replay", uid, "ADMIN", true);
+        run("GET", "/api/admin/kafka-dlt", uid, "USER", false);
+        run("GET", "/api/admin/kafka-dlt", null, null, false);
+        run("POST", "/api/admin/kafka-dlt/replay", uid, "USER", false);
+    }
 }

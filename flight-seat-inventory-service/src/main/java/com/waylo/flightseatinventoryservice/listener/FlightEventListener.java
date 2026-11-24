@@ -27,16 +27,19 @@ public class FlightEventListener {
     public void handleFlightEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
         try {
             if (record.value() instanceof FlightCancelledEvent event) {
-                if (idempotencyService.tryAcquire(event.getEventId())) {
+                // Record as processed only AFTER success, so a retried record is not skipped as a duplicate.
+                if (!idempotencyService.isProcessed(event.getEventId())) {
                     flightSeatService.closeFlightSeats(event.getFlightNumber());
+                    idempotencyService.markProcessed(event.getEventId());
                 }
             } else {
                 log.debug("Skipping unknown flight event type: {}", record.value());
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT). No ack here.
             log.error("Flight event processing failed: {}", ex.getMessage(), ex);
-        } finally {
-            ack.acknowledge();
+            throw ex;
         }
+        ack.acknowledge();
     }
 }

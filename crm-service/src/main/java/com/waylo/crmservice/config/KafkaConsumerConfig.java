@@ -2,8 +2,6 @@ package com.waylo.crmservice.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,15 +11,16 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import com.waylo.observability.dlt.DltAdminController;
+import com.waylo.observability.dlt.DltBrowser;
+import com.waylo.observability.dlt.DltErrorHandlers;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
 public class KafkaConsumerConfig {
-
-    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerConfig.class);
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -70,19 +69,25 @@ public class KafkaConsumerConfig {
      * couple of times (in case the failure is transient, e.g. a dependency briefly down) and
      * then logs and skips it so the partition keeps moving.
      */
+    /**
+     * Retry 3 times (1s/2s/4s, max 10s), then publish to <topic>.DLT (see DltErrorHandlers). The offset is committed
+     * only after the DLT publish succeeded. Poison records (deserialization, IllegalArgument, validation) go straight to the DLT.
+     */
     @Bean
     public DefaultErrorHandler kafkaErrorHandler() {
-        DefaultErrorHandler handler = new DefaultErrorHandler(
-                (record, exception) -> log.error(
-                        "Skipping unprocessable Kafka record after retries: topic={}, partition={}, offset={}, error={}",
-                        record.topic(), record.partition(), record.offset(), exception.getMessage()),
-                new FixedBackOff(1000L, 2L));
-        handler.addNotRetryableExceptions(
-                org.springframework.kafka.support.serializer.DeserializationException.class);
-        // Listener never runs (and never acks) for a skipped record under MANUAL_IMMEDIATE, so
-        // commit its offset here; otherwise lag stays non-zero and it is re-consumed on restart.
-        handler.setCommitRecovered(true);
-        return handler;
+        JsonSerializer<Object> json = new JsonSerializer<>();
+        json.setAddTypeInfo(false); // original headers (incl. __TypeId__) are copied by the recoverer
+        return DltErrorHandlers.create(bootstrapServers, json);
+    }
+
+    @Bean
+    public DltBrowser dltBrowser() {
+        return new DltBrowser(bootstrapServers, "crm-service");
+    }
+
+    @Bean
+    public DltAdminController dltAdminController(DltBrowser dltBrowser) {
+        return new DltAdminController(dltBrowser);
     }
 
     @Bean

@@ -19,23 +19,38 @@ class FlightEventListenerTest {
     void cancellationClosesSeatsOnceAndAcknowledges() {
         FlightCancelledEvent event = new FlightCancelledEvent();
         event.setFlightNumber(" tk100 ");
-        when(idempotency.tryAcquire(event.getEventId())).thenReturn(true);
+        when(idempotency.isProcessed(event.getEventId())).thenReturn(false);
 
         listener.handleFlightEvent(new ConsumerRecord<>("flight-events", 0, 0L, "TK100", event), ack);
 
         verify(service).closeFlightSeats(" tk100 ");
+        verify(idempotency).markProcessed(event.getEventId());
         verify(ack).acknowledge();
     }
 
     @Test
     void duplicateCancellationDoesNotCloseSeats() {
         FlightCancelledEvent event = new FlightCancelledEvent();
-        when(idempotency.tryAcquire(event.getEventId())).thenReturn(false);
+        when(idempotency.isProcessed(event.getEventId())).thenReturn(true);
 
         listener.handleFlightEvent(new ConsumerRecord<>("flight-events", 0, 0L, "TK100", event), ack);
 
         verifyNoInteractions(service);
+        verify(idempotency, never()).markProcessed(any());
         verify(ack).acknowledge();
+    }
+
+    @Test
+    void processingFailurePropagates_notAcked_notMarkedProcessed() {
+        FlightCancelledEvent event = new FlightCancelledEvent();
+        when(idempotency.isProcessed(event.getEventId())).thenReturn(false);
+        when(service.closeFlightSeats(any())).thenThrow(new IllegalStateException("db down"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                listener.handleFlightEvent(new ConsumerRecord<>("flight-events", 0, 0L, "TK100", event), ack));
+
+        verify(ack, never()).acknowledge();
+        verify(idempotency, never()).markProcessed(any());
     }
 
     @Test

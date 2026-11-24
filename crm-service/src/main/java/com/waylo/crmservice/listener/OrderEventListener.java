@@ -24,10 +24,11 @@ public class OrderEventListener {
                 int pts = loyaltyService.awardForRedeemedItem(e.getOrderItemId(), e.getCustomerId(), e.getCurrency(), e.getAmount());
                 log.info("[CRM] Redeemed item {} -> {} loyalty points", e.getOrderItemId(), pts);
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT). No ack here.
             log.error("[CRM] Order event islenirken hata: {}", ex.getMessage(), ex);
-        } finally {
-            ack.acknowledge();
+            throw ex;
         }
+        ack.acknowledge();
     }
 }

@@ -22,12 +22,24 @@ public class CrmAccessFilter extends OncePerRequestFilter {
     @Override
     public boolean shouldNotFilter(HttpServletRequest request) {
         String p = request.getRequestURI();
-        return !(p.startsWith("/api/customers") || p.startsWith("/api/loyalty"));
+        return !(p.startsWith("/api/customers") || p.startsWith("/api/loyalty") || isDltPath(p));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if (isDltPath(request.getRequestURI())) {
+            // Kafka DLT admin: ADMIN only, no service-token bypass.
+            String uid = request.getHeader("X-User-Id");
+            if (uid == null || uid.isBlank()) {
+                deny(response, 401, "Authentication required");
+            } else if ("ADMIN".equals(request.getHeader("X-User-Role"))) {
+                chain.doFilter(request, response);
+            } else {
+                deny(response, 403, "Admin role required");
+            }
+            return;
+        }
         // Caller verified (signature, audience, allowlist) by service-auth-common's ServiceAuthFilter.
         if (ServiceAuthFilter.isServiceCall(request) && "GET".equals(request.getMethod())) {
             chain.doFilter(request, response);
@@ -47,6 +59,10 @@ public class CrmAccessFilter extends OncePerRequestFilter {
             return;
         }
         deny(response, 403, "Admin role required");
+    }
+
+    private static boolean isDltPath(String p) {
+        return p.equals("/api/admin/kafka-dlt") || p.startsWith("/api/admin/kafka-dlt/");
     }
 
     private void deny(HttpServletResponse response, int status, String message) throws IOException {

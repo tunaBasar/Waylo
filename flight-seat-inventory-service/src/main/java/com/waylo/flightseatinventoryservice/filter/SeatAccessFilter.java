@@ -24,6 +24,7 @@ public class SeatAccessFilter extends OncePerRequestFilter {
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_ROLE = "X-User-Role";
     private static final String BASE = "/api/seat-inventory";
+    private static final String DLT_BASE = "/api/admin/kafka-dlt";
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
     @Override
@@ -32,6 +33,16 @@ public class SeatAccessFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String path = request.getRequestURI();
         String method = request.getMethod().toUpperCase();
+
+        if (path.equals(DLT_BASE) || path.startsWith(DLT_BASE + "/")) {
+            // Kafka DLT admin: ADMIN only for every method (reads expose payloads).
+            if (!"ADMIN".equals(request.getHeader(HEADER_USER_ROLE))) {
+                send(response, 403, "FORBIDDEN", "Admin role required for this operation", path);
+                return;
+            }
+            chain.doFilter(request, response);
+            return;
+        }
 
         boolean guarded = path.equals(BASE) || path.startsWith(BASE + "/");
         if (!guarded || SAFE_METHODS.contains(method)) {

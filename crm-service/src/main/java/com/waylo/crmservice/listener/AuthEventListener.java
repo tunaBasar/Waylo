@@ -46,6 +46,17 @@ public class AuthEventListener {
             containerFactory = "kafkaListenerContainerFactory")
     public void handleAuthEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
         try {
+            process(record);
+        } catch (RuntimeException ex) {
+            // Propagate to the DefaultErrorHandler (retry, then <topic>.DLT). No ack here.
+            log.error("[CRM] Auth event islenirken hata: {}", ex.getMessage(), ex);
+            throw ex;
+        }
+        ack.acknowledge();
+    }
+
+    private void process(ConsumerRecord<String, Object> record) {
+        try {
             Object value = record.value();
             if (!(value instanceof String raw)) {
                 log.warn("[CRM] Beklenmeyen auth event payload tipi: {}",
@@ -70,12 +81,13 @@ public class AuthEventListener {
             }
             if ("PROFILE_UPDATED".equals(eventType) || "USER_UPDATED".equals(eventType)) {
                 String eventId = node.path("eventId").asText(null);
-                if (eventId != null && !idempotencyService.tryAcquire(eventId)) return;
+                if (eventId != null && idempotencyService.isProcessed(eventId)) return;
                 var existing = customerRepository.findById(userId);
                 if (existing.isEmpty() && email != null && !email.isBlank()) {
                     // No linked customer: link a manual CRM record with the same email (update events never create).
                     if (customerRepository.linkByEmail(userId, email.trim().toLowerCase()) > 0)
                         log.info("[CRM] USER_UPDATED ile mevcut musteri baglandi - customerId={}", userId);
+                    if (eventId != null) idempotencyService.markProcessed(eventId);
                     return;
                 }
                 existing.filter(c -> c.isActive()).ifPresent(c -> {
@@ -89,6 +101,7 @@ public class AuthEventListener {
                     }
                     customerRepository.save(c);
                 });
+                if (eventId != null) idempotencyService.markProcessed(eventId);
                 return;
             }
             if (email == null || email.isBlank()) {
@@ -101,10 +114,8 @@ public class AuthEventListener {
             } else if (!customerRepository.existsById(userId)) {
                 log.warn("[CRM] Musteri olusturulamadi, e-posta baska bir musteride kayitli - userId={}", userId);
             }
-        } catch (Exception ex) {
-            log.error("[CRM] Auth event islenirken hata: {}", ex.getMessage(), ex);
-        } finally {
-            ack.acknowledge();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+            throw new IllegalArgumentException("Malformed auth event JSON", ex); // non-retryable -> DLT
         }
     }
 }

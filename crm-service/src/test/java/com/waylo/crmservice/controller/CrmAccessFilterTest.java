@@ -59,4 +59,14 @@ class CrmAccessFilterTest {
         req.setRequestURI("/actuator/health");
         assertThat(filter.shouldNotFilter(req)).isTrue();
     }
+
+    @Test void dltAdmin_allowed() throws Exception {
+        assertThat(call("GET", "/api/admin/kafka-dlt", "a", "ADMIN", null)).isEqualTo(200);
+        assertThat(call("POST", "/api/admin/kafka-dlt/replay", "a", "ADMIN", null)).isEqualTo(200);
+    }
+    @Test void dltUser_403() throws Exception { assertThat(call("GET", "/api/admin/kafka-dlt", "u", "USER", null)).isEqualTo(403); }
+    @Test void dltAnonymous_401() throws Exception { assertThat(call("GET", "/api/admin/kafka-dlt", null, null, null)).isEqualTo(401); }
+    @Test void dltServiceCall_notBypassed() throws Exception {
+        assertThat(call("GET", "/api/admin/kafka-dlt", null, null, TOKEN)).isEqualTo(401);
+    }
 }

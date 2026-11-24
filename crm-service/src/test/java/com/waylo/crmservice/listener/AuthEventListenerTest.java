@@ -88,11 +88,13 @@ class AuthEventListenerTest {
     }
 
     @Test
-    void malformedJson_isSwallowedAndAcked() {
-        listener().handleAuthEvent(rec("not-json"), ack);
+    void malformedJson_isNotSwallowed_goesToErrorHandler() {
+        // DLT wiring: a poison record must reach the DefaultErrorHandler (non-retryable -> <topic>.DLT), not be acked here
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> listener().handleAuthEvent(rec("not-json"), ack));
 
         verifyNoInteractions(repository);
-        verify(ack).acknowledge();
+        verify(ack, never()).acknowledge();
     }
 
     private com.waylo.crmservice.domain.Customer customer() {
@@ -147,7 +149,7 @@ class AuthEventListenerTest {
     void userUpdated_updatesCustomer_andDuplicateEventIdIsSkipped() {
         com.waylo.crmservice.domain.Customer c = customer();
         when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
-        when(idempotency.tryAcquire("e1")).thenReturn(true, false);
+        when(idempotency.isProcessed("e1")).thenReturn(false, true);
         String json = "{\"eventType\":\"USER_UPDATED\",\"eventId\":\"e1\",\"userId\":\"" + userId
                 + "\",\"name\":\"Grace Hopper\",\"email\":\"grace@waylo.test\"}";
         listener().handleAuthEvent(rec(json), ack);
@@ -155,6 +157,7 @@ class AuthEventListenerTest {
         org.junit.jupiter.api.Assertions.assertEquals("Grace", c.getFirstName());
         org.junit.jupiter.api.Assertions.assertEquals("Hopper", c.getLastName());
         verify(repository, times(1)).save(c);
+        verify(idempotency, times(1)).markProcessed("e1");
         verify(ack, times(2)).acknowledge();
     }
 
@@ -177,9 +180,10 @@ class AuthEventListenerTest {
     }
 
     @Test
-    void malformedDeletePayload_ackedWithoutException() {
-        listener().handleAuthEvent(rec("{\"eventType\":\"USER_DELETED\",\"userId\":\"nope\"}"), ack);
-        verify(ack).acknowledge();
+    void malformedDeletePayload_poisonPropagatesAndIsNotAcked() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
+                listener().handleAuthEvent(rec("{\"eventType\":\"USER_DELETED\",\"userId\":\"nope\"}"), ack));
+        verify(ack, never()).acknowledge();
     }
 
     @Test
@@ -217,7 +221,6 @@ class AuthEventListenerTest {
     @Test
     void userUpdated_withoutLinkedCustomer_linksManualCustomerByEmail() {
         when(repository.findById(userId)).thenReturn(java.util.Optional.empty());
-        when(idempotency.tryAcquire("e2")).thenReturn(true);
         when(repository.linkByEmail(userId, "ada@waylo.test")).thenReturn(1);
         String msg = "{\"eventType\":\"USER_UPDATED\",\"eventId\":\"e2\",\"userId\":\"" + userId
                 + "\",\"name\":\"Ada Lovelace\",\"email\":\"ada@waylo.test\"}";
@@ -241,5 +244,27 @@ class AuthEventListenerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals("ada@waylo.test", c.getEmail());
         verify(repository).save(c);
+    }
+
+    @Test
+    void processingFailure_propagatesAndIsNotAcked_andNotMarkedProcessed() {
+        com.waylo.crmservice.domain.Customer c = customer();
+        when(repository.findById(userId)).thenReturn(java.util.Optional.of(c));
+        when(repository.save(any())).thenThrow(new IllegalStateException("db down"));
+        String msg = "{\"eventType\":\"USER_UPDATED\",\"eventId\":\"e9\",\"userId\":\"" + userId
+                + "\",\"name\":\"Grace Hopper\",\"email\":\"grace@waylo.test\"}";
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> listener().handleAuthEvent(rec(msg), ack));
+
+        verify(ack, never()).acknowledge();
+        verify(idempotency, never()).markProcessed(anyString());
+    }
+
+    @Test
+    void malformedJson_throwsIllegalArgument_notAcked() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> listener().handleAuthEvent(rec("{not json"), ack));
+        verify(ack, never()).acknowledge();
     }
 }
