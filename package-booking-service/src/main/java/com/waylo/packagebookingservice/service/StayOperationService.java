@@ -67,8 +67,10 @@ public class StayOperationService {
         if (expectedVersion == null || expectedVersion != v.getVersion()) {
             throw new VoucherException("VERSION_CONFLICT", HttpStatus.CONFLICT);
         }
-        Instant now = clock.instant();
-        Instant at = checkedOutAt == null ? now : checkedOutAt;
+        // PostgreSQL timestamptz keeps microseconds: truncate here so the first response and every idempotent replay
+        // (which reads the stored value back) return the same instant.
+        Instant now = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        Instant at = checkedOutAt == null ? now : checkedOutAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         if (at.isAfter(now)) throw new IllegalArgumentException("checkedOutAt cannot be in the future");
         if (v.getRedeemedAt() != null && at.isBefore(v.getRedeemedAt())) {
             throw new IllegalArgumentException("checkedOutAt cannot be before the check-in time");

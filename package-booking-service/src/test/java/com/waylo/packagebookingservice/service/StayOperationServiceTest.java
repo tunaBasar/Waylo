@@ -81,6 +81,15 @@ class StayOperationServiceTest {
     }
 
     @Test
+    void checkedOutAtIsStoredAtDatabasePrecision_soReplaysReturnTheSameInstant() {
+        // timestamptz keeps microseconds; a nanosecond instant would differ from the value read back on replay
+        Instant withNanos = NOW.minusSeconds(60).plusNanos(123_456_789);
+        StayOperationResponse r = service.checkOut(user, org, itemId, 3L, withNanos);
+        assertThat(r.checkedOutAt()).isEqualTo(NOW.minusSeconds(60).plusNanos(123_456_000));
+        assertThat(voucher.getCheckedOutAt().getNano() % 1_000).isZero();
+    }
+
+    @Test
     void activeNoShowAndVoidAreInvalidTransitions() {
         for (VoucherStatus s : List.of(VoucherStatus.ACTIVE, VoucherStatus.NO_SHOW, VoucherStatus.VOID)) {
             voucher.setStatus(s);
