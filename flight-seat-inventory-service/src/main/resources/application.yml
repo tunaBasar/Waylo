@@ -51,8 +51,6 @@ management:
 waylo:
   seat-hold:
     minutes: 15
-  internal:
-    token: ${INTERNAL_API_TOKEN}
   # Service-to-service allowlist (service-auth-common): verified X-Service-Token callers per route group.
   # Derived from the Feign clients; any other /internal path fails closed. required: false = optional (user calls allowed too).
   service-auth:
@@ -60,7 +58,7 @@ waylo:
       - path: /internal/flight-holds
         callers: [package-booking-service]
   flight:
-    offer-secret: ${FLIGHT_OFFER_SECRET:${INTERNAL_API_TOKEN}}
+    offer-secret: ${FLIGHT_OFFER_SECRET}
     offer-ttl-minutes: 10
     hold-ttl-minutes: 15
     sales-cutoff-minutes: 120

@@ -13,7 +13,7 @@ import java.util.UUID;
  * (Order model, internal endpoint), so FlightEventListener can notify the right customers.
  * Response is wrapped in the standard ApiResponse envelope.
  */
-@FeignClient(name = "package-booking-service", path = "/internal/orders", configuration = InternalTokenFeignConfig.class)
+@FeignClient(name = "package-booking-service", path = "/internal/orders")
 public interface PackageBookingServiceClient {
 
     /** departureDate is UTC yyyy-MM-dd, may be null (all dates of that flight number). */

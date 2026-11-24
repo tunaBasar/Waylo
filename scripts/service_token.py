@@ -40,12 +40,8 @@ def sign(issuer, audience, ttl=30, now=None, key_of=None):
 
 
 def headers(issuer, audience):
-    """Headers for a direct /internal call: signed token plus the legacy token (ignored in strict mode)."""
-    h = {'X-Service-Token': sign(issuer, audience)}
-    legacy = env_value('INTERNAL_API_TOKEN')
-    if legacy:
-        h['X-Internal-Token'] = legacy
-    return h
+    """Headers for a direct /internal call: a freshly signed single-use X-Service-Token."""
+    return {'X-Service-Token': sign(issuer, audience)}
 
 
 class SignedHeaders(dict):

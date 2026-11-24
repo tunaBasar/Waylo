@@ -49,8 +49,6 @@ def main():
         lines = [l for l in lines if l.split('=', 1)[0] not in (priv_name, pub_name)]
         lines += [f'{priv_name}={priv}', f'{pub_name}={pub}']
         added.append(svc)
-    if 'WAYLO_SERVICE_AUTH_MODE' not in present:
-        lines.append('WAYLO_SERVICE_AUTH_MODE=dual')
     tmp = ENV.with_suffix('.tmp')
     tmp.write_text('\n'.join(lines) + '\n')
     os.chmod(tmp, 0o600)

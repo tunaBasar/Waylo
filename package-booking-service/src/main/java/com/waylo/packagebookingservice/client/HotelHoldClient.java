@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/** Internal hotel-service hold API. Requires X-Internal-Token (added by {@link HotelHoldFeignConfig}). */
+/** Internal hotel-service hold API. Signed X-Service-Token is added globally (service-auth-common). */
 @FeignClient(name = "hotel-service", contextId = "hotelHoldClient", path = "/internal/hotel-holds",
         configuration = HotelHoldFeignConfig.class)
 public interface HotelHoldClient {

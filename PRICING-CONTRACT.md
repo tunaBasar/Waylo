@@ -79,7 +79,7 @@ Constraint: unique (campaign_id, code). `uses_count` only incremented via the `/
 - `PARTNER` discount: customer pays `net = gross - discount`. Commission = `gross * rate` (partner agreed to fund the discount, platform commission unchanged). Partner receives `net - gross*rate`. Must be >= 0, else the quote fails with 422 `DISCOUNT_EXCEEDS_PARTNER_SHARE`.
 - payment-service therefore needs per item: `grossAmount`, `discountAmount`, `discountFundedBy` (not only the charged amount). Escrow snapshots `commission_base = gross_amount`.
 
-## 3. Internal API — `POST /internal/pricing/quote` (X-Internal-Token)
+## 3. Internal API — `POST /internal/pricing/quote` (X-Service-Token)
 
 ```
 Request:  { vertical, supplierOrganizationId, grossAmount, currency,

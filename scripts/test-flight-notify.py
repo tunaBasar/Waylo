@@ -25,7 +25,6 @@ PB = 'http://127.0.0.1:8085'
 
 
 def main():
-    internal = t.env_value('INTERNAL_API_TOKEN')
     sfx = uuid.uuid4().hex[:10]
     cust, partner = f'fl-ntf-c-{sfx}@example.test', f'fl-ntf-p-{sfx}@example.test'
     pws = {e: 'Pw1' + secrets.token_urlsafe(16) for e in (cust, partner)}

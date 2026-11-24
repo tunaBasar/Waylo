@@ -56,8 +56,6 @@ waylo:
   push:
     expo:
       enabled: ${EXPO_PUSH_ENABLED:false}
-  internal:
-    token: ${INTERNAL_API_TOKEN}
 
 eureka:
   client:

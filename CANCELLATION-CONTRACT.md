@@ -22,7 +22,7 @@ Escrow state machine stays `HELD -> RELEASED | REFUNDED`. `escrow_items.settleme
 - Seller money is never clawed back. A redeemed (`RELEASED` by scan/ticketing) item cannot be cancelled: 422 `ESCROW_ALREADY_RELEASED`.
 - Idempotent: repeating cancel returns the recorded outcome and writes no ledger entries.
 
-Internal endpoints (`X-Internal-Token`): `POST /internal/escrow-items/{orderItemId}/cancellation-preview|cancel` body `{policy, freeHoursBefore, serviceStartAt}`, `POST .../no-show`. Result: `{outcome REFUND|NO_REFUND, cancellable, refundAmount, supplierAmount, commissionAmount, chargedAmount, currency, status}`.
+Internal endpoints (signed `X-Service-Token`): `POST /internal/escrow-items/{orderItemId}/cancellation-preview|cancel` body `{policy, freeHoursBefore, serviceStartAt}`, `POST .../no-show`. Result: `{outcome REFUND|NO_REFUND, cancellable, refundAmount, supplierAmount, commissionAmount, chargedAmount, currency, status}`.
 
 ## 3. Customer API (package-booking-service)
 

@@ -33,7 +33,7 @@ interface FlightSupplier {
 ### 2.1 Internal implementation (`InternalFlightSupplier`)
 
 - Search: flight-service `GET /api/flights/search?from&to&date` (Feign), keep `SCHEDULED` flights departing later than `now + sales-cutoff` (default 120 min, `waylo.flight.sales-cutoff-minutes`), then one offer per cabin (`seat_type`) with the minimum seat price among free seats. Free = not closed and (available or hold expired).
-- Offer id: stateless, HMAC-SHA256 signed `base64url(flightNumber|cabin|price|currency|expiresEpoch).base64url(sig)`, secret `waylo.flight.offer-secret` (env `FLIGHT_OFFER_SECRET`, falls back to `INTERNAL_API_TOKEN`). The price is inside the signature so a client cannot alter it. **Offer TTL 10 min** (`waylo.flight.offer-ttl-minutes`): long enough to fill a passenger form, short enough that prices do not go stale.
+- Offer id: stateless, HMAC-SHA256 signed `base64url(flightNumber|cabin|price|currency|expiresEpoch).base64url(sig)`, secret `waylo.flight.offer-secret` (env `FLIGHT_OFFER_SECRET`, compose falls back to `VOUCHER_SECRET`; no longer `INTERNAL_API_TOKEN`). The price is inside the signature so a client cannot alter it. **Offer TTL 10 min** (`waylo.flight.offer-ttl-minutes`): long enough to fill a passenger form, short enough that prices do not go stale.
 - Hold: price must equal the offer price or 409 `FARE_CHANGED`. Seat chosen by number (`SELECT ... FOR UPDATE` on that seat) or, when `seatNumber` is omitted, cheapest free seat of the cabin (`FOR UPDATE SKIP LOCKED`). Runs in a read-write `@Transactional`. A partial unique index on `seat_holds(seat_id) WHERE status IN ('HELD','CONFIRMED')` backs it up. **Hold TTL 15 min** (`waylo.flight.hold-ttl-minutes`), same as car.
 - Idempotency: same `idempotencyKey` returns the same hold, no second seat is taken.
 - `issueTicket` (called by confirm): HELD and unexpired -> CONFIRMED, seat becomes permanently unavailable (`hold_expires_at = null`), PNR (6 chars, no I/O/0/1) and e-ticket number (`WL` + 11 digits) assigned. Expired or cancelled -> 409 `HOLD_EXPIRED`. Repeat call returns the same ticket.
@@ -66,7 +66,7 @@ Tables (Flyway, new V-number):
 
 Endpoints:
 - Admin (`X-User-Role: ADMIN`): `POST /api/admin/supplier-accounts/{supplier}/topups {amount, currency, reference, idempotencyKey}` -> account; `GET /api/admin/supplier-accounts` (all accounts + balance); `GET /api/admin/supplier-accounts/{supplier}/ledger?page&size`.
-- Internal (X-Internal-Token): `POST /internal/supplier-payouts {supplier, orderId, orderItemId, amount, currency, idempotencyKey}` -> 200 or 422 `SUPPLIER_BALANCE_INSUFFICIENT` (body has `balance`, `required`), 404 `SUPPLIER_ACCOUNT_NOT_FOUND`; `POST /internal/supplier-credits` for refunds (same shape).
+- Internal (X-Service-Token): `POST /internal/supplier-payouts {supplier, orderId, orderItemId, amount, currency, idempotencyKey}` -> 200 or 422 `SUPPLIER_BALANCE_INSUFFICIENT` (body has `balance`, `required`), 404 `SUPPLIER_ACCOUNT_NOT_FOUND`; `POST /internal/supplier-credits` for refunds (same shape).
 - A low balance threshold (`waylo.supplier.low-balance-threshold`, unset = no alert) is a later addition, not part of this contract.
 
 ## 4. Error codes
@@ -80,7 +80,7 @@ Endpoints:
 | 409 | `HOLD_EXPIRED` | confirm after TTL or after cancel |
 | 422 | `INVALID_OFFER`, `FLIGHT_NOT_BOOKABLE`, `SEAT_CABIN_MISMATCH`, `PASSENGER_COUNT_UNSUPPORTED` | business rule |
 | 404 | `NOT_FOUND` | flight, seat or hold missing |
-| 401 | `UNAUTHORIZED` | `/internal/**` without valid `X-Internal-Token` (fails closed if no token configured) |
+| 401 | `UNAUTHORIZED` | `/internal/**` without a valid signed `X-Service-Token` (fails closed) |
 | 403 | `ADMIN_CANNOT_PURCHASE` | admin creating a flight order (package-booking) |
 | 422 | `SUPPLIER_BALANCE_INSUFFICIENT` | supplier balance below net fare (payment-service) |
 | 503 | `SERVICE_UNAVAILABLE` | flight-service down |
@@ -94,7 +94,7 @@ Public (flight-seat-inventory-service, gateway route `/api/flight-offers/**`, no
 - `GET /api/flight-offers/{offerId}` -> re-priced `FlightOffer` (409 `OFFER_EXPIRED` / `FARE_CHANGED`).
 - Airports for the search form: existing `GET /api/airports`.
 
-Internal (X-Internal-Token, never routed by the gateway), path `/internal/flight-holds`:
+Internal (X-Service-Token, never routed by the gateway), path `/internal/flight-holds`:
 - `POST /internal/flight-holds {offerId, seatNumber?, passengerFirstName, passengerLastName, principalUserId, idempotencyKey, orderCorrelationId}` -> `FlightHold`. Names: letters, space, apostrophe, hyphen, max 80, must be as on the ID.
 - `GET /internal/flight-holds/{id}`, `POST /internal/flight-holds/{id}/confirm` (issues ticket), `POST /internal/flight-holds/{id}/release` (idempotent), `GET /internal/flight-holds/{id}/refund-quote`.
 

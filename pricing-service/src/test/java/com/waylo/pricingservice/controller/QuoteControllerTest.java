@@ -35,7 +35,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "spring.datasource.password=",
                 "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
                 "spring.jpa.hibernate.ddl-auto=create-drop",
-                "waylo.internal.token=test-token-123",
                 "eureka.client.enabled=false",
                 "eureka.client.register-with-eureka=false",
                 "eureka.client.fetch-registry=false"

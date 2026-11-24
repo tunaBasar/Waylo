@@ -9,9 +9,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 import java.util.UUID;
 
-/** package-booking-service internal review read model. X-Internal-Token is added by InternalAuthFeignConfig. */
-@FeignClient(name = "package-booking-service", contextId = "reviewOrderItemClient", path = "/internal/orders/items",
-        configuration = InternalAuthFeignConfig.class)
+/** package-booking-service internal review read model. Signed X-Service-Token is added globally. */
+@FeignClient(name = "package-booking-service", contextId = "reviewOrderItemClient", path = "/internal/orders/items")
 public interface OrderItemClient {
 
     @GetMapping("/{orderItemId}/review-eligibility")

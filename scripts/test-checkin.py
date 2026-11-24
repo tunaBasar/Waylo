@@ -55,7 +55,6 @@ def order_and_pay(token, fno, dep, seat):
 
 def main():
     admin_email, admin_pw = t.env_value('WAYLO_BOOTSTRAP_ADMIN_EMAIL'), t.env_value('WAYLO_BOOTSTRAP_ADMIN_PASSWORD')
-    internal = t.env_value('INTERNAL_API_TOKEN')
     sfx = uuid.uuid4().hex[:10]
     cust1, cust2, partner = (f'ci-c1-{sfx}@example.test', f'ci-c2-{sfx}@example.test', f'ci-p-{sfx}@example.test')
     pws = {e: 'Pw1' + secrets.token_urlsafe(16) for e in (cust1, cust2, partner)}

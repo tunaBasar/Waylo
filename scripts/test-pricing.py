@@ -32,7 +32,6 @@ spec.loader.exec_module(car)
 
 call, check, data, err, psql, login, register = car.call, car.check, car.data, car.err, car.psql, car.login, car.register
 campaign_ids = []
-INTERNAL_TOKEN = car.env_value('INTERNAL_API_TOKEN')
 PAYMENT_INTERNAL = 'http://localhost:8087'
 LIMIT = 3
 

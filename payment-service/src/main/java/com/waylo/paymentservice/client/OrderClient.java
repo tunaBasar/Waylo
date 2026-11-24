@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-/** Internal package-booking-service order API. X-Internal-Token is added by {@link OrderFeignConfig}. */
+/** Internal package-booking-service order API. Signed X-Service-Token is added globally (service-auth-common). */
 @FeignClient(name = "package-booking-service", contextId = "orderClient", path = "/internal/orders",
         configuration = OrderFeignConfig.class)
 public interface OrderClient {

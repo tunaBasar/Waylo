@@ -14,14 +14,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Verifies X-Service-Token (or, in dual mode, the legacy X-Internal-Token) on protected route groups and records
+ * Verifies X-Service-Token on protected route groups and records
  * the caller in the {@link #CALLER_ATTRIBUTE} request attribute. Required groups (all of /internal) fail closed.
  */
 public class ServiceAuthFilter implements Filter {
 
-    /** Request attribute holding the authenticated caller service name ("legacy" for X-Internal-Token). */
+    /** Request attribute holding the authenticated caller service name. */
     public static final String CALLER_ATTRIBUTE = "waylo.serviceAuth.caller";
-    public static final String LEGACY_HEADER = "X-Internal-Token";
 
     private static final Logger log = LoggerFactory.getLogger(ServiceAuthFilter.class);
 
@@ -46,17 +45,12 @@ public class ServiceAuthFilter implements Filter {
             return;
         }
         String token = request.getHeader(ServiceTokens.HEADER);
-        String legacy = request.getHeader(LEGACY_HEADER);
-        if (!route.required() && token == null && legacy == null) {
+        if (!route.required() && token == null) {
             chain.doFilter(req, res);
             return;
         }
-        ServiceAuthenticator.Decision d = authenticator.decide(route, token, legacy);
+        ServiceAuthenticator.Decision d = authenticator.decide(route, token);
         if (d.allowed()) {
-            if ("legacy".equals(d.caller()) && d.reason() != null) {
-                log.warn("Accepted legacy internal token on {} {} (signed token rejected: {})",
-                        request.getMethod(), request.getRequestURI(), d.reason());
-            }
             request.setAttribute(CALLER_ATTRIBUTE, d.caller());
             chain.doFilter(req, res);
             return;

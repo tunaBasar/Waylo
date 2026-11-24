@@ -39,7 +39,7 @@ python3 scripts/gen-service-keys.py            # eksik anahtarları üret
 python3 scripts/gen-service-keys.py --rotate payment-service   # bir servisin anahtarını yenile
 ```
 
-`WAYLO_SERVICE_AUTH_MODE`: `dual` (varsayılan; imzalı token veya eski `X-Internal-Token` kabul) veya `strict` (yalnızca imzalı token). Anahtarlar yoksa servisler `dual` modda eski token ile çalışmaya devam eder. Doğrulama: `python3 scripts/test-service-auth.py`.
+Servisler arası çağrılar yalnızca imzalı `X-Service-Token` ile kabul edilir. Eski paylaşımlı `INTERNAL_API_TOKEN` / `X-Internal-Token` kaldırıldı ve `WAYLO_SERVICE_AUTH_MODE` artık yoktur. Anahtar yoksa servisler arası çağrılar reddedilir. Doğrulama: `python3 scripts/test-service-auth.py`.
 
 Bu komut backend kaynaklarını Java 21 ile derler, frontend için `npm ci` ve production build çalıştırır, ardından altyapı ve uygulama servislerini başlatır. İlk derleme internet bağlantısı gerektirir ve sonraki derlemelerden daha uzun sürer.
 

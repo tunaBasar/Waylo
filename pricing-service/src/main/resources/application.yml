@@ -49,8 +49,6 @@ management:
       show-details: when-authorized
 
 waylo:
-  internal:
-    token: ${INTERNAL_API_TOKEN}
   # Service-to-service allowlist (service-auth-common): verified X-Service-Token callers per route group.
   # Derived from the Feign clients; any other /internal path fails closed. required: false = optional (user calls allowed too).
   service-auth:

@@ -36,7 +36,7 @@ Check order: owner, vertical, supplier, cancelled, existing check-in (idempotent
 
 - Customer: `POST /api/checkins/order-items/{orderItemId}` (`X-User-Id`), `GET /api/checkins/me`.
 - Admin: `GET /api/admin/checkins?page&size` (`X-User-Role: ADMIN`), page `{items,page,size,total}`.
-- Internal (package-booking, `X-Internal-Token`, never routed by the gateway): `GET /internal/orders/items/{orderItemId}` returns owner, order status, vertical, cancelOutcome, supplier, flight fields, passenger names, voucherStatus.
+- Internal (package-booking, signed `X-Service-Token`, never routed by the gateway): `GET /internal/orders/items/{orderItemId}` returns owner, order status, vertical, cancelOutcome, supplier, flight fields, passenger names, voucherStatus.
 - Schema: checkin-service `V2__order_item_checkin.sql` adds `order_item_id` (unique), `order_id, pnr, passenger_name, flight_number, departure_at`; `booking_id`, `flight_id` become nullable.
 
 ## 6. Errors
