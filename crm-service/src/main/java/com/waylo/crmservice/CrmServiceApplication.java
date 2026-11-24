@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication
+@org.springframework.scheduling.annotation.EnableScheduling
 @EnableFeignClients
 public class CrmServiceApplication {
 

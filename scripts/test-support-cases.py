@@ -12,6 +12,7 @@ import importlib.util
 import pathlib
 import secrets
 import sys
+import time
 import uuid
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -22,6 +23,17 @@ spec.loader.exec_module(ci)
 t = ci.t
 call, data, check = t.call, t.data, t.check
 case_ids = []
+
+
+def mail_rows(email, subject):
+    """notifications rows (notification-service) for this recipient and subject, polled up to 30s."""
+    q = f"SELECT count(*) FROM notifications WHERE recipient = '{email}' AND subject = '{subject}'"
+    for _ in range(15):
+        n = t.psql('notification_db', q).strip()
+        if n not in ('', '0'):
+            return int(n)
+        time.sleep(2)
+    return 0
 
 
 def main():
@@ -112,6 +124,7 @@ def main():
     ans = data((s, b)) or {}
     check('partner reply 201 -> ANSWERED', s == 201 and ans.get('status') == 'ANSWERED', (s, b))
     check('thread has 2 messages, partner second', [m['authorRole'] for m in ans.get('messages') or []] == ['CUSTOMER', 'PARTNER'], ans)
+    check('partner reply e-mails the customer', mail_rows(emails['a'], 'Destek talebiniz yanıtlandı') >= 1)
     s, b = call('GET', f'/api/me/support-cases/{cid}', token=tok['a'])
     check('customer sees the partner answer', s == 200 and data((s, b))['status'] == 'ANSWERED' and len(data((s, b))['messages']) == 2, s)
 
@@ -128,8 +141,16 @@ def main():
     print('\n=== customer follow up and close ===')
     s, b = call('POST', f'/api/me/support-cases/{cid}/messages', {'body': 'Thanks!'}, tok['a'])
     check('customer follow-up reopens (OPEN)', s == 201 and data((s, b))['status'] == 'OPEN', (s, b))
+    time.sleep(3)
+    # only support e-mails count: the customer's flight order can produce its own notification rows
+    n_answered = t.psql('notification_db', f"SELECT count(*) FROM notifications WHERE recipient = '{emails['a']}' "
+                        "AND subject IN ('Destek talebiniz yanıtlandı', 'Destek talebiniz kapatıldı')").strip()
+    check('customer own message creates no e-mail row', n_answered == '1', n_answered)
+    s, b = call('POST', f'/api/admin/support-cases/{cid}/close', None, admin)
+    check('admin closes -> CLOSED', s == 200 and data((s, b))['status'] == 'CLOSED', (s, b))
+    check('admin close e-mails the customer', mail_rows(emails['a'], 'Destek talebiniz kapatıldı') >= 1)
     s, b = call('POST', f'/api/me/support-cases/{cid}/close', None, tok['a'])
-    check('customer closes -> CLOSED', s == 200 and data((s, b))['status'] == 'CLOSED', (s, b))
+    check('customer close of closed case is idempotent -> CLOSED', s == 200 and data((s, b))['status'] == 'CLOSED', (s, b))
     s, b = call('POST', f'/api/me/support-cases/{cid}/messages', {'body': 'more'}, tok['a'])
     check('closed case takes no message (422)', s == 422, (s, b))
     s, b = call('POST', f'/api/partner/organizations/{seller}/support-cases/{cid}/messages', {'body': 'late'}, tok['p'])

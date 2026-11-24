@@ -6,6 +6,8 @@ import com.waylo.crmservice.domain.SupportCase;
 import com.waylo.crmservice.domain.SupportMessage;
 import com.waylo.crmservice.dto.SupportDtos.CaseResponse;
 import com.waylo.crmservice.dto.SupportDtos.OpenCaseRequest;
+import com.waylo.crmservice.event.OutboxWriter;
+import com.waylo.crmservice.event.SupportCaseUpdatedEvent;
 import com.waylo.crmservice.exception.AccessDeniedException;
 import com.waylo.crmservice.exception.BusinessRuleException;
 import com.waylo.crmservice.exception.ResourceNotFoundException;
@@ -13,6 +15,7 @@ import com.waylo.crmservice.repository.SupportCaseRepository;
 import com.waylo.crmservice.repository.SupportMessageRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -24,6 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class SupportCaseServiceTest {
@@ -32,7 +36,8 @@ class SupportCaseServiceTest {
     private final SupportMessageRepository messages = mock(SupportMessageRepository.class);
     private final OrderClient orders = mock(OrderClient.class);
     private final AuthAccessClient access = mock(AuthAccessClient.class);
-    private final SupportCaseService service = new SupportCaseService(cases, messages, orders, access);
+    private final OutboxWriter outbox = mock(OutboxWriter.class);
+    private final SupportCaseService service = new SupportCaseService(cases, messages, orders, access, outbox);
 
     private final UUID customerA = UUID.randomUUID();
     private final UUID customerB = UUID.randomUUID();
@@ -181,5 +186,53 @@ class SupportCaseServiceTest {
     void migrationInstallsAppendOnlyTrigger() throws Exception {
         String sql = new String(getClass().getResourceAsStream("/db/migration/V2__support_cases.sql").readAllBytes());
         assertThat(sql).contains("BEFORE UPDATE OR DELETE ON support_messages").contains("BEFORE TRUNCATE ON support_messages");
+    }
+
+    // ---- RM-36 e-mail outbox ----
+
+    private SupportCaseUpdatedEvent oneEvent(SupportCase c) {
+        ArgumentCaptor<Object> ev = ArgumentCaptor.forClass(Object.class);
+        verify(outbox, times(1)).write(eq("SUPPORT_CASE"), eq(c.getId().toString()), eq("support-events"),
+                eq(c.getId().toString()), ev.capture());
+        return (SupportCaseUpdatedEvent) ev.getValue();
+    }
+
+    @Test
+    void partnerReplyWritesAnsweredOutboxRow() {
+        UUID partnerA = UUID.randomUUID();
+        SupportCase c = caseOf(customerA, orgA);
+        allow(partnerA, orgA, true);
+        service.partnerReply(partnerA, orgA, c.getId(), "we look into it");
+        SupportCaseUpdatedEvent e = oneEvent(c);
+        assertThat(e.getKind()).isEqualTo(SupportCaseUpdatedEvent.Kind.ANSWERED);
+        assertThat(e.getAuthorRole()).isEqualTo(SupportCaseUpdatedEvent.AuthorRole.PARTNER);
+        assertThat(e.getCustomerId()).isEqualTo(customerA);
+        assertThat(e.getSubject()).isEqualTo("subject");
+    }
+
+    @Test
+    void adminReplyWritesAnsweredOutboxRow() {
+        SupportCase c = caseOf(customerA, orgA);
+        service.adminReply(UUID.randomUUID(), c.getId(), "admin here");
+        SupportCaseUpdatedEvent e = oneEvent(c);
+        assertThat(e.getKind()).isEqualTo(SupportCaseUpdatedEvent.Kind.ANSWERED);
+        assertThat(e.getAuthorRole()).isEqualTo(SupportCaseUpdatedEvent.AuthorRole.ADMIN);
+    }
+
+    @Test
+    void adminCloseWritesClosedOutboxRow() {
+        SupportCase c = caseOf(customerA, orgA);
+        service.adminClose(c.getId());
+        SupportCaseUpdatedEvent e = oneEvent(c);
+        assertThat(e.getKind()).isEqualTo(SupportCaseUpdatedEvent.Kind.CLOSED);
+        assertThat(e.getAuthorRole()).isEqualTo(SupportCaseUpdatedEvent.AuthorRole.ADMIN);
+    }
+
+    @Test
+    void customerMessageAndCustomerCloseWriteNoOutboxRow() {
+        SupportCase c = caseOf(customerA, orgA);
+        service.customerReply(customerA, c.getId(), "hello");
+        service.closeMine(customerA, c.getId());
+        verifyNoInteractions(outbox);
     }
 }

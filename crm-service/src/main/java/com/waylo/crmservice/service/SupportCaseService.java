@@ -8,6 +8,8 @@ import com.waylo.crmservice.dto.SupportDtos.CaseResponse;
 import com.waylo.crmservice.dto.SupportDtos.OpenCaseRequest;
 import com.waylo.crmservice.exception.AccessDeniedException;
 import com.waylo.crmservice.exception.ResourceNotFoundException;
+import com.waylo.crmservice.event.OutboxWriter;
+import com.waylo.crmservice.event.SupportCaseUpdatedEvent;
 import com.waylo.crmservice.exception.UpstreamUnavailableException;
 import com.waylo.crmservice.repository.SupportCaseRepository;
 import com.waylo.crmservice.repository.SupportMessageRepository;
@@ -32,9 +34,11 @@ public class SupportCaseService {
     private final SupportMessageRepository messages;
     private final OrderClient orderClient;
     private final AuthAccessClient accessClient;
+    private final OutboxWriter outbox;
 
     public SupportCaseService(SupportCaseRepository cases, SupportMessageRepository messages,
-                              OrderClient orderClient, AuthAccessClient accessClient) {
+                              OrderClient orderClient, AuthAccessClient accessClient, OutboxWriter outbox) {
+        this.outbox = outbox;
         this.cases = cases;
         this.messages = messages;
         this.orderClient = orderClient;
@@ -80,7 +84,7 @@ public class SupportCaseService {
 
     @Transactional
     public CaseResponse closeMine(UUID customerId, UUID caseId) {
-        return close(ownCase(customerId, caseId));
+        return close(ownCase(customerId, caseId), null);
     }
 
     // ---- partner ----
@@ -125,7 +129,7 @@ public class SupportCaseService {
 
     @Transactional
     public CaseResponse adminClose(UUID caseId) {
-        return close(anyCase(caseId));
+        return close(anyCase(caseId), SupportCaseUpdatedEvent.AuthorRole.ADMIN);
     }
 
     // ---- internals ----
@@ -135,12 +139,25 @@ public class SupportCaseService {
         c.onMessage(role, now);   // throws CASE_CLOSED
         cases.save(c);
         messages.save(new SupportMessage(c.getId(), role, authorId, body.trim(), now));
+        if (role != SupportMessage.Role.CUSTOMER) {
+            emit(c, SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.valueOf(role.name()));
+        }
         return detail(c);
     }
 
-    private CaseResponse close(SupportCase c) {
+    /** adminRole is null for the customer's own close, which sends no e-mail. */
+    private CaseResponse close(SupportCase c, SupportCaseUpdatedEvent.AuthorRole adminRole) {
+        boolean wasOpen = c.getStatus() != SupportCase.Status.CLOSED;
         c.close(Instant.now());
-        return detail(cases.save(c));
+        cases.save(c);
+        if (adminRole != null && wasOpen) emit(c, SupportCaseUpdatedEvent.Kind.CLOSED, adminRole);
+        return detail(c);
+    }
+
+    /** Same transaction as the message/close (RM-36 e-mail via outbox). */
+    private void emit(SupportCase c, SupportCaseUpdatedEvent.Kind kind, SupportCaseUpdatedEvent.AuthorRole role) {
+        outbox.write("SUPPORT_CASE", c.getId().toString(), "support-events", c.getId().toString(),
+                new SupportCaseUpdatedEvent(c.getId(), c.getCustomerId(), c.getOrderId(), c.getSubject(), kind, role));
     }
 
     private CaseResponse detail(SupportCase c) {

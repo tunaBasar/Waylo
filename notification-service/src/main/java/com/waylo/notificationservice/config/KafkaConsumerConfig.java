@@ -36,8 +36,9 @@ public class KafkaConsumerConfig {
      * would otherwise fail with ClassNotFoundException for every cross-service event.
      * Token names must stay in sync with each producer's TYPE_MAPPINGS.
      */
-    private static final String TYPE_MAPPINGS =
-            "bookingCreated:com.waylo.notificationservice.event.BookingCreatedEvent,"
+    static final String TYPE_MAPPINGS =
+            "supportCaseUpdated:com.waylo.notificationservice.event.SupportCaseUpdatedEvent,"
+          + "bookingCreated:com.waylo.notificationservice.event.BookingCreatedEvent,"
           + "bookingCancelled:com.waylo.notificationservice.event.BookingCancelledEvent,"
           + "flightCreated:com.waylo.notificationservice.event.FlightCreatedEvent,"
           + "flightCancelled:com.waylo.notificationservice.event.FlightCancelledEvent,"
