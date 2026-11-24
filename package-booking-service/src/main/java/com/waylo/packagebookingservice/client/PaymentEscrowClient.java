@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.UUID;
 
-/** Internal payment-service escrow API. X-Internal-Token is added by {@link PaymentFeignConfig}. */
+/** Internal payment-service escrow API. Signed X-Service-Token is added globally (service-auth-common). */
 @FeignClient(name = "payment-service", contextId = "paymentEscrowClient", path = "/internal/escrow-items",
         configuration = PaymentFeignConfig.class)
 public interface PaymentEscrowClient {

@@ -59,7 +59,7 @@ Public: `GET /api/bus-sales-status` -> `{enabled}` (legal gate for the UI), `GET
 
 Customer (`X-User-Id`): `GET /api/bus-bookings/me`, `GET /api/bus-bookings/{id}` (owner or ADMIN). No direct create or cancel: lifecycle comes from orders.
 
-Internal (X-Internal-Token), `/internal/bus-holds`:
+Internal (X-Service-Token), `/internal/bus-holds`:
 - `POST {tripId, fromSeq, toSeq, passengers:[{seatNo, name, gender, identityNumber?}], principalUserId, idempotencyKey, orderCorrelationId}` -> `HoldDto {holdId, organizationId, tripId, fromSeq, toSeq, fromTerminalId, toTerminalId, fromCity, toCity, fromTerminalName, toTerminalName, companyName, boardingAt, arrivalAt, seatNos, currency, totalAmount, status, expiresAt}`. Same idempotencyKey returns the same hold.
 - `POST /{id}/confirm` (HELD and unexpired -> CONFIRMED, else 409 `HOLD_EXPIRED`), `POST /{id}/release` (HELD or CONFIRMED -> CANCELLED, idempotent). TTL `waylo.bus.hold-ttl-minutes` default 15, scheduled job marks expired HELD bookings EXPIRED.
 

@@ -186,7 +186,6 @@ def pay(order_id, token):
 def main():
     admin_email = env_value('WAYLO_BOOTSTRAP_ADMIN_EMAIL')
     admin_pw = env_value('WAYLO_BOOTSTRAP_ADMIN_PASSWORD')
-    internal = env_value('INTERNAL_API_TOKEN')
     sfx = uuid.uuid4().hex[:10]
     cust1, cust2, partner = (f'fl-ord-c1-{sfx}@example.test', f'fl-ord-c2-{sfx}@example.test', f'fl-ord-p-{sfx}@example.test')
     pws = {e: 'Pw1' + secrets.token_urlsafe(16) for e in (cust1, cust2, partner)}

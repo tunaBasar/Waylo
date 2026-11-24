@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.time.Instant;
 import java.util.UUID;
 
-/** package-booking-service internal read model. X-Internal-Token is added by {@link OrderItemFeignConfig}. */
+/** package-booking-service internal read model. Signed X-Service-Token is added globally (service-auth-common). */
 @FeignClient(name = "package-booking-service", contextId = "orderItemClient", path = "/internal/orders/items",
         configuration = OrderItemFeignConfig.class)
 public interface OrderItemClient {

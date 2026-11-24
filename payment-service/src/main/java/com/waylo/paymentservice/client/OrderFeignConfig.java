@@ -3,9 +3,7 @@ package com.waylo.paymentservice.client;
 import com.waylo.paymentservice.exception.BusinessRuleException;
 import com.waylo.paymentservice.exception.OrderServiceUnavailableException;
 import com.waylo.paymentservice.exception.ResourceNotFoundException;
-import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -15,14 +13,6 @@ import java.nio.charset.StandardCharsets;
 public class OrderFeignConfig {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-
-    @Bean
-    public RequestInterceptor orderInternalTokenInterceptor(@Value("${waylo.internal.token}") String token) {
-        if (token == null || token.isBlank() || token.length() < 32) {
-            throw new IllegalStateException("waylo.internal.token must be non-blank and at least 32 characters");
-        }
-        return template -> template.header("X-Internal-Token", token);
-    }
 
     @Bean
     public ErrorDecoder orderErrorDecoder() {

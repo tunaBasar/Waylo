@@ -104,6 +104,6 @@ Existing auth logic and V1 are unchanged. The user's separate Hotel.java change 
 
 ### Service-to-service authentication
 
-All `/internal/**` endpoints on auth-service and hotel-service now require the `X-Internal-Token` header. The api-gateway strips this header before forwarding to downstream services, so internal endpoints enforce it directly. Without the header or with an invalid token, requests receive `401`.
+All `/internal/**` endpoints on auth-service and hotel-service now require a signed `X-Service-Token`. The api-gateway strips this header before forwarding to downstream services, so internal endpoints enforce it directly. Without the header or with an invalid token, requests receive `401`.
 
 This prevents unauthenticated internal calls from any local process, complementing the `127.0.0.1` port binding.

@@ -35,10 +35,6 @@ eureka:
     register-with-eureka: false
     fetch-registry: false
 
-waylo:
-  internal:
-    token: test-token-123
-
 management:
   endpoints:
     web:

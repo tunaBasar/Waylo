@@ -27,5 +27,5 @@ Fixed in this pass: gateway `gateway` actuator endpoint removed, order-create an
 ## Checked and fine
 - X-User-Id/Email/Role/X-Internal-Token stripped on every request (unit tests plus live).
 - All services expose only `health,info`; `/actuator/env|heapdump|configprops` 404 via gateway.
-- Every compose service calling /internal has `INTERNAL_API_TOKEN` with `:?`; healthchecks and memory limits present on all; saga orchestrator is under `profiles: ["legacy-saga"]`.
+- (INTERNAL_API_TOKEN retired, signed service tokens only); healthchecks and memory limits present on all; saga orchestrator is under `profiles: ["legacy-saga"]`.
 - Secrets in git: no private keys or real secrets found. Only `.env.example` (placeholders) and `${ENV}` references with no defaults. Not exhaustive for binary or history. `.env` is untracked. No rotation needed from this scan.

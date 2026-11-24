@@ -3,12 +3,12 @@
 
 Calls /internal endpoints directly on 127.0.0.1-bound service ports:
   - no credential -> 401
-  - legacy X-Internal-Token alone -> 401 in strict mode (200-class in dual mode)
+  - the retired legacy X-Internal-Token alone -> 401
   - token signed for another audience -> 401
   - expired token, tampered token, caller not in the allowlist, issuer signing with another service's key -> rejected
   - valid token from an allowed caller -> accepted
   - the same token used twice -> second call 401 (replay protection)
-Mode is read from WAYLO_SERVICE_AUTH_MODE in .env. Keys are read from .env and never printed. Standard library + cryptography.
+Keys are read from .env and never printed. Standard library + cryptography.
 """
 import base64
 import json
@@ -22,7 +22,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import service_token  # noqa: E402
 
 P = F = 0
-MODE = (service_token.env_value('WAYLO_SERVICE_AUTH_MODE') or 'dual').lower()
 PB = 'http://127.0.0.1:8085'
 AUTH = 'http://127.0.0.1:8092'
 UNKNOWN_ITEM = '/internal/orders/items/00000000-0000-0000-0000-000000000000'
@@ -51,17 +50,13 @@ def tok(iss, aud, **kw):
 
 
 def main():
-    print(f'mode={MODE}')
-    legacy = {'X-Internal-Token': service_token.env_value('INTERNAL_API_TOKEN') or ''}
+    legacy = {'X-Internal-Token': 'l' * 40}
     # A passing call reaches the controller: unknown item -> 404, which proves the auth filter let it through.
     passed = lambda s: s in (200, 404)
 
     ok(call(PB, UNKNOWN_ITEM) == 401, 'no credential -> 401')
     s = call(PB, UNKNOWN_ITEM, legacy)
-    if MODE == 'strict':
-        ok(s == 401, f'legacy X-Internal-Token rejected in strict ({s})')
-    else:
-        ok(passed(s), f'legacy X-Internal-Token accepted in dual ({s})')
+    ok(s == 401, f'legacy X-Internal-Token rejected ({s})')
     ok(call(PB, UNKNOWN_ITEM, {'X-Internal-Token': 'x' * 40}) == 401, 'wrong legacy token -> 401')
 
     s = call(PB, UNKNOWN_ITEM, tok('checkin-service', 'payment-service'))

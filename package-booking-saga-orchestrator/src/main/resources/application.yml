@@ -48,6 +48,3 @@ management:
     health:
       show-details: when-authorized
 
-waylo:
-  internal:
-    token: ${INTERNAL_API_TOKEN}

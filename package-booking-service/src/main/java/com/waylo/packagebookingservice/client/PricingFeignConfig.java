@@ -3,9 +3,7 @@ package com.waylo.packagebookingservice.client;
 import com.waylo.packagebookingservice.exception.BusinessRuleException;
 import com.waylo.packagebookingservice.exception.PricingUnavailableException;
 import feign.Request;
-import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -16,14 +14,6 @@ import java.util.concurrent.TimeUnit;
 public class PricingFeignConfig {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-
-    @Bean
-    public RequestInterceptor pricingInternalTokenInterceptor(@Value("${waylo.internal.token}") String token) {
-        if (token == null || token.isBlank() || token.length() < 32) {
-            throw new IllegalStateException("waylo.internal.token must be non-blank and at least 32 characters");
-        }
-        return template -> template.header("X-Internal-Token", token);
-    }
 
     /** Short timeouts: sales must not hang on the commercial layer. */
     @Bean

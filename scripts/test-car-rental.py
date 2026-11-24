@@ -39,7 +39,6 @@ def env_value(key):
     return None
 
 
-INTERNAL = env_value('INTERNAL_API_TOKEN')
 
 
 def call(method, path, body=None, token=None, base=BASE, headers=None, raw=None):

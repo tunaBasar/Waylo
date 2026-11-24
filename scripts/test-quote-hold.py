@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Live quote/hold acceptance checks against Waylo, including real PostgreSQL races.
 
-Requires WAYLO_ADMIN_TOKEN (an existing platform admin's access token) and
-WAYLO_INTERNAL_TOKEN. Tokens are read from environment and never printed.
+Requires WAYLO_ADMIN_TOKEN (an existing platform admin's access token), read from the environment and never
+printed. Direct /internal calls use a signed X-Service-Token (scripts/service_token.py, keys from .env).
 Creates only dedicated test fixtures and deactivates its own hotel on exit.
 This is not a payment-provider or order-to-hold integration test.
 """
@@ -20,15 +20,19 @@ from decimal import Decimal
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import service_token  # noqa: E402
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--gateway', default='http://localhost:8080')
 parser.add_argument('--hotel', default='http://localhost:8083')
 args = parser.parse_args()
 admin = os.environ.get('WAYLO_ADMIN_TOKEN')
-internal = os.environ.get('WAYLO_INTERNAL_TOKEN')
-if not admin or not internal:
-    raise SystemExit('WAYLO_ADMIN_TOKEN and WAYLO_INTERNAL_TOKEN must be set')
+internal = True  # marker: send a signed package-booking-service token
+if not admin:
+    raise SystemExit('WAYLO_ADMIN_TOKEN must be set')
 passed = 0
 
 
@@ -44,8 +48,10 @@ def request(method, path, body=None, token=None, internal_token=None, direct=Fal
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = f'Bearer {token}'
-    if internal_token:
-        headers['X-Internal-Token'] = internal_token
+    if internal_token == 'invalid':
+        headers['X-Service-Token'] = 'invalid'
+    elif internal_token:
+        headers.update(service_token.headers('package-booking-service', 'hotel-service'))
     data = json.dumps(body).encode() if body is not None else None
     req = Request((args.hotel if direct else args.gateway) + path, data=data,
                   headers=headers, method=method)

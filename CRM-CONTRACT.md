@@ -2,7 +2,7 @@
 
 ## Access (crm-service `CrmAccessFilter`, identity from gateway headers)
 - ADMIN: all `/api/customers/**`. Any other user: only `GET /api/customers/me` (everything else 403, no identity 401).
-- notification-service reads `GET /api/customers/{id}` with `X-Internal-Token` (GET only).
+- notification-service reads `GET /api/customers/{id}` with a signed `X-Service-Token` (GET only).
 - `passport_number` is stored but never returned by any endpoint. `/me` returns name, email and loyalty fields only.
 
 ## Events

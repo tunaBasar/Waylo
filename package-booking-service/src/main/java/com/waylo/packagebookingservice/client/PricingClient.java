@@ -9,7 +9,7 @@ import tools.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Internal pricing-service API (PRICING-CONTRACT.md section 3). X-Internal-Token is added by {@link PricingFeignConfig}. */
+/** Internal pricing-service API (PRICING-CONTRACT.md section 3). Signed X-Service-Token is added globally (service-auth-common). */
 @FeignClient(name = "pricing-service", contextId = "pricingClient", path = "/internal/pricing",
         configuration = PricingFeignConfig.class)
 public interface PricingClient {

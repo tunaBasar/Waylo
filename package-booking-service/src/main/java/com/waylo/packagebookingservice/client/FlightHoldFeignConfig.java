@@ -1,9 +1,7 @@
 package com.waylo.packagebookingservice.client;
 
 import com.waylo.packagebookingservice.exception.FlightRejectedException;
-import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -12,14 +10,6 @@ import java.nio.charset.StandardCharsets;
 
 public class FlightHoldFeignConfig {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-
-    @Bean
-    public RequestInterceptor flightInternalTokenInterceptor(@Value("${waylo.internal.token}") String token) {
-        if (token == null || token.isBlank() || token.length() < 32) {
-            throw new IllegalStateException("waylo.internal.token must be non-blank and at least 32 characters");
-        }
-        return template -> template.header("X-Internal-Token", token);
-    }
 
     @Bean
     public ErrorDecoder flightHoldErrorDecoder() {

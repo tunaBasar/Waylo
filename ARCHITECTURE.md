@@ -81,7 +81,7 @@ flowchart LR
    (`iss`=çağıran, `aud`=hedef, `exp-iat` <= 60 sn, `jti`). Token tek kullanımlıktır: alıcı servis kabul ettiği `(iss, jti)`
    çiftini süre dolana kadar hatırlar, tekrar gelen token 401 alır (servis örneği başına bellek içi). Hedef servis her `/internal` route grubu için izinli çağıranları
    `waylo.service-auth.routes` altında tanımlar. Tanımsız `/internal` yolları fail-closed'dır.
-   `WAYLO_SERVICE_AUTH_MODE=dual` eski paylaşımlı `INTERNAL_API_TOKEN`'ı da kabul eder, `strict` yalnız imzalı token kabul eder.
+   Eski paylaşımlı `INTERNAL_API_TOKEN` / `X-Internal-Token` kaldırıldı, yalnız imzalı token kabul edilir.
    Anahtarlar `scripts/gen-service-keys.py` ile `.env`'e yazılır.
 
 ## Mimari Kararlar

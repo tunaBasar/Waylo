@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *       aud = the Feign client name.</li>
  *   <li>Receiver: /internal/** (fail closed) and the route groups in waylo.service-auth.routes are verified against
  *       WAYLO_SERVICE_KEYS_&lt;CALLER&gt; and the per-group caller allowlist.</li>
- *   <li>WAYLO_SERVICE_AUTH_MODE=dual (default) also accepts the legacy X-Internal-Token, strict does not.</li>
+ *   <li>Signed identity only: the legacy shared X-Internal-Token (INTERNAL_API_TOKEN) is retired.</li>
  * </ul>
  */
 @AutoConfiguration
@@ -67,22 +67,19 @@ public class ServiceAuthAutoConfiguration {
     static class Servlet {
         @Bean
         ServiceAuthenticator serviceAuthenticator(Environment env) {
-            String modeRaw = env.getProperty("WAYLO_SERVICE_AUTH_MODE", "dual").trim().toUpperCase();
-            ServiceAuthenticator.Mode mode = ServiceAuthenticator.Mode.valueOf(modeRaw.isEmpty() ? "DUAL" : modeRaw);
             List<ServiceAuthenticator.Route> routes = Binder.get(env)
                     .bind("waylo.service-auth.routes", Bindable.listOf(RouteProperties.class))
                     .orElse(List.of()).stream()
                     .map(r -> new ServiceAuthenticator.Route(r.getPath(), Set.copyOf(r.getCallers()), r.isRequired()))
                     .toList();
             Map<String, Optional<PublicKey>> cache = new ConcurrentHashMap<>();
-            String legacy = mode == ServiceAuthenticator.Mode.DUAL ? env.getProperty("waylo.internal.token", "") : "";
-            log.info("Service auth: self={} mode={} routes={}", self(env), mode, routes.size());
-            return new ServiceAuthenticator(self(env), mode, routes,
+            log.info("Service auth: self={} routes={}", self(env), routes.size());
+            return new ServiceAuthenticator(self(env), routes,
                     iss -> cache.computeIfAbsent(iss, i -> {
                         String raw = env.getProperty(ServiceTokens.publicKeyEnvName(i), "");
                         return raw.isBlank() ? Optional.empty() : Optional.of(ServiceTokens.publicKey(raw));
                     }).orElse(null),
-                    legacy, Clock.systemUTC());
+                    Clock.systemUTC());
         }
 
         /** Right after the request id filter, before Spring Security and every service filter. */
@@ -97,7 +94,7 @@ public class ServiceAuthAutoConfiguration {
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(name = "feign.RequestInterceptor")
     static class Feign {
-        /** Global bean: every Feign client context inherits it. Without a private key no token is sent (dual mode only). */
+        /** Global bean: every Feign client context inherits it. Without a private key no token is sent and strict receivers reject the call. */
         @Bean
         feign.RequestInterceptor serviceTokenFeignInterceptor(Environment env) {
             Optional<PrivateKey> key = privateKey(env);

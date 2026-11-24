@@ -13,7 +13,7 @@ Source decisions: PRODUCT-DISCUSSION-NOTES.md "Araç kiralama" + "Ödeme modeli"
 New permission `FLEET_MANAGE` (branches, vehicles, rates, documents of a CAR_RENTAL org): `ORGANIZATION_OWNER` only. `RESERVATION_READ` and `RESERVATION_REDEEM` keep their current rule (`ORGANIZATION_OWNER` of the org qualifies, hotel roles as today).
 `FLEET_MANAGE` on a non-CAR_RENTAL org is denied. `HOTEL_CREATE` on a CAR_RENTAL org is denied.
 
-Internal (X-Internal-Token): `GET /internal/organizations/{id}` -> `{id, name, status, businessType, legalType}`; 404 if missing.
+Internal (X-Service-Token): `GET /internal/organizations/{id}` -> `{id, name, status, businessType, legalType}`; 404 if missing.
 Access check stays `GET /internal/access?userId&organizationId&permission` (hotelId omitted).
 
 Individual partners are behind a legal gate: car-rental-service property `waylo.car.individual-partners-enabled` (env `CAR_INDIVIDUAL_PARTNERS_ENABLED`, default `false`). When false, offers of INDIVIDUAL orgs are never returned and holds for them return 422 `INDIVIDUAL_PARTNERS_DISABLED`. Partner management (branches, vehicles, documents) still works so they can prepare.
@@ -67,7 +67,7 @@ Public:
 
 Customer (`X-User-Id`): `GET /api/rentals/me`, `GET /api/rentals/{id}` (owner or ADMIN). No direct create or cancel: lifecycle comes from orders.
 
-Internal (X-Internal-Token, path `/internal/car-holds`):
+Internal (X-Service-Token, path `/internal/car-holds`):
 - `POST /internal/car-holds {pickupBranchId, returnBranchId, category, transmission, pickupAt, returnAt, driverAge, principalUserId, idempotencyKey, orderCorrelationId}` -> `HoldDto`. Same idempotencyKey returns the same hold. Errors: 409 `NO_VEHICLE_AVAILABLE`, 422 `ROUTE_NOT_OFFERED`, `DRIVER_TOO_YOUNG`, `OUTSIDE_BRANCH_HOURS`, `INVALID_TIME`, `NO_RATE`, `INDIVIDUAL_PARTNERS_DISABLED`, `PARTNER_NOT_SELLABLE`.
 - `POST /internal/car-holds/{id}/confirm` (HELD and unexpired -> CONFIRMED, else 409 `HOLD_EXPIRED`), `POST /internal/car-holds/{id}/release` (HELD or CONFIRMED -> CANCELLED, idempotent).
 - `HoldDto {holdId, organizationId, pickupBranchId, returnBranchId, category, transmission, exampleModel, pickupAt, returnAt, chargeableDays, currency, totalAmount, depositAmount, kmLimitPerDay, status, expiresAt}`

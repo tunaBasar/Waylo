@@ -7,9 +7,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 import java.util.UUID;
 
-/** auth-service internal access check. Requires X-Internal-Token (added by {@link InternalAuthFeignConfig}). */
-@FeignClient(name = "auth-service", contextId = "authAccessClient", path = "/internal",
-        configuration = InternalAuthFeignConfig.class)
+/** auth-service internal access check. Requires a signed X-Service-Token (added globally). */
+@FeignClient(name = "auth-service", contextId = "authAccessClient", path = "/internal")
 public interface AuthAccessClient {
 
     @GetMapping("/access")
