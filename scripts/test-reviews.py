@@ -101,7 +101,11 @@ def main():
     s, r, _ = redeem(order_id, item_id, cust, partner, org_main)
     check('voucher redeem 200', s == 200, (s, err(r)))
     s, r, _ = call('POST', '/api/me/hotel-reviews', review_body, cust)
-    check('stay in the future -> 422 REVIEW_STAY_NOT_FINISHED', s == 422 and err(r) == 'REVIEW_STAY_NOT_FINISHED', (s, r))
+    check('redeemed, not checked out -> 422 REVIEW_NOT_CHECKED_OUT', s == 422 and err(r) == 'REVIEW_NOT_CHECKED_OUT', (s, r))
+    ver = int(psql('package_booking_db', f"SELECT version FROM vouchers WHERE order_item_id='{item_id}'"))
+    s, r, _ = call('POST', f'/api/partner/organizations/{org_main}/order-items/{item_id}/check-out',
+                   {'expectedVersion': ver}, partner)
+    check('partner check-out 200', s == 200, (s, r))
 
     # Fixture only: move this test order's own stay into the past.
     past_in = (datetime.date.today() - datetime.timedelta(days=3)).isoformat()

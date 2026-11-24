@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
@@ -42,6 +43,16 @@ public class Voucher {
     @Column(name = "redeemed_by_user_id")
     private UUID redeemedByUserId;
 
+    @Column(name = "checked_out_at")
+    private Instant checkedOutAt;
+
+    @Column(name = "checked_out_by_user_id")
+    private UUID checkedOutByUserId;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -64,5 +75,10 @@ public class Voucher {
     public void setRedeemedAt(Instant redeemedAt) { this.redeemedAt = redeemedAt; }
     public UUID getRedeemedByUserId() { return redeemedByUserId; }
     public void setRedeemedByUserId(UUID redeemedByUserId) { this.redeemedByUserId = redeemedByUserId; }
+    public Instant getCheckedOutAt() { return checkedOutAt; }
+    public void setCheckedOutAt(Instant checkedOutAt) { this.checkedOutAt = checkedOutAt; }
+    public UUID getCheckedOutByUserId() { return checkedOutByUserId; }
+    public void setCheckedOutByUserId(UUID v) { this.checkedOutByUserId = v; }
+    public Long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
 }

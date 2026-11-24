@@ -16,7 +16,7 @@ class PartnerOrderControllerTest {
     @Test
     void delegatesWithHeaderUserAndPathOrg() {
         var service = mock(PartnerOrderService.class);
-        var controller = new PartnerOrderController(service);
+        var controller = new PartnerOrderController(service, org.mockito.Mockito.mock(com.waylo.packagebookingservice.service.StayOperationService.class));
         UUID user = UUID.randomUUID(), org = UUID.randomUUID();
         var page = new PartnerOrderItemPage(List.of(), 0, 20, 0);
         when(service.list(user, org, null, null, null, 0, 20)).thenReturn(page);

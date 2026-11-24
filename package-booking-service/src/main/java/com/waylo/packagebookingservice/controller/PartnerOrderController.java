@@ -2,6 +2,12 @@ package com.waylo.packagebookingservice.controller;
 
 import com.waylo.packagebookingservice.domain.OrderStatus;
 import com.waylo.packagebookingservice.dto.ApiResponse;
+import com.waylo.packagebookingservice.dto.CheckOutRequest;
+import com.waylo.packagebookingservice.dto.StayOperationResponse;
+import com.waylo.packagebookingservice.service.StayOperationService;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.waylo.packagebookingservice.dto.PartnerOrderItemPage;
 import com.waylo.packagebookingservice.service.PartnerOrderService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,8 +28,21 @@ public class PartnerOrderController {
 
     private final PartnerOrderService partnerOrderService;
 
-    public PartnerOrderController(PartnerOrderService partnerOrderService) {
+    private final StayOperationService stayOperationService;
+
+    public PartnerOrderController(PartnerOrderService partnerOrderService, StayOperationService stayOperationService) {
         this.partnerOrderService = partnerOrderService;
+        this.stayOperationService = stayOperationService;
+    }
+
+    @PostMapping("/{orderItemId}/check-out")
+    public ResponseEntity<ApiResponse<StayOperationResponse>> checkOut(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @PathVariable UUID organizationId,
+            @PathVariable UUID orderItemId,
+            @Valid @RequestBody CheckOutRequest request) {
+        return ResponseEntity.ok(ApiResponse.of(stayOperationService.checkOut(
+                userId, organizationId, orderItemId, request.expectedVersion(), request.checkedOutAt()), "Checked out"));
     }
 
     @GetMapping

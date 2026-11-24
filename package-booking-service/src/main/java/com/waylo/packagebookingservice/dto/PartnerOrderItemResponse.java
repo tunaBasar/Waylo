@@ -24,5 +24,7 @@ public record PartnerOrderItemResponse(
         String passengerLastName,
         String voucherStatus,
         String cancelOutcome,
-        BigDecimal refundAmount
+        BigDecimal refundAmount,
+        Instant checkedOutAt,
+        Long stayVersion
 ) {}

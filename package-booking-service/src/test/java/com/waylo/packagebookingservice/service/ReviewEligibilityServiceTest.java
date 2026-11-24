@@ -13,10 +13,8 @@ import com.waylo.packagebookingservice.repository.VoucherRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,12 +24,10 @@ import static org.mockito.Mockito.when;
 
 class ReviewEligibilityServiceTest {
 
-    // 2026-11-14 22:30 UTC is already 2026-11-15 01:30 in Istanbul: checkOut 11-15 must count as finished.
-    private final Clock clock = Clock.fixed(Instant.parse("2026-11-14T22:30:00Z"), ZoneId.of("Europe/Istanbul"));
     private final OrderItemRepository items = mock(OrderItemRepository.class);
     private final OrderRepository orders = mock(OrderRepository.class);
     private final VoucherRepository vouchers = mock(VoucherRepository.class);
-    private final ReviewEligibilityService service = new ReviewEligibilityService(items, orders, vouchers, clock);
+    private final ReviewEligibilityService service = new ReviewEligibilityService(items, orders, vouchers);
 
     private final UUID customer = UUID.randomUUID();
     private final UUID itemId = UUID.randomUUID();
@@ -54,6 +50,7 @@ class ReviewEligibilityServiceTest {
         order.setStatus(OrderStatus.CONFIRMED);
         voucher = new Voucher();
         voucher.setStatus(VoucherStatus.REDEEMED);
+        voucher.setCheckedOutAt(Instant.parse("2026-11-15T09:00:00Z"));
         when(items.findById(itemId)).thenReturn(Optional.of(item));
         when(orders.findById(orderId)).thenReturn(Optional.of(order));
         when(vouchers.findByOrderItemId(itemId)).thenReturn(Optional.of(voucher));
@@ -64,16 +61,21 @@ class ReviewEligibilityServiceTest {
     }
 
     @Test
-    void redeemedFinishedStayOfOwnerIsEligible() {
+    void checkedOutStayOfOwnerIsEligible() {
         assertThat(check(customer).eligible()).isTrue();
     }
 
     @Test
-    void checkOutUsesIstanbulCalendarNotUtc() {
-        item.setCheckOut(LocalDate.of(2026, 11, 15));
-        assertThat(check(customer).eligible()).isTrue();
-        item.setCheckOut(LocalDate.of(2026, 11, 16));
-        assertThat(check(customer).reason()).isEqualTo("STAY_NOT_FINISHED");
+    void redeemedButNotCheckedOutIsRejectedEvenWhenDatesPassed() {
+        voucher.setCheckedOutAt(null);
+        item.setCheckOut(LocalDate.of(2020, 1, 1));
+        assertThat(check(customer).eligible()).isFalse();
+        assertThat(check(customer).reason()).isEqualTo("NOT_CHECKED_OUT");
+    }
+
+    @Test
+    void organizationMemberIsNotOwnerAndRejected() {
+        assertThat(check(UUID.randomUUID()).reason()).isEqualTo("NOT_OWNER");
     }
 
     @Test

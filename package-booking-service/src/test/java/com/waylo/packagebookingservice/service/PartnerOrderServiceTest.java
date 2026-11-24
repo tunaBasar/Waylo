@@ -39,7 +39,7 @@ class PartnerOrderServiceTest {
     private PartnerOrderItemResponse row() {
         return new PartnerOrderItemResponse(UUID.randomUUID(), UUID.randomUUID(), "CONFIRMED", Instant.now(),
                 "Deluxe room", new BigDecimal("200.00"), "USD", UUID.randomUUID(), null, null,
-                "HOTEL", LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 4), null, null, "ACTIVE", null, null);
+                "HOTEL", LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 4), null, null, "ACTIVE", null, null, null, 0L);
     }
 
     @Test

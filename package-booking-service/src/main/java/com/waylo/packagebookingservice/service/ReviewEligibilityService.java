@@ -14,16 +14,14 @@ import com.waylo.packagebookingservice.repository.VoucherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Verified-review rule for hotel stays (RM-29): the item is the caller's, a HOTEL item, its order is CONFIRMED,
- * not cancelled/no-show, the voucher was REDEEMED (guest checked in) and checkOut is not after today in the
- * business timezone. Membership in the hotel organization is checked by hotel-service, which owns that data.
+ * not cancelled/no-show, the voucher was REDEEMED (guest checked in) and a partner recorded the check-out
+ * (checked_out_at). Dates alone never complete a stay. Membership in the hotel organization is checked by hotel-service, which owns that data.
  */
 @Service
 public class ReviewEligibilityService {
@@ -31,14 +29,12 @@ public class ReviewEligibilityService {
     private final OrderItemRepository itemRepository;
     private final OrderRepository orderRepository;
     private final VoucherRepository voucherRepository;
-    private final Clock clock;
 
     public ReviewEligibilityService(OrderItemRepository itemRepository, OrderRepository orderRepository,
-                                    VoucherRepository voucherRepository, Clock clock) {
+                                    VoucherRepository voucherRepository) {
         this.itemRepository = itemRepository;
         this.orderRepository = orderRepository;
         this.voucherRepository = voucherRepository;
-        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -75,8 +71,7 @@ public class ReviewEligibilityService {
         if (item.getCancelOutcome() != null) return "CANCELLED_OR_NO_SHOW";
         if (order.getStatus() != OrderStatus.CONFIRMED) return "ORDER_NOT_CONFIRMED";
         if (voucher == null || voucher.getStatus() != VoucherStatus.REDEEMED) return "NOT_CHECKED_IN";
-        LocalDate checkOut = item.getCheckOut();
-        if (checkOut == null || checkOut.isAfter(LocalDate.now(clock))) return "STAY_NOT_FINISHED";
+        if (voucher.getCheckedOutAt() == null) return "NOT_CHECKED_OUT";
         return null;
     }
 
