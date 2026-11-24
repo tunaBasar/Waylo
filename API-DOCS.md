@@ -26,7 +26,7 @@
 14. [Auth Service and Account](#13-auth-service-and-account)
 15. [Bus Service](#14-bus-service)
 16. [Service-to-service (internal) endpoints](#15-service-to-service-internal-endpoints)
-17. [Added 2026-11-24: hotel publication, stay check-out, partner payouts, Kafka DLT admin](#16-added-2026-11-24)
+17. [Added 2026-11-24: hotel publication, stay check-out, payouts, Kafka DLT, hotel photos, order expiry/reconciliation, notification retries](#16-added-2026-11-24)
 18. [Enums Reference](#enums-reference)
 19. [Kafka Events](#kafka-events)
 20. [Architecture](#architecture)
@@ -1853,6 +1853,45 @@ exception/offset headers); deserialization and validation errors skip the retrie
   original topic; consumer idempotency (`processed_events`) makes a replay safe.
 
 The gateway picks the service by the `service` query parameter. CLI fallback: `scripts/kafka-dlt.py`.
+
+### 16.5 Hotel photos (hotel-service, contract section 5)
+
+Partner (`HOTEL_MANAGE` on the hotel):
+
+| Method | Path | Body / notes |
+|---|---|---|
+| POST | `/api/hotels/{id}/media` | multipart `file` + optional `caption`, `rightsSource` (`OWNED`, `LICENSED`, `PARTNER_ATTESTED`), `rightsNote`. JPEG/PNG/WebP by magic bytes, max 5 MB, min 800x600, max 20 per hotel; EXIF/XMP/IPTC stripped. 201 `MediaView`. Errors: 400 `EMPTY_FILE`, `IMAGE_TOO_SMALL`, `IMAGE_TOO_LARGE`, `CORRUPT_IMAGE`; 413 `FILE_TOO_LARGE`; 415 `UNSUPPORTED_FILE_TYPE`; 409 `MEDIA_LIMIT_REACHED`, `HOTEL_NOT_OWNED` |
+| GET | `/api/hotels/{id}/media/mine` | all own photos with `reviewStatus` (PENDING/APPROVED/REJECTED + reason) |
+| PUT | `/api/hotels/{id}/media/order` | `{ids:[...]}` new sort order |
+| PATCH | `/api/hotels/{id}/media/{mediaId}` | `{caption}`; editing an approved photo sends it back to review |
+| DELETE | `/api/hotels/{id}/media/{mediaId}` | 204; 409 `MEDIA_LIVE` for an approved photo of a published hotel |
+| GET | `/api/hotels/{id}/media/{mediaId}/file` | own file, `Cache-Control: no-store` |
+
+Public (no token): `GET /api/hotels/{id}/media` -> `[{id, caption, sortOrder, width, height}]` and
+`GET /api/hotels/{id}/media/{mediaId}` -> image bytes, both only for scan CLEAN + review APPROVED photos of a public hotel
+(else 404), `Cache-Control: public, max-age=300`, `X-Content-Type-Options: nosniff`.
+
+Admin (`ADMIN`): `GET /api/admin/hotel-media?status=&page=&size=`, `GET /api/admin/hotel-media/{mediaId}/file`,
+`POST /api/admin/hotel-media/{mediaId}/decisions` `{decision: APPROVE | REJECT, reason}` (reason required for REJECT;
+409 `ALREADY_DECIDED`). Every decision is an append-only row in `hotel_media_decisions`.
+
+### 16.6 Order expiry and payment reconciliation (RM-27)
+
+- Orders get a terminal status **`EXPIRED`**: a PENDING order whose holds lapsed (`holdExpiresAt` + 2 min grace) is closed
+  by a job every 60s, its holds and pricing reservation are released and an `ORDER_EXPIRED` event is published.
+  Paying it afterwards fails: payment confirm answers 409 `ORDER_EXPIRED` and the provider payment is cancelled.
+  Cancel and cancellation preview treat EXPIRED as terminal.
+- `GET /api/admin/payment-reconciliation?status=&page=&size=` (ADMIN, payment-service): decisions of the reconciliation job
+  `{items:[{id, paymentIntentId, orderId, providerPaymentId, intentStatus, orderStatus, status, detail, createdAt}], page, size, total}`.
+  `status` is `ESCROW_REPAIRED` (order CONFIRMED but escrow/ledger missing: rebuilt exactly as confirm would),
+  `PROVIDER_CANCELLED` (order not paid: provider payment cancelled, intent CANCELLED) or `MANUAL_REVIEW`.
+
+### 16.7 Notification delivery retries (RM-30)
+
+FAILED e-mail/push notifications are retried automatically after 1m, 5m, 30m, 2h and 12h; after 5 attempts the status
+becomes **`GAVE_UP`**. Responses carry `nextAttemptAt` and `lastError` (exception class only).
+`GET /api/notifications/status/{status}` (ADMIN) lists by status. `POST /api/notifications/{id}/retry` (ADMIN) retries
+now, also from GAVE_UP; it is rejected for SENT so a delivered message is never resent.
 
 ---
 

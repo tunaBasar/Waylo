@@ -46,7 +46,7 @@ Müşteri tek siparişte birden fazla dikeyden ürün alır, tek ödeme yapar, h
 | payment-service | 8087 | Payment intent, escrow, append-only ledger, komisyon, iade, tedarikçi bakiyesi. Provider: `TEST` (iyzico anahtar bekliyor) |
 | crm-service | 8088 | Müşteri profili (id = auth userId, auth-events ile senkron), sadakat mekanizması kapalı |
 | checkin-service | 8089 | Order uçuş kalemleri için online check-in |
-| notification-service | 8090 | E-posta ve Expo push, gerçek teslim durumu (SENT/SUPPRESSED/FAILED), cihaz kaydı |
+| notification-service | 8090 | E-posta ve Expo push, gerçek teslim durumu (SENT/SUPPRESSED/FAILED/GAVE_UP), otomatik yeniden deneme, cihaz kaydı |
 | traffic-simulator | 8095 | Admin-only, sınırlı salt-okuma yük testi |
 | package-booking-saga-orchestrator | 8091 | **Emekli.** Compose profili `legacy-saga`, varsayılan olarak başlamaz (bkz. Karar 6) |
 | observability-common | - | Kütüphane: request id, metrikler, outbox backlog gauge, log varsayılanları |
@@ -116,6 +116,14 @@ Başlangıçta Kafka tabanlı bir saga orchestrator vardı. Bugün sipariş akı
 Saga yalnız legacy `PackageBooking` adımlarını işaretliyordu, gerçek rezervasyon yapmıyordu. Bu yüzden ikinci ve yanıltıcı bir
 doğruluk kaynağı olmaması için devreden çıkarıldı (`SAGA-DECISION.md`). Modül derlenir ve testleri çalışır, `/api/sagas` route'u 503 döner.
 
+**Zaman aşımı ve uzlaştırma (RM-27):** `PendingOrderExpiryJob` (60 sn) hold süresi + 2 dk geçmiş PENDING siparişleri
+`EXPIRED` yapar, kalan hold'ları ve fiyat rezervasyonunu bırakır, `ORDER_EXPIRED` olayı yazar. EXPIRED siparişe geç gelen
+`markPaid` 409 `ORDER_EXPIRED` alır ve payment-service provider ödemesini iptal eder: geç ödeme süresi dolmuş hold'u asla
+kendiliğinden onaylamaz. payment-service'teki `PaymentReconciliationJob` (60 sn) 5 dakikadan eski, escrow'u olmayan AUTHORIZED
+intent'leri siparişe sorar: sipariş CONFIRMED ise escrow ve ledger confirm ile aynı kod yolundan (`holdInEscrow`) idempotent
+olarak yeniden kurulur; sipariş ödenmemişse provider ödemesi iptal edilir; diğer durumlar `MANUAL_REVIEW` olarak bekler.
+Her karar append-only `payment_reconciliations` tablosuna yazılır, admin `GET /api/admin/payment-reconciliation` ile görür.
+
 ### 7. İptal, iade ve finans
 İptal kuralları kalem bazında saklanan **politika snapshot'ından** hesaplanır, sonradan fiyat veya otel düzenlemesi bunu değiştirmez.
 `GET /api/orders/{id}/cancellation-preview` sonucu önceden gösterir. Para iadesi, escrow ve stok serbest bırakma ayrı sonuçlarla izlenir.
@@ -141,6 +149,10 @@ Kafka exactly-once iş etkisi garantisi olarak sunulmaz. `X-Request-Id` HTTP ve 
 Offset yalnız DLT yazımı başarılı olunca commit edilir. Deserialization ve doğrulama hataları denenmeden DLT'ye gider.
 Admin `GET /api/admin/kafka-dlt` ile bakar (maskeli, kısaltılmış), `POST /api/admin/kafka-dlt/replay` ile tek kaydı
 orijinal topic'e geri yollar; idempotent consumer tekrar işlemeyi önler. Sayaç: `waylo.kafka.dlt.published`.
+
+**Bildirim teslimi (RM-30):** FAILED e-posta/push bildirimleri `DeliveryRetryJob` ile 1 dk, 5 dk, 30 dk, 2 sa ve 12 sa sonra
+aynı gönderim yolundan yeniden denenir (satırlar `FOR UPDATE SKIP LOCKED` ile alınır, iki instance aynı satırı göndermez).
+5 denemeden sonra durum `GAVE_UP` olur. SENT ve SUPPRESSED asla yeniden gönderilmez. Sayaç: `waylo.notifications.delivery`.
 
 ### 9. Kiracı izolasyonu: kod + PostgreSQL RLS (hotel, car-rental, bus)
 Kod katmanı: her mutasyon `HotelAccessGuard` ile auth-service'e sorulur, child kayıtlar `hotelId + childId` ile bağlanır.
@@ -168,6 +180,12 @@ kuruluş otelleri gizlenir (fail-closed). V10 öncesindeki bütün oteller PUBLI
 (`.../order-items/{id}/check-out`). Yorum hakkı yalnız kayıtlı check-out'tan sonra doğar; tarih geçmesi yetmez, NO_SHOW ve
 iptal hak vermez.
 
+**Otel fotoğrafları (sözleşme bölüm 5):** partner JPEG/PNG/WebP yükler (magic byte ile tespit, 5 MB, en az 800x600, otel başına 20).
+EXIF/XMP/IPTC silinir, dosya rastgele anahtarla `hotel_media` volume'ünde saklanır, kullanıcının dosya adı kullanılmaz.
+Harici virüs tarayıcı yoktur: yapısal çözümleme tarama yerine geçer, fotoğraf admin onayına kadar görünmez. Public servis yalnız
+onaylı fotoğrafları ve yalnız public otel için verir (aksi 404). `hotel_media` RLS altındadır; partner kendi fotoğrafını
+onaylayamaz (trigger).
+
 ### 11. Spring Boot 4.x artifact değişiklikleri
 - `spring-boot-starter-web` -> `spring-boot-starter-webmvc`
 - `spring-boot-starter-kafka` (eski `spring-kafka` yerine)
@@ -186,6 +204,11 @@ scripts/dev-up.sh hotel     # core + hotel + orders + payments (car | bus | flig
 Core: postgres, kafka, redis, config, discovery, gateway, auth, frontend. Her Java servisi `-Xmx256m` ve 384 MB bellek
 limitiyle çalışır. Tek servis yeniden dağıtımı: `docker compose up --no-deps -d --build <servis>`.
 Başlangıç sırası compose `depends_on` ve healthcheck ile sağlanır: config -> discovery -> gateway/auth -> domain servisleri.
+
+**Production:** `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`. Overlay tüm sırları zorunlu yapar
+(dev varsayılanları yok) ve `prod` profilini açar; `ProductionSecretsGuard` bu profilde boş, dev literal'i veya 32 karakterden
+kısa sırla başlamayı reddeder (mesajda yalnız değişken adı geçer). Statik kontrol: `scripts/check-prod-config.sh`.
+`WAYLO_PAYOUT_IBAN_KEY` ilk kullanımdan sonra asla değiştirilmez.
 
 ## Test ve kalite kapıları
 

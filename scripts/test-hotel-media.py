@@ -83,10 +83,26 @@ def register(n):
     return d["data"]["token"]
 
 
+def env_file_value(key):
+    """Value of KEY from the repo .env (never printed). Used when the env var itself is not set."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k, v = line.split("=", 1)
+                    if k.strip() == key:
+                        return v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return None
+
+
 def main():
-    admin_email, admin_pw = os.environ.get("WAYLO_ADMIN_EMAIL"), os.environ.get("WAYLO_ADMIN_PASSWORD")
+    admin_email = os.environ.get("WAYLO_ADMIN_EMAIL") or env_file_value("WAYLO_BOOTSTRAP_ADMIN_EMAIL")
+    admin_pw = os.environ.get("WAYLO_ADMIN_PASSWORD") or env_file_value("WAYLO_BOOTSTRAP_ADMIN_PASSWORD")
     if not admin_email or not admin_pw:
-        print("SKIP: set WAYLO_ADMIN_EMAIL and WAYLO_ADMIN_PASSWORD")
+        print("SKIP: set WAYLO_ADMIN_EMAIL and WAYLO_ADMIN_PASSWORD (or the bootstrap admin in .env)")
         return 2
     s, d = js("POST", "/api/auth/login", {"email": admin_email, "password": admin_pw})
     assert s == 200, f"admin login {s}"
