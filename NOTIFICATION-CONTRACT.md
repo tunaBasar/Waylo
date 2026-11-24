@@ -30,3 +30,15 @@ Failure handling: a failed crm lookup logs and skips the mail but still acknowle
 | `GET /api/notifications/booking/{orderId}` | all rows | only own rows | 401 |
 | `GET /api/notifications/{id}` | any | own, foreign id gives 404 | 401 |
 | `POST /api/notifications/{id}/retry` | 200 | 403 | 401 |
+| `GET /api/notifications/status/{status}` (e.g. `FAILED`, `GAVE_UP`) | 200 | 403 | 401 |
+
+## 3. Delivery status and retry policy (RM-30)
+
+Statuses: `PENDING`, `SENT` (provider accepted), `FAILED` (transport error, will be retried), `SUPPRESSED` (reserved/test domain, no device, push disabled: never retried), `GAVE_UP` (terminal, retries exhausted). Columns: `retry_count`, `next_attempt_at`, `last_error` (max 300 chars, exception class only, no addresses or other PII).
+
+- `DeliveryRetryJob` runs every 60 s (`waylo.notifications.retry.interval-ms`). It claims up to `waylo.notifications.retry.batch-size` (20) rows with `status = FAILED AND retry_count < max AND next_attempt_at <= now` using `SELECT ... FOR UPDATE SKIP LOCKED` inside the sending transaction, so two instances never send the same row.
+- The retry uses the same send path as the first attempt. `SENT` and `SUPPRESSED` rows are never picked and a `SENT` mail is never resent.
+- Max attempts `waylo.notifications.retry.max-attempts` (default 5). Backoff after failed attempt n (counted from the first send): 1 m, 5 m, 30 m, 2 h, 12 h. When `retry_count` reaches the max and the send fails again, the row becomes `GAVE_UP` and `next_attempt_at` is cleared.
+- Manual `POST /api/notifications/{id}/retry` (admin only) sets `next_attempt_at` to now and retries at once. It also works for `GAVE_UP` (a new failure keeps `GAVE_UP`), and answers 422-style business error for `SENT`.
+- Admin view: `GET /api/notifications/status/FAILED` and `/status/GAVE_UP`.
+- Metric `waylo.notifications.delivery{channel,outcome=sent|failed|gave_up}`. Logs carry the notification id only.

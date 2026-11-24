@@ -8,5 +8,6 @@ import java.util.UUID;
 public record NotificationResponse(
         UUID id, UUID customerId, UUID bookingId, NotificationType type,
         String recipient, String subject, String body, NotificationStatus status,
-        int retryCount, Instant sentAt, Instant createdAt, Instant updatedAt
+        int retryCount, Instant sentAt, Instant createdAt, Instant updatedAt,
+        Instant nextAttemptAt, String lastError
 ) {}

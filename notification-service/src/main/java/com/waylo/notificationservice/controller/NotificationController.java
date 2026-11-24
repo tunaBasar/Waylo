@@ -63,6 +63,16 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.of(notificationService.getAll()));
     }
 
+    /** Admin view of delivery problems, e.g. /status/FAILED or /status/GAVE_UP. */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<ApiResponse<List<NotificationResponse>>> getByStatus(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            @PathVariable com.waylo.notificationservice.domain.NotificationStatus status) {
+        requireAdmin(userId, role);
+        return ResponseEntity.ok(ApiResponse.of(notificationService.getByStatus(status)));
+    }
+
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<ApiResponse<List<NotificationResponse>>> getByCustomerId(
             @RequestHeader(value = "X-User-Id", required = false) String userId,

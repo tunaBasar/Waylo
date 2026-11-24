@@ -14,4 +14,7 @@ public interface NotificationService {
     List<NotificationResponse> getByCustomerId(UUID customerId);
     List<NotificationResponse> getByBookingId(UUID bookingId);
     NotificationResponse retry(UUID id);
+    List<NotificationResponse> getByStatus(com.waylo.notificationservice.domain.NotificationStatus status);
+    /** Retries up to batchSize due FAILED rows, returns how many were attempted. */
+    int retryDue(int batchSize);
 }

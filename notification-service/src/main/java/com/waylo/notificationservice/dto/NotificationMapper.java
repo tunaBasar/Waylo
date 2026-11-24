@@ -12,6 +12,8 @@ public interface NotificationMapper {
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "retryCount", ignore = true)
     @Mapping(target = "sentAt", ignore = true)
+    @Mapping(target = "nextAttemptAt", ignore = true)
+    @Mapping(target = "lastError", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Notification toEntity(NotificationRequest request);

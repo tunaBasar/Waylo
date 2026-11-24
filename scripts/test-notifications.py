@@ -110,6 +110,13 @@ def main():
     check('retry by other customer -> 403', s == 403, s)
     s, bd = call('POST', f'/api/notifications/{nid}/retry', None, admin)
     check('retry by admin -> 200', s == 200 and data((s, bd))['retryCount'] == 1, s)
+    # RM-30: delivery status filter is admin only, GAVE_UP is a valid filter value
+    s, _ = call('GET', '/api/notifications/status/GAVE_UP', token=ta)
+    check('status filter by customer -> 403', s == 403, s)
+    s, bd = call('GET', '/api/notifications/status/SUPPRESSED', token=admin)
+    check('admin status filter SUPPRESSED lists the row', s == 200 and any(n['id'] == nid for n in data((s, bd)) or []), s)
+    s, _ = call('GET', '/api/notifications/status/GAVE_UP', token=admin)
+    check('admin status filter GAVE_UP -> 200', s == 200, s)
 
     # cancel paid order -> refund notification with the amount
     s, bd = call('POST', f"/api/orders/{order['id']}/cancel", None, ta)

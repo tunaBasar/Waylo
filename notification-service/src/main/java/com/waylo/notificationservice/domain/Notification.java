@@ -52,6 +52,12 @@ public class Notification {
     @Column(name = "sent_at")
     private Instant sentAt;
 
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
+    @Column(name = "last_error", length = 300)
+    private String lastError;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -91,6 +97,14 @@ public class Notification {
 
     public Instant getSentAt() { return sentAt; }
     public void setSentAt(Instant sentAt) { this.sentAt = sentAt; }
+
+    public Instant getNextAttemptAt() { return nextAttemptAt; }
+    public void setNextAttemptAt(Instant nextAttemptAt) { this.nextAttemptAt = nextAttemptAt; }
+
+    public String getLastError() { return lastError; }
+    public void setLastError(String lastError) {
+        this.lastError = lastError == null ? null : (lastError.length() > 300 ? lastError.substring(0, 300) : lastError);
+    }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

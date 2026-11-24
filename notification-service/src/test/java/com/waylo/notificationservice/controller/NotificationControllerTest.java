@@ -40,7 +40,7 @@ class NotificationControllerTest {
 
     private NotificationResponse resp(UUID owner) {
         return new NotificationResponse(notificationId, owner, bookingId, NotificationType.EMAIL,
-                "test@example.test", "Subject", "Body", NotificationStatus.SENT, 0, Instant.now(), Instant.now(), Instant.now());
+                "test@example.test", "Subject", "Body", NotificationStatus.SENT, 0, Instant.now(), Instant.now(), Instant.now(), null, null);
     }
 
     private NotificationRequest req() {

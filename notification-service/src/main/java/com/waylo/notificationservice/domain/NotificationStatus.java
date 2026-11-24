@@ -6,5 +6,7 @@ public enum NotificationStatus {
     FAILED,
     RETRYING,
     /** Not delivered on purpose: reserved/test domain or invalid address (dev and test users). */
-    SUPPRESSED
+    SUPPRESSED,
+    /** Terminal: automatic retries exhausted. Only a manual admin retry can try again. */
+    GAVE_UP
 }
