@@ -324,7 +324,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
   const withMedia = <T extends object>(body: T): T & { mediaIds?: string[] } => (pendingIds.length > 0 ? { ...body, mediaIds } : body);
   const photoByStatus = new Map(photos.map(p => [p.id, p]));
   const checklist = pendingIds.length > 0 && (
-    <div className="space-y-1">
+    <div className="space-y-1" data-testid="publication-media-checklist">
       <p className="text-xs font-semibold text-on-surface-variant">Bu talebe eklenecek fotograflar</p>
       <ul className="space-y-1 text-sm">
         {pendingIds.map(id => {
@@ -332,7 +332,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
           return (
             <li key={id}>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={!unchecked.has(id)} disabled={busy}
+                <input type="checkbox" data-testid="publication-media-check" checked={!unchecked.has(id)} disabled={busy}
                   onChange={e => setUnchecked(prev => { const n = new Set(prev); if (e.target.checked) n.delete(id); else n.add(id); return n; })} />
                 <span>{p?.caption || `Fotograf ${(p?.sortOrder ?? 0) + 1}`}</span>
               </label>

@@ -28,9 +28,12 @@ export default async function globalTeardown(force = false) {
     psql('car_rental_db', `DELETE FROM ${t} WHERE organization_id IN (${orgs})`);
   }
   // Hotel photos uploaded by 06-partner-payouts-media (rows, decisions and the files on the hotel-service volume).
-  const mediaKeys = psql('hotel_db', `SELECT storage_key FROM hotel_media WHERE hotel_id='${s.hotelId}'`).split(/\s+/);
-  psql('hotel_db', `DELETE FROM hotel_media_decisions WHERE hotel_id='${s.hotelId}'`);
-  psql('hotel_db', `DELETE FROM hotel_media WHERE hotel_id='${s.hotelId}'`);
+  // Also covers photos of hotels created by 11-media-request (all hotels of the fixture orgs).
+  const mediaHotels = `SELECT id FROM hotels WHERE organization_id IN (${orgs}) OR id='${s.hotelId}'`;
+  const mediaKeys = psql('hotel_db', `SELECT storage_key FROM hotel_media WHERE hotel_id IN (${mediaHotels})`).split(/\s+/);
+  psql('hotel_db', `DO $$ BEGIN IF to_regclass('hotel_publication_request_media') IS NOT NULL THEN DELETE FROM hotel_publication_request_media WHERE hotel_id IN (${mediaHotels}); END IF; END $$`);
+  psql('hotel_db', `DELETE FROM hotel_media_decisions WHERE hotel_id IN (${mediaHotels})`);
+  psql('hotel_db', `DELETE FROM hotel_media WHERE hotel_id IN (${mediaHotels})`);
   for (const k of mediaKeys) {
     if (/^[0-9a-f-]+$/.test(k)) execFileSync('docker', ['exec', 'waylo-hotel-service', 'rm', '-f', `/data/hotel-media/${k}`]);
   }

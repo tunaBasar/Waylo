@@ -70,7 +70,7 @@ function Photo({ media, onChanged }: { media: HotelMediaItem; onChanged: () => v
 export function RequestPhotos({ media, onChanged }: { media: HotelMediaItem[]; onChanged: () => void }) {
   if (media.length === 0) return null;
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="request-photos">
       <p className="text-xs font-semibold text-on-surface-variant">Fotograflar ({media.length})</p>
       <p className="text-xs text-on-surface-variant">Onayla, hala incelemede olan fotograflari da onaylar. Istemediginiz fotografi once tek tek reddedin.</p>
       <div className="grid gap-2 sm:grid-cols-3">
