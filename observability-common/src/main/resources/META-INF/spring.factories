@@ -1,2 +1,3 @@
 org.springframework.boot.EnvironmentPostProcessor=\
-com.waylo.observability.LoggingDefaultsEnvironmentPostProcessor
+com.waylo.observability.LoggingDefaultsEnvironmentPostProcessor,\
+com.waylo.observability.config.ProductionSecretsGuard

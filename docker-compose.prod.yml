@@ -1,0 +1,124 @@
+# Production overlay. Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Every secret becomes mandatory (no dev defaults) and the prod profile enables ProductionSecretsGuard.
+# Check statically with scripts/check-prod-config.sh.
+services:
+  config-service:
+    environment:
+      # keep "native" (file-based config backend, see config-service application.yml); prod only adds the secrets guard
+      SPRING_PROFILES_ACTIVE: native,prod
+      CONFIG_PASSWORD: "${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}"
+  discovery-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_PASSWORD: "${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}"
+  api-gateway:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required in production}"
+  flight-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+  flight-seat-inventory-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_FLIGHT_SEAT_INVENTORY_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_FLIGHT_SEAT_INVENTORY_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+  hotel-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_HOTEL_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_HOTEL_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_AUTH_SERVICE: "${WAYLO_SERVICE_KEYS_AUTH_SERVICE:?WAYLO_SERVICE_KEYS_AUTH_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+  car-rental-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_CAR_RENTAL_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_CAR_RENTAL_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+  bus-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_BUS_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_BUS_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+  package-booking-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_PACKAGE_BOOKING_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_HOTEL_SERVICE: "${WAYLO_SERVICE_KEYS_HOTEL_SERVICE:?WAYLO_SERVICE_KEYS_HOTEL_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_CHECKIN_SERVICE: "${WAYLO_SERVICE_KEYS_CHECKIN_SERVICE:?WAYLO_SERVICE_KEYS_CHECKIN_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PAYMENT_SERVICE: "${WAYLO_SERVICE_KEYS_PAYMENT_SERVICE:?WAYLO_SERVICE_KEYS_PAYMENT_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE: "${WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE:?WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SAGA_ORCHESTRATOR: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SAGA_ORCHESTRATOR:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SAGA_ORCHESTRATOR is required in production}"
+      VOUCHER_SECRET: "${VOUCHER_SECRET:?VOUCHER_SECRET is required in production}"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+  pricing-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_PRICING_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_PRICING_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+  payment-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_PAYMENT_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_PAYMENT_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_FLIGHT_SEAT_INVENTORY_SERVICE: "${WAYLO_SERVICE_KEYS_FLIGHT_SEAT_INVENTORY_SERVICE:?WAYLO_SERVICE_KEYS_FLIGHT_SEAT_INVENTORY_SERVICE is required in production}"
+      WAYLO_PAYOUT_IBAN_KEY: "${WAYLO_PAYOUT_IBAN_KEY:?WAYLO_PAYOUT_IBAN_KEY is required in production}"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+  crm-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_CRM_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_CRM_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE: "${WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE:?WAYLO_SERVICE_KEYS_NOTIFICATION_SERVICE is required in production}"
+  checkin-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_CHECKIN_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_CHECKIN_SERVICE is required in production}"
+  notification-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_NOTIFICATION_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_NOTIFICATION_SERVICE is required in production}"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD:?MAIL_PASSWORD is required in production}"
+  auth-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required in production}"
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_AUTH_SERVICE:?WAYLO_SERVICE_PRIVATE_KEY_AUTH_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_HOTEL_SERVICE: "${WAYLO_SERVICE_KEYS_HOTEL_SERVICE:?WAYLO_SERVICE_KEYS_HOTEL_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_BUS_SERVICE: "${WAYLO_SERVICE_KEYS_BUS_SERVICE:?WAYLO_SERVICE_KEYS_BUS_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_CAR_RENTAL_SERVICE: "${WAYLO_SERVICE_KEYS_CAR_RENTAL_SERVICE:?WAYLO_SERVICE_KEYS_CAR_RENTAL_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE: "${WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE:?WAYLO_SERVICE_KEYS_PACKAGE_BOOKING_SERVICE is required in production}"
+      WAYLO_SERVICE_KEYS_PAYMENT_SERVICE: "${WAYLO_SERVICE_KEYS_PAYMENT_SERVICE:?WAYLO_SERVICE_KEYS_PAYMENT_SERVICE is required in production}"
+  package-booking-saga-orchestrator:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      WAYLO_SERVICE_PRIVATE_KEY: "${WAYLO_SERVICE_PRIVATE_KEY_PACKAGE_BOOKING_SAGA_ORCHESTRATOR:?WAYLO_SERVICE_PRIVATE_KEY_PACKAGE_BOOKING_SAGA_ORCHESTRATOR is required in production}"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://${EUREKA_USER:-eureka}:${EUREKA_PASSWORD:?EUREKA_PASSWORD is required in production}@discovery-service:8761/eureka/"
+  traffic-simulator:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://${CONFIG_USER:-config}:${CONFIG_PASSWORD:?CONFIG_PASSWORD is required in production}@config-service:8888"

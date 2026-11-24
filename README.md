@@ -68,6 +68,14 @@ MAIL_PASSWORD=your-app-password-without-spaces
 
 SMTP şifresi veya kaynak kod değiştiğinde tekrar `docker compose up -d --build` çalıştırın. `docker compose start` mevcut container yapılandırmasını değiştirmez.
 
+## Production secrets
+
+Production runs with the overlay: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`. It removes every dev default, so compose fails fast when a variable is missing, and sets `SPRING_PROFILES_ACTIVE=prod`, which turns on `ProductionSecretsGuard` (observability-common). The guard refuses to start a service whose secret is a known dev default, blank, or shorter than 32 chars (JWT, HMAC and key secrets).
+
+Required: `POSTGRES_PASSWORD`, `PGADMIN_PASSWORD`, `JWT_SECRET`, `VOUCHER_SECRET`, `CONFIG_PASSWORD`, `EUREKA_PASSWORD`, `MAIL_PASSWORD`, `WAYLO_PAYOUT_IBAN_KEY`, and every `WAYLO_SERVICE_PRIVATE_KEY_*` / `WAYLO_SERVICE_KEYS_*` pair (`python3 scripts/gen-service-keys.py`).
+
+Generate values with `openssl rand -base64 48` (`openssl rand -base64 32` for `WAYLO_PAYOUT_IBAN_KEY`). **`WAYLO_PAYOUT_IBAN_KEY` must never change after first use**, stored IBANs become unreadable. Static check, starts nothing: `scripts/check-prod-config.sh`.
+
 ## Durdurma ve yeniden başlatma
 
 ```bash
