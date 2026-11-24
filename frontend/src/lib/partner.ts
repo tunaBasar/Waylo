@@ -117,6 +117,8 @@ export interface PublicationSubmitRequest {
   /** CONTENT_CHANGE only (hotel PUBLISHED or SUSPENDED). */
   revisionId?: string;
   expectedVersion?: number;
+  /** PENDING photos of this hotel attached to the request (max MAX_REQUEST_MEDIA). */
+  mediaIds?: string[];
 }
 
 export interface PublicationRequestCreated {
@@ -131,10 +133,12 @@ export interface PublicationRequestCreated {
   note: string | null;
   version: number;
   hotelPublicationStatus: PublicationStatus;
+  mediaIds?: string[];
 }
 
 export interface PublicationRequestSummary {
   id: string;
+  mediaCount: number;
   kind: PublicationRequestKind;
   status: PublicationRequestStatus;
   submittedAt: string;
@@ -942,3 +946,26 @@ export const hotelMediaApi = {
     return res.blob();
   },
 };
+
+// ---------- photos attached to a publication request (media phase 3) ----------
+
+export const MAX_REQUEST_MEDIA = 20;
+
+/** Ids of the non-deleted PENDING photos, in display order. */
+export function pendingPhotoIds(items: Array<{ id: string; sortOrder: number; reviewStatus: MediaReviewStatus; deleted?: boolean; deletedAt?: string | null }>): string[] {
+  return items
+    .filter(i => i.reviewStatus === 'PENDING' && !i.deleted && !i.deletedAt)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(i => i.id);
+}
+
+/** Turkish text for the photo related submit errors; other errors fall through to partnerErrorMessage. */
+export function publicationMediaErrorMessage(err: unknown, fallback: string): string {
+  if (isErrorCode(err, 404, 'MEDIA_NOT_FOUND')) {
+    return 'Secilen fotograflardan biri bulunamadi. Fotograf listesi yenilendi, tekrar deneyin.';
+  }
+  if (isErrorCode(err, 409, 'MEDIA_NOT_PENDING')) {
+    return 'Secilen fotograflardan biri artik incelemede degil. Fotograf listesi yenilendi, tekrar deneyin.';
+  }
+  return partnerErrorMessage(err, fallback);
+}

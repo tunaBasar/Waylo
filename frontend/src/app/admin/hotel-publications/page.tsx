@@ -11,6 +11,7 @@ import {
   PUBLICATION_STATUS_LABEL, PUBLICATION_STATUS_TONE, type PublicationRequestStatus,
 } from '@/lib/partner';
 import { MediaReview } from './MediaReview';
+import { RequestPhotos } from './RequestPhotos';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const TABS: Array<{ key: PublicationRequestStatus; label: string }> = [
@@ -133,6 +134,8 @@ function Detail({ requestId, onChanged }: { requestId: string; onChanged: () => 
         </div>
       )}
 
+      <RequestPhotos media={d.media ?? []} onChanged={() => void load()} />
+
       {d.note && <p className="text-sm"><span className="text-on-surface-variant">Partner notu: </span>{d.note}</p>}
 
       <div>
@@ -248,7 +251,7 @@ export default function AdminHotelPublicationsPage() {
                     <div className="min-w-0">
                       <p className="font-semibold text-on-surface truncate">{it.hotelName}</p>
                       <p className="text-xs text-outline">Isletme: {it.organizationId}</p>
-                      <p className="text-xs text-on-surface-variant">{KIND_LABEL[it.kind]} &middot; {fmtDate(it.submittedAt)}</p>
+                      <p className="text-xs text-on-surface-variant">{KIND_LABEL[it.kind]} &middot; {fmtDate(it.submittedAt)}{(it.mediaCount ?? 0) > 0 && <> &middot; {it.mediaCount} fotograf</>}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusPill tone={PUBLICATION_STATUS_TONE[it.hotelPublicationStatus]}>{PUBLICATION_STATUS_LABEL[it.hotelPublicationStatus]}</StatusPill>

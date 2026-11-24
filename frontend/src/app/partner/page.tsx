@@ -15,9 +15,9 @@ import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
 import {
   partnerApi, ORGANIZATION_STATUS_LABEL, ROLE_LABEL, PUBLICATION_STATUS_LABEL, PUBLICATION_STATUS_TONE, REVISION_STATUS_LABEL,
-  canManageHotel, submitBlockReason, contentDiff, isErrorCode,
+  canManageHotel, submitBlockReason, contentDiff, isErrorCode, hotelMediaApi, pendingPhotoIds, publicationMediaErrorMessage, MAX_REQUEST_MEDIA,
   type HotelRequest, type OrganizationStatus, type BusinessType, type LegalType, type PartnerHotel,
-  type PublicationRequestSummary, type HotelContentView, type HotelContent,
+  type PublicationRequestSummary, type HotelContentView, type HotelContent, type HotelMediaItem,
 } from '@/lib/partner';
 import { HotelPhotosPanel } from './HotelPhotosPanel';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
@@ -265,6 +265,8 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<HotelMediaItem[]>([]);
+  const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
   const inFlight = useRef(false);
   const revisionMode = status === 'PUBLISHED' || status === 'SUSPENDED';
 
@@ -272,6 +274,10 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
     try {
       const reqs = await partnerApi.publicationRequests(hotel.id);
       setRequests(reqs.data ?? []);
+      if (canManage) {
+        // photos are optional for a request: a failed list only hides the checklist (photos stay in the per-photo queue)
+        setPhotos(await hotelMediaApi.list(hotel.id).then(r => r.data ?? [], () => []));
+      }
       if (revisionMode && canManage) setView((await partnerApi.getContent(hotel.id)).data);
       else setView(null);
       setLoadError(null);
@@ -305,13 +311,38 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
       const text = err instanceof Error ? err.message : 'Islem basarisiz';
       if (isErrorCode(err, 409, 'HOTEL_INCOMPLETE')) setMissing(Object.keys(MISSING_LABEL).filter(k => text.includes(k)));
       if (isErrorCode(err, 409, 'VERSION_CONFLICT')) toast.error('Icerik baska biri tarafindan degistirildi. Yayin bilgileri yenilendi, tekrar deneyin.');
-      else toast.error(text);
+      else toast.error(publicationMediaErrorMessage(err, text));
       await refresh();
     } finally {
       inFlight.current = false;
       setBusy(false);
     }
   }
+
+  const pendingIds = pendingPhotoIds(photos).slice(0, MAX_REQUEST_MEDIA);
+  const mediaIds = pendingIds.filter(id => !unchecked.has(id));
+  const withMedia = <T extends object>(body: T): T & { mediaIds?: string[] } => (pendingIds.length > 0 ? { ...body, mediaIds } : body);
+  const photoByStatus = new Map(photos.map(p => [p.id, p]));
+  const checklist = pendingIds.length > 0 && (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-on-surface-variant">Bu talebe eklenecek fotograflar</p>
+      <ul className="space-y-1 text-sm">
+        {pendingIds.map(id => {
+          const p = photoByStatus.get(id);
+          return (
+            <li key={id}>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!unchecked.has(id)} disabled={busy}
+                  onChange={e => setUnchecked(prev => { const n = new Set(prev); if (e.target.checked) n.delete(id); else n.add(id); return n; })} />
+                <span>{p?.caption || `Fotograf ${(p?.sortOrder ?? 0) + 1}`}</span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-xs text-on-surface-variant">Talep onaylandiginda isaretli fotograflar da onaylanir. Isaretsiz fotograflar ayrica incelenir.</p>
+    </div>
+  );
 
   const blocked = submitBlockReason(organizationStatus, canManage);
   const latest = requests[0];
@@ -343,9 +374,10 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
           <Field label="Not" hint="Istege bagli, incelemeyi yapan yoneticiye iletilir">
             <input className={inputClass} value={note} maxLength={1000} onChange={e => setNote(e.target.value)} disabled={!!blocked} />
           </Field>
+          {checklist}
           <div className="flex flex-wrap items-center gap-2">
             <Button icon="send" disabled={busy || !!blocked}
-              onClick={() => void run(() => partnerApi.submitPublication(hotel.id, note.trim() ? { note: note.trim() } : {}), 'Otel incelemeye gonderildi')}>
+              onClick={() => void run(() => partnerApi.submitPublication(hotel.id, withMedia(note.trim() ? { note: note.trim() } : {})), 'Otel incelemeye gonderildi')}>
               Yayin icin gonder
             </Button>
             {canManage && !editing && <Button variant="ghost" icon="edit" onClick={() => setEditing(true)}>Duzenle</Button>}
@@ -375,13 +407,14 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
           {revision && (
             <p className="text-sm">Degisiklik taslagi #{revision.revisionNo}: <StatusPill tone={revision.status === 'SUBMITTED' ? 'warning' : 'neutral'}>{REVISION_STATUS_LABEL[revision.status]}</StatusPill></p>
           )}
+          {revision?.status === 'DRAFT' && checklist}
           <div className="flex flex-wrap items-center gap-2">
             {!editing && revision?.status !== 'SUBMITTED' && (
               <Button variant="secondary" icon="edit" disabled={!view} onClick={() => setEditing(true)}>Icerigi duzenle</Button>
             )}
             {revision?.status === 'DRAFT' && (
               <Button icon="send" disabled={busy || !!blocked}
-                onClick={() => void run(() => partnerApi.submitPublication(hotel.id, { note: note.trim() || undefined, revisionId: revision.id, expectedVersion: revision.version }), 'Degisiklik incelemeye gonderildi')}>
+                onClick={() => void run(() => partnerApi.submitPublication(hotel.id, withMedia({ note: note.trim() || undefined, revisionId: revision.id, expectedVersion: revision.version })), 'Degisiklik incelemeye gonderildi')}>
                 Incelemeye gonder
               </Button>
             )}
@@ -404,7 +437,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
           <ul className="space-y-1 text-sm">
             {requests.map(r => (
               <li key={r.id} className="text-on-surface-variant">
-                {r.kind === 'INITIAL' ? 'Ilk yayin' : 'Icerik degisikligi'} &middot; {new Date(r.submittedAt).toLocaleString('tr-TR')} &middot; {r.status}
+                {r.kind === 'INITIAL' ? 'Ilk yayin' : 'Icerik degisikligi'} &middot; {new Date(r.submittedAt).toLocaleString('tr-TR')} &middot; {r.status}{r.mediaCount > 0 && <span> &middot; {r.mediaCount} fotograf</span>}
                 {r.decision?.reason && <span>: {r.decision.reason}</span>}
               </li>
             ))}

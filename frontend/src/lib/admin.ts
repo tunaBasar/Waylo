@@ -60,6 +60,7 @@ export interface HotelPublicationItem {
   note: string | null;
   hotelPublicationStatus: PublicationStatus;
   version: number;
+  mediaCount?: number;
 }
 export interface HotelPublicationPage { items: HotelPublicationItem[]; page: number; size: number; total: number }
 export interface PublicationDiffEntry { field: string; from: unknown; to: unknown }
@@ -71,6 +72,7 @@ export interface HotelPublicationDetail extends HotelPublicationItem {
   revision: { id?: string; revisionNo?: number; content: HotelContent } | null;
   diff: PublicationDiffEntry[];
   decisions: PublicationDecisionRow[];
+  media: import('./partner').HotelMediaItem[];
 }
 
 /** Wire shape of GET /api/admin/hotel-publications/{id}: request fields nested under `request` (id, not requestId). */
@@ -80,6 +82,7 @@ export interface HotelPublicationDetailWire {
   revision: HotelPublicationDetail['revision'];
   diff: PublicationDiffEntry[] | null;
   decisions: PublicationDecisionRow[] | null;
+  media?: import('./partner').HotelMediaItem[] | null;
 }
 
 /** Flatten the nested detail into the item shape the admin page uses. Already flat input is returned as is. */
@@ -94,6 +97,7 @@ export function flattenPublicationDetail(w: HotelPublicationDetailWire | HotelPu
     revision: w.revision,
     diff: w.diff ?? [],
     decisions: w.decisions ?? [],
+    media: w.media ?? [],
   } as HotelPublicationDetail;
 }
 export type PublicationReviewDecision = 'APPROVE' | 'REJECT' | 'APPROVE_AND_PUBLISH';

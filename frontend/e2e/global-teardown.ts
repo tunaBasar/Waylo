@@ -50,6 +50,8 @@ export default async function globalTeardown(force = false) {
   // Publication rows (V10) reference the hotel with ON DELETE RESTRICT: decisions -> requests -> revisions, in FK order.
   psql('hotel_db', `UPDATE hotels SET published_revision_id=NULL WHERE id IN (${hotels})`);
   psql('hotel_db', `DELETE FROM hotel_publication_decisions WHERE hotel_id IN (${hotels})`);
+  // Photos attached to those requests (media phase 3). The table may not exist on older schemas, so a DO block guards the delete.
+  psql('hotel_db', `DO $$ BEGIN IF to_regclass('hotel_publication_request_media') IS NOT NULL THEN DELETE FROM hotel_publication_request_media WHERE request_id IN (SELECT id FROM hotel_publication_requests WHERE hotel_id IN (${hotels})); END IF; END $$`);
   psql('hotel_db', `UPDATE hotel_publication_requests SET revision_id=NULL WHERE hotel_id IN (${hotels})`);
   psql('hotel_db', `DELETE FROM hotel_publication_requests WHERE hotel_id IN (${hotels})`);
   psql('hotel_db', `DELETE FROM hotel_content_revisions WHERE hotel_id IN (${hotels})`);
