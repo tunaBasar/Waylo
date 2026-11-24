@@ -35,7 +35,9 @@ def make_flight(admin, fno, dep):
 
 
 def order_and_pay(token, fno, dep, seat):
-    date = dep.strftime('%Y-%m-%d')
+    # flight-service reads the search date in the departure airport's zone (IST = Europe/Istanbul, UTC+3, no DST):
+    # a UTC date misses flights that leave after local midnight (the 'near' flight in afternoon runs)
+    date = (dep + datetime.timedelta(hours=3)).strftime('%Y-%m-%d')
     s, b = call('GET', f'/api/flight-offers?from=IST&to=ESB&date={date}&adults=1')
     offers = [o for o in (b.get('data') or []) if o['flightNumber'] == fno]
     if not offers:

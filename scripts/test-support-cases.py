@@ -34,6 +34,15 @@ def main():
     admin = t.login(admin_email, admin_pw)
     tok = {k: t.login(emails[k], pws[emails[k]]) for k in emails}
     seller = t.ensure_seller(admin, tok['p'])
+    # The seller org is reused across runs: make this run's partner an owner of it (as test-flight-order.py does)
+    if t.psql('auth_db', f"SELECT count(*) FROM organization_memberships m JOIN users u ON u.id = m.user_id "
+                         f"WHERE u.email = '{emails['p']}' AND m.organization_id = '{seller}'") in ('', '0'):
+        t.psql('auth_db', f"INSERT INTO organization_memberships (user_id, organization_id) "
+                          f"SELECT id, '{seller}' FROM users WHERE email = '{emails['p']}'")
+        t.psql('auth_db', f"INSERT INTO role_assignments (membership_id, organization_id, role, scope_type, scope_id) "
+                          f"SELECT m.id, '{seller}', 'ORGANIZATION_OWNER', 'ORGANIZATION', '{seller}' FROM organization_memberships m "
+                          f"JOIN users u ON u.id = m.user_id WHERE u.email = '{emails['p']}' AND m.organization_id = '{seller}'")
+        tok['p'] = t.login(emails['p'], pws[emails['p']])
     rates = (call('GET', '/api/admin/commission-rates', token=admin)[1].get('data')) or []
     if not any(r.get('vertical') == 'FLIGHT' and str(r.get('supplierOrganizationId')) == seller for r in rates):
         call('POST', '/api/admin/commission-rates', {'vertical': 'FLIGHT', 'supplierOrganizationId': seller, 'rate': 0.05}, admin)
