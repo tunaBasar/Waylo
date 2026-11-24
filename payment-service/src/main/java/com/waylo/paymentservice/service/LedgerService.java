@@ -77,6 +77,14 @@ public class LedgerService {
         BusinessMetrics.increment("waylo.payment.refunds");
     }
 
+    /** True when the capture legs of this order item were already written (idempotency guard for repairs). */
+    @Transactional(readOnly = true)
+    public boolean hasCapture(UUID orderId, UUID orderItemId) {
+        return repository.findByOrderIdOrderByOccurredAtAscEntryIdAsc(orderId).stream()
+                .anyMatch(e -> orderItemId.equals(e.getOrderItemId()) && e.getAccount() == LedgerAccount.CUSTOMER_FUNDS_HELD
+                        && e.getCreditAmount() != null && e.getCreditAmount().signum() > 0);
+    }
+
     @Transactional(readOnly = true)
     public List<LedgerEntry> entriesOfOrder(UUID orderId) {
         return repository.findByOrderIdOrderByOccurredAtAscEntryIdAsc(orderId);

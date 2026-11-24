@@ -34,6 +34,12 @@ public class OrderEventPublisher {
         BusinessMetrics.increment("waylo.orders", "event", "cancelled");
     }
 
+    public void publishOrderExpired(OrderExpiredEvent event) {
+        log.info("Queueing OrderExpiredEvent: {}", event.getOrderId());
+        outbox.write("ORDER", event.getOrderId().toString(), KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);
+        BusinessMetrics.increment("waylo.orders", "event", "expired");
+    }
+
     public void publishOrderItemRedeemed(OrderItemRedeemedEvent event) {
         log.info("Queueing OrderItemRedeemedEvent: {}", event.getOrderId());
         outbox.write("ORDER", event.getOrderId().toString(), KafkaTopics.ORDER_EVENTS, event.getOrderId().toString(), event);

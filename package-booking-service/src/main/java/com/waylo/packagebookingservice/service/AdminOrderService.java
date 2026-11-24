@@ -76,7 +76,7 @@ public class AdminOrderService {
     }
 
     static String paymentState(OrderStatus status, List<OrderItem> items) {
-        if (status == OrderStatus.PENDING || status == OrderStatus.FAILED) return "UNPAID";
+        if (status == OrderStatus.PENDING || status == OrderStatus.FAILED || status == OrderStatus.EXPIRED) return "UNPAID";
         long refunded = items.stream().filter(i -> "REFUND".equals(i.getCancelOutcome())).count();
         boolean anyOutcome = items.stream().anyMatch(i -> i.getCancelOutcome() != null);
         if (status == OrderStatus.CANCELLED && !anyOutcome) return "UNPAID";

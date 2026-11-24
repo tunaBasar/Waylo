@@ -45,4 +45,10 @@ public interface OrderService {
 
     /** Internal (payment-service): money is in escrow. Confirms hotel holds and sets CONFIRMED. Idempotent. */
     InternalOrderResponse markPaid(UUID orderId);
+
+    /**
+     * RM-27: expires a PENDING order whose holds ran out before {@code cutoff}. Locks the row (skip locked), re-checks the state,
+     * releases holds and the pricing reservation, writes ORDER_EXPIRED. Returns false when nothing was done (idempotent).
+     */
+    boolean expireIfStale(UUID orderId, java.time.Instant cutoff);
 }

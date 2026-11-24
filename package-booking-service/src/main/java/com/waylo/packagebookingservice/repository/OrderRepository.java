@@ -17,4 +17,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID>,
     List<Order> findByStatus(OrderStatus status);
 
     List<Order> findByCustomerIdAndQuoteId(UUID customerId, UUID quoteId);
+
+    /** Ids of PENDING orders whose holds expired before the cutoff, oldest first (RM-27). */
+    @org.springframework.data.jpa.repository.Query("select o.id from Order o where o.status = com.waylo.packagebookingservice.domain.OrderStatus.PENDING "
+            + "and o.holdExpiresAt is not null and o.holdExpiresAt < :cutoff order by o.holdExpiresAt")
+    List<UUID> findExpiredPendingIds(@org.springframework.data.repository.query.Param("cutoff") java.time.Instant cutoff,
+                                     org.springframework.data.domain.Pageable pageable);
+
+    /** Row lock that skips rows another transaction already holds (SELECT ... FOR UPDATE SKIP LOCKED). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.QueryHints(@jakarta.persistence.QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @org.springframework.data.jpa.repository.Query("select o from Order o where o.id = :id")
+    java.util.Optional<Order> findByIdForUpdateSkipLocked(@org.springframework.data.repository.query.Param("id") UUID id);
 }

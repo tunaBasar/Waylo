@@ -45,6 +45,7 @@ public class KafkaConsumerConfig {
           + "orderCancelled:com.waylo.notificationservice.event.OrderEvent,"
           + "orderCreated:com.waylo.notificationservice.event.OrderEvent,"
           + "orderItemRedeemed:com.waylo.notificationservice.event.OrderEvent,"
+          + "orderExpired:com.waylo.notificationservice.event.OrderEvent,"
           + "paymentCompleted:com.waylo.notificationservice.event.PaymentCompletedEvent,"
           + "paymentRefunded:com.waylo.notificationservice.event.PaymentRefundedEvent,"
           + "payoutPaid:com.waylo.notificationservice.event.PayoutPaidEvent,"

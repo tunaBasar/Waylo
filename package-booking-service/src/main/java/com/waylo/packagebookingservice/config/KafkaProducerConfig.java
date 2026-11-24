@@ -32,7 +32,8 @@ public class KafkaProducerConfig {
           + "orderCreated:com.waylo.packagebookingservice.event.OrderCreatedEvent,"
           + "orderPaid:com.waylo.packagebookingservice.event.OrderPaidEvent,"
           + "orderCancelled:com.waylo.packagebookingservice.event.OrderCancelledEvent,"
-          + "orderItemRedeemed:com.waylo.packagebookingservice.event.OrderItemRedeemedEvent";
+          + "orderItemRedeemed:com.waylo.packagebookingservice.event.OrderItemRedeemedEvent,"
+          + "orderExpired:com.waylo.packagebookingservice.event.OrderExpiredEvent";
 
     @Bean
     public ProducerFactory<String, Object> producerFactory() {

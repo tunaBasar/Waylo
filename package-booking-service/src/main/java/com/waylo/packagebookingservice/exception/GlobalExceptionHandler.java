@@ -98,6 +98,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
+    @ExceptionHandler(OrderExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleOrderExpired(OrderExpiredException ex, HttpServletRequest request) {
+        log.warn("Order expired: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(
+                HttpStatus.CONFLICT.value(), "ORDER_EXPIRED", ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex,
                                                              HttpServletRequest request) {

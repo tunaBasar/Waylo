@@ -140,34 +140,10 @@ public class PaymentIntentService {
             return IntentResponse.from(intentRepository.saveAndFlush(intent));
         }
 
-        Instant now = Instant.now();
         intent.setProviderPaymentId(result.providerPaymentId());
         intent.setStatus(PaymentIntentStatus.AUTHORIZED);
         intent.setFailureCode(null);
-        for (Plan p : plans) {
-            EscrowItem e = new EscrowItem();
-            e.setId(UUID.randomUUID());
-            e.setPaymentIntentId(intent.getId());
-            e.setOrderId(intent.getOrderId());
-            e.setOrderItemId(p.item().orderItemId());
-            e.setVertical(p.vertical());
-            e.setSupplierOrganizationId(p.item().supplierOrganizationId());
-            e.setGrossAmount(p.item().effectiveGross());
-            e.setChargedAmount(p.item().amount());
-            e.setDiscountAmount(p.item().effectiveDiscount());
-            e.setDiscountFundedBy(p.item().effectiveDiscount().signum() > 0 ? p.item().discountFundedBy() : null);
-            e.setCommissionRate(p.rate());
-            e.setCommissionAmount(p.split().commission());
-            e.setSupplierAmount(p.split().supplier());
-            e.setCurrency(p.item().currency());
-            e.setStatus(EscrowStatus.HELD);
-            e.setReleaseTrigger(triggerFor(p.vertical()));
-            e.setProviderItemRef(result.itemRefs().get(p.item().orderItemId()));
-            e.setHeldAt(now);
-            escrowRepository.save(e);
-            ledgerService.recordCapture(intent.getOrderId(), p.item().orderItemId(), p.item().amount(),
-                    p.item().currency(), intent.getId());
-        }
+        holdInEscrow(intent, plans, result.itemRefs(), Instant.now());
         intentRepository.saveAndFlush(intent);
 
         try {
@@ -184,6 +160,58 @@ public class PaymentIntentService {
         }
         BusinessMetrics.increment("waylo.payments", "outcome", "confirmed");
         return IntentResponse.from(intent);
+    }
+
+    /**
+     * The single place that books a capture: one HELD escrow item plus its capture ledger legs per planned order item.
+     * Used by confirm and by the reconciliation repair, so a repaired escrow equals what confirm would have created.
+     * Idempotent per order item: an existing escrow item or an existing capture ledger group is never written twice.
+     */
+    private void holdInEscrow(PaymentIntent intent, List<Plan> plans, java.util.Map<UUID, String> itemRefs, Instant now) {
+        for (Plan p : plans) {
+            if (escrowRepository.findByOrderItemId(p.item().orderItemId()).isEmpty()) {
+                EscrowItem e = new EscrowItem();
+                e.setId(UUID.randomUUID());
+                e.setPaymentIntentId(intent.getId());
+                e.setOrderId(intent.getOrderId());
+                e.setOrderItemId(p.item().orderItemId());
+                e.setVertical(p.vertical());
+                e.setSupplierOrganizationId(p.item().supplierOrganizationId());
+                e.setGrossAmount(p.item().effectiveGross());
+                e.setChargedAmount(p.item().amount());
+                e.setDiscountAmount(p.item().effectiveDiscount());
+                e.setDiscountFundedBy(p.item().effectiveDiscount().signum() > 0 ? p.item().discountFundedBy() : null);
+                e.setCommissionRate(p.rate());
+                e.setCommissionAmount(p.split().commission());
+                e.setSupplierAmount(p.split().supplier());
+                e.setCurrency(p.item().currency());
+                e.setStatus(EscrowStatus.HELD);
+                e.setReleaseTrigger(triggerFor(p.vertical()));
+                e.setProviderItemRef(itemRefs == null ? null : itemRefs.get(p.item().orderItemId()));
+                e.setHeldAt(now);
+                escrowRepository.save(e);
+            }
+            if (!ledgerService.hasCapture(intent.getOrderId(), p.item().orderItemId())) {
+                ledgerService.recordCapture(intent.getOrderId(), p.item().orderItemId(), p.item().amount(),
+                        p.item().currency(), intent.getId());
+            }
+        }
+    }
+
+    /**
+     * RM-27 repair: the order is CONFIRMED but this AUTHORIZED intent has no escrow (the paid call committed on the order side
+     * while the local confirm rolled back or crashed). Books the same escrow and ledger rows confirm would have. Idempotent.
+     * The provider item refs are not known here (null) and are not needed by the TEST provider.
+     */
+    @Transactional
+    public void repairEscrow(PaymentIntent intent, OrderClient.OrderDto order) {
+        List<Plan> plans = plan(order);
+        intent.setAmount(order.totalAmount());
+        intent.setCurrency(order.currency());
+        holdInEscrow(intent, plans, null, Instant.now());
+        List<EscrowItem> held = escrowRepository.findByPaymentIntentId(intent.getId());
+        if (!held.isEmpty()) intent.setStatus(EscrowService.deriveStatus(held.stream().map(EscrowItem::getStatus).toList()));
+        intentRepository.saveAndFlush(intent);
     }
 
     /**

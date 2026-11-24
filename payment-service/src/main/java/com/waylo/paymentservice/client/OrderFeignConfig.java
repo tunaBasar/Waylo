@@ -19,7 +19,7 @@ public class OrderFeignConfig {
         return (methodKey, response) -> decode(response.status(), readBody(response));
     }
 
-    /** 404 -> not found, 422 -> business answer (code passed through), anything else (401 bad token, 5xx) -> unavailable. */
+    /** 404 -> not found, 409 ORDER_EXPIRED -> conflict (confirm cancels the provider payment), 422 -> business answer (code passed through), anything else (401 bad token, 5xx) -> unavailable. */
     static RuntimeException decode(int status, String body) {
         if (status == 404) {
             return new ResourceNotFoundException("Order", "id", "?");
@@ -35,6 +35,19 @@ public class OrderFeignConfig {
                 // keep defaults
             }
             return new BusinessRuleException(code, message);
+        }
+        if (status == 409) {
+            String code = null;
+            try {
+                JsonNode node = MAPPER.readTree(body);
+                if (node.hasNonNull("error")) code = node.get("error").asString();
+            } catch (RuntimeException ignored) {
+                // fall through to unavailable
+            }
+            if ("ORDER_EXPIRED".equals(code)) {
+                return new com.waylo.paymentservice.exception.ConflictException("ORDER_EXPIRED",
+                        "Order expired before payment, the provider payment was cancelled");
+            }
         }
         return new OrderServiceUnavailableException("Order service returned HTTP " + status);
     }

@@ -42,7 +42,8 @@ public class KafkaConsumerConfig {
           + "orderCreated:com.waylo.crmservice.event.OrderEvent,"
           + "orderPaid:com.waylo.crmservice.event.OrderEvent,"
           + "orderCancelled:com.waylo.crmservice.event.OrderEvent,"
-          + "orderItemRedeemed:com.waylo.crmservice.event.OrderEvent";
+          + "orderItemRedeemed:com.waylo.crmservice.event.OrderEvent,"
+          + "orderExpired:com.waylo.crmservice.event.OrderEvent";
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {

@@ -37,6 +37,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.waylo.packagebookingservice.event.OrderExpiredEvent;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -104,7 +105,7 @@ public class OrderServiceImpl implements OrderService {
         List<Order> existing = orderRepository.findByCustomerIdAndQuoteId(actorUserId, request.quoteId());
         if (!existing.isEmpty()) {
             Order prior = existing.get(0);
-            if (prior.getStatus() == OrderStatus.CANCELLED || prior.getStatus() == OrderStatus.FAILED) {
+            if (prior.getStatus() == OrderStatus.CANCELLED || prior.getStatus() == OrderStatus.FAILED || prior.getStatus() == OrderStatus.EXPIRED) {
                 throw new BusinessRuleException("QUOTE_ALREADY_USED",
                         "An earlier order for this quote was cancelled, please request a new quote");
             }
@@ -575,7 +576,7 @@ public class OrderServiceImpl implements OrderService {
         String blocked = null;
         List<com.waylo.packagebookingservice.dto.CancellationPreviewResponse.Item> out = new java.util.ArrayList<>();
         BigDecimal total = BigDecimal.ZERO.setScale(2);
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED || order.getStatus() == OrderStatus.EXPIRED) {
             blocked = order.getStatus() == OrderStatus.CANCELLED ? "ALREADY_CANCELLED" : "TERMINAL_STATE";
         }
         for (OrderItem item : items) {
@@ -617,6 +618,9 @@ public class OrderServiceImpl implements OrderService {
         }
         if (order.getStatus() == OrderStatus.FAILED) {
             throw new BusinessRuleException("TERMINAL_STATE", "Order is in a terminal failed state");
+        }
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            throw new BusinessRuleException("TERMINAL_STATE", "Order expired before payment");
         }
 
         if (expectedVersion != null && !expectedVersion.equals(order.getVersion())) {
@@ -707,6 +711,9 @@ public class OrderServiceImpl implements OrderService {
             voucherService.createForItems(items.stream().filter(i -> !"REFUND".equals(i.getCancelOutcome())).toList()); // idempotent
             return toInternal(order, items);
         }
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            throw new com.waylo.packagebookingservice.exception.OrderExpiredException("Order expired before payment, the payment must be cancelled or refunded");
+        }
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessRuleException("ORDER_NOT_PAYABLE", "Order is " + order.getStatus() + ", it cannot be marked paid");
         }
@@ -735,6 +742,26 @@ public class OrderServiceImpl implements OrderService {
         voucherService.createForItems(confirmed);
         eventPublisher.publishOrderPaid(paidEvent(order, confirmed));
         return toInternal(order, items);
+    }
+
+    @Override
+    public boolean expireIfStale(UUID orderId, java.time.Instant cutoff) {
+        Order order = orderRepository.findByIdForUpdateSkipLocked(orderId).orElse(null);
+        if (order == null || order.getStatus() != OrderStatus.PENDING
+                || order.getHoldExpiresAt() == null || !order.getHoldExpiresAt().isBefore(cutoff)) {
+            return false;
+        }
+        for (OrderItem item : orderItemRepository.findByOrderId(orderId)) {
+            if (item.getFulfillmentRef() != null && item.getCancelOutcome() == null) {
+                releaseHoldQuietly(item.getVertical(), item.getFulfillmentRef());
+            }
+        }
+        pricingApplier.release(orderId);
+        order.setStatus(OrderStatus.EXPIRED);
+        orderRepository.saveAndFlush(order);
+        eventPublisher.publishOrderExpired(new OrderExpiredEvent(order.getId(), order.getCustomerId(), order.getCurrency(), order.getTotalAmount()));
+        log.info("Order {} expired: holds ran out unpaid", orderId);
+        return true;
     }
 
     /** Customer facing summary of the confirmed items. No voucher code or QR payload is ever put on the bus. */

@@ -88,4 +88,6 @@ public class PaymentIntent {
     public Long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    /** Test seam: lets reconciliation tests age an intent. The database overwrites it on every update. */
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -8,5 +8,7 @@ public enum OrderStatus {
     PENDING,
     CONFIRMED,
     CANCELLED,
-    FAILED
+    FAILED,
+    /** PENDING order whose holds ran out unpaid (PendingOrderExpiryJob). Terminal, a late payment is rejected with 409 ORDER_EXPIRED. */
+    EXPIRED
 }
