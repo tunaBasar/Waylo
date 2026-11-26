@@ -190,3 +190,24 @@ test('pickupLeadError accepts a pickup 2h or more ahead', () => {
 test('pickupLeadError flags an unparsable value', () => {
   assert.strictEqual(m.pickupLeadError('not-a-dateT09:00:00', Date.now()), 'Gecersiz tarih veya saat formati.');
 });
+
+// ── Admin sellability (F59) ──────────────────────────────────────────────────
+
+test('adminSellability: a failed org lookup is UNKNOWN, not Kiralanamaz', () => {
+  assert.equal(m.adminSellability({ sellable: true, sellabilityKnown: true }), 'SELLABLE');
+  assert.equal(m.adminSellability({ sellable: false, sellabilityKnown: true }), 'NOT_SELLABLE');
+  assert.equal(m.adminSellability({ sellable: false, sellabilityKnown: false }), 'UNKNOWN');
+  // Payload from an older service without the field: trust sellable.
+  assert.equal(m.adminSellability({ sellable: false }), 'NOT_SELLABLE');
+});
+
+test('adminSellabilityCounts keeps unknown vehicles out of the Kiralanamaz count', () => {
+  const counts = m.adminSellabilityCounts([
+    { sellable: true, sellabilityKnown: true },
+    { sellable: false, sellabilityKnown: true },
+    { sellable: false, sellabilityKnown: false },
+    { sellable: false, sellabilityKnown: false },
+  ]);
+  assert.deepEqual(counts, { sellable: 1, notSellable: 1, unknown: 2 });
+  assert.match(m.SELLABILITY_UNKNOWN_HINT, /gecici olarak bilinmiyor/);
+});

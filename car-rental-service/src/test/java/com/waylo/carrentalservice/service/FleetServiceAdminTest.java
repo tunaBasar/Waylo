@@ -5,6 +5,7 @@ import com.waylo.carrentalservice.client.OrgInfo;
 import com.waylo.carrentalservice.config.CarSettings;
 import com.waylo.carrentalservice.domain.*;
 import com.waylo.carrentalservice.dto.CarDtos.AdminVehicleResponse;
+import com.waylo.carrentalservice.exception.ResourceNotFoundException;
 import com.waylo.carrentalservice.repository.*;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +67,7 @@ class FleetServiceAdminTest {
         assertThat(result.get(0).homeBranchName()).isEqualTo("Istanbul");
         assertThat(result.get(0).sellable()).isTrue();
         assertThat(result.get(0).missingDocuments()).isEmpty();
+        assertThat(result.get(0).sellabilityKnown()).isTrue();
     }
 
     @Test
@@ -110,6 +112,27 @@ class FleetServiceAdminTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).organizationName()).isNull();
+        // F59: a failed lookup is "unknown", not a confirmed "Kiralanamaz".
+        assertThat(result.get(0).sellable()).isFalse();
+        assertThat(result.get(0).sellabilityKnown()).isFalse();
+    }
+
+    @Test
+    void adminVehicles_orgNotFound_isKnownNotSellable() {
+        FleetService svc = service();
+        UUID orgId = UUID.randomUUID();
+        UUID vid = UUID.randomUUID();
+        UUID branchId = UUID.randomUUID();
+
+        when(vehicles.findAllByOrderByOrganizationIdAscPlateNumberAsc()).thenReturn(List.of(makeVehicle(vid, orgId, branchId, "Toyota", "Corolla")));
+        when(auth.organization(orgId)).thenThrow(new ResourceNotFoundException("Organization not found: " + orgId));
+        when(branches.findByIdIn(anySet())).thenReturn(List.of(makeBranch(branchId, "Istanbul")));
+        when(documents.findByOrganizationIdAndVehicleIdIsNull(orgId)).thenReturn(List.of());
+        when(documents.findByVehicleIdIn(anySet())).thenReturn(List.of());
+
+        AdminVehicleResponse only = svc.adminVehicles().get(0);
+        assertThat(only.sellable()).isFalse();
+        assertThat(only.sellabilityKnown()).isTrue();
     }
 
     @Test

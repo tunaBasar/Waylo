@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { CATEGORY_LABEL, TRANSMISSION_LABEL, FUEL_LABEL } from '@/lib/car';
+import { CATEGORY_LABEL, TRANSMISSION_LABEL, FUEL_LABEL, adminSellability, adminSellabilityCounts, SELLABILITY_UNKNOWN_HINT } from '@/lib/car';
 
 type VehicleCategory = 'ECONOMY' | 'COMPACT' | 'MIDSIZE' | 'FULLSIZE' | 'SUV' | 'MINIVAN' | 'LUXURY' | 'VAN';
 type TransmissionType = 'AUTOMATIC' | 'MANUAL';
@@ -25,6 +25,8 @@ type AdminVehicle = {
   seatCount: number;
   active: boolean;
   sellable: boolean;
+  /** False when the org lookup failed (F59): the status is unknown, not "Kiralanamaz". */
+  sellabilityKnown?: boolean;
   missingDocuments: string[];
 };
 
@@ -57,6 +59,8 @@ export default function AdminVehiclesPage() {
 
   if (!isAdmin) return <AdminOnly />;
 
+  const counts = adminSellabilityCounts(vehicles);
+
   return (
     <div className="space-y-space-md">
       <div className="flex items-center justify-between">
@@ -73,14 +77,18 @@ export default function AdminVehiclesPage() {
           <p className="text-[10px] text-on-surface-variant">Toplam Arac</p>
         </div>
         <div className="bg-surface-container-lowest rounded-xl p-3 shadow-sm text-center">
-          <p className="text-lg font-bold text-on-surface">{vehicles.filter(v => v.sellable).length}</p>
+          <p className="text-lg font-bold text-on-surface">{counts.sellable}</p>
           <p className="text-[10px] text-on-surface-variant">Kiralanabilir</p>
         </div>
         <div className="bg-surface-container-lowest rounded-xl p-3 shadow-sm text-center">
-          <p className="text-lg font-bold text-error">{vehicles.filter(v => !v.sellable).length}</p>
-          <p className="text-[10px] text-on-surface-variant">Kiralanamaz</p>
+          <p className="text-lg font-bold text-error">{counts.notSellable}</p>
+          <p className="text-[10px] text-on-surface-variant">Kiralanamaz{counts.unknown > 0 ? ` (+${counts.unknown} bilinmiyor)` : ''}</p>
         </div>
       </div>
+
+      {counts.unknown > 0 && (
+        <p className="rounded-lg bg-surface-container px-3 py-2 text-xs text-on-surface-variant">{SELLABILITY_UNKNOWN_HINT}</p>
+      )}
 
       {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
 
@@ -100,14 +108,19 @@ export default function AdminVehiclesPage() {
                   <p className="text-[10px] text-on-surface-variant">Plaka: {vehicle.plateNumber}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {vehicle.sellable && (
+                  {adminSellability(vehicle) === 'SELLABLE' && (
                     <span className="text-[10px] font-bold text-on-secondary-container bg-secondary-container px-2 py-0.5 rounded-full">
                       Kiralanabilir
                     </span>
                   )}
-                  {!vehicle.sellable && vehicle.missingDocuments?.length > 0 && (
+                  {adminSellability(vehicle) === 'UNKNOWN' && (
+                    <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+                      Durum bilinmiyor
+                    </span>
+                  )}
+                  {adminSellability(vehicle) === 'NOT_SELLABLE' && vehicle.missingDocuments?.length > 0 && (
                     <span className="text-[10px] font-bold text-on-error-container bg-error-container px-2 py-0.5 rounded-full">
-                      Eksi: {vehicle.missingDocuments.length}
+                      Eksik belge: {vehicle.missingDocuments.length}
                     </span>
                   )}
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${

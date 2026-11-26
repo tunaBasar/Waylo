@@ -274,12 +274,18 @@ public class FleetService {
         Set<UUID> orgIds = list.stream().map(v -> v.organizationId).collect(Collectors.toSet());
         Set<UUID> branchIds = list.stream().map(v -> v.homeBranchId).collect(Collectors.toSet());
 
-        // Cache org lookups per request
+        // Cache org lookups per request. A failed lookup (auth-service restarting) is remembered separately (F59):
+        // the vehicle is still reported not sellable, but with sellabilityKnown=false so the admin sees "unknown".
         Map<UUID, OrgInfo> orgCache = new HashMap<>();
+        Set<UUID> lookupFailed = new HashSet<>();
         for (UUID orgId : orgIds) {
             try {
                 orgCache.put(orgId, auth.organization(orgId));
-            } catch (Exception e) { /* null on fail */ }
+            } catch (ResourceNotFoundException e) {
+                // The org really does not exist: known not sellable.
+            } catch (Exception e) {
+                lookupFailed.add(orgId);
+            }
         }
 
         // Cache branch names
@@ -309,7 +315,7 @@ public class FleetService {
             List<DocumentType> missing = Sellability.missingVehicleDocuments(vDocs, today());
             boolean sellable = v.active && orgSellable && missing.isEmpty();
             return AdminVehicleResponse.of(v, orgName, branchNames.getOrDefault(v.homeBranchId, null),
-                    sellable, missing);
+                    sellable, missing, !lookupFailed.contains(v.organizationId));
         }).toList();
     }
 }

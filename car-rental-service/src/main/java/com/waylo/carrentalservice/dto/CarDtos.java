@@ -130,12 +130,21 @@ public final class CarDtos {
                                        String brand, String model, int year, CarCategory category,
                                        Transmission transmission, FuelType fuelType, int seatCount, boolean active,
                                        String organizationName, String homeBranchName, boolean sellable,
-                                       List<DocumentType> missingDocuments) {
+                                       List<DocumentType> missingDocuments, boolean sellabilityKnown) {
         public static AdminVehicleResponse of(Vehicle v, String orgName, String branchName,
                                                boolean sellable, List<DocumentType> missing) {
+            return of(v, orgName, branchName, sellable, missing, true);
+        }
+
+        /**
+         * {@code sellabilityKnown=false} (F59): the organization lookup failed (auth-service restarting or down), so
+         * "not sellable" is a guess; the admin list then says "Durum bilinmiyor" instead of "Kiralanamaz".
+         */
+        public static AdminVehicleResponse of(Vehicle v, String orgName, String branchName,
+                                               boolean sellable, List<DocumentType> missing, boolean sellabilityKnown) {
             return new AdminVehicleResponse(v.id, v.organizationId, v.homeBranchId, v.plateNumber, v.brand, v.model,
                     v.year, v.category, v.transmission, v.fuelType, v.seatCount, v.active,
-                    orgName, branchName, sellable, missing);
+                    orgName, branchName, sellable, missing, sellabilityKnown);
         }
     }
 

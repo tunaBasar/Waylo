@@ -312,3 +312,35 @@ export function formatDateTime(iso: string | null | undefined): string {
     return iso;
   }
 }
+
+// ── Admin vehicle list (F59) ────────────────────────────────────────────────
+
+/**
+ * Sellability of one vehicle in the admin list. When car-rental-service could not reach auth-service (restart), it
+ * sends sellabilityKnown=false: that is "unknown", not a confirmed "Kiralanamaz". Older payloads without the field
+ * count as known.
+ */
+export type AdminSellability = 'SELLABLE' | 'NOT_SELLABLE' | 'UNKNOWN';
+
+export function adminSellability(v: { sellable: boolean; sellabilityKnown?: boolean | null }): AdminSellability {
+  if (v.sellabilityKnown === false) return 'UNKNOWN';
+  return v.sellable ? 'SELLABLE' : 'NOT_SELLABLE';
+}
+
+/** Counts for the admin summary row; unknown vehicles are not counted as "Kiralanamaz". */
+export function adminSellabilityCounts(list: { sellable: boolean; sellabilityKnown?: boolean | null }[]): {
+  sellable: number; notSellable: number; unknown: number;
+} {
+  const counts = { sellable: 0, notSellable: 0, unknown: 0 };
+  for (const v of list) {
+    const s = adminSellability(v);
+    if (s === 'SELLABLE') counts.sellable++;
+    else if (s === 'NOT_SELLABLE') counts.notSellable++;
+    else counts.unknown++;
+  }
+  return counts;
+}
+
+/** Shown above the admin list when at least one vehicle's status could not be determined. */
+export const SELLABILITY_UNKNOWN_HINT =
+  'Isletme bilgisi su an alinamadi (servis yeniden basliyor olabilir). Bu araclarin satis durumu gecici olarak bilinmiyor; sayfayi biraz sonra yenileyin.';
