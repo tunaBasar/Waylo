@@ -416,7 +416,10 @@ def run(admin_email, admin_pw, created):
     ck('R6', 'second order CONFIRMED', poll(lambda: order_status(oid2) == 'CONFIRMED', 60, 2), order_status(oid2))
     ck('R6', 'second escrow HELD', poll(lambda: escrow(oid2).startswith('HELD'), 30, 2), escrow(oid2))
     snap = must('GET', f'/api/orders/{oid2}', None, tok_c)['items'][0]
-    ck('R12', 'item snapshot policy FREE_CANCELLATION', snap.get('cancellationPolicy') == 'FREE_CANCELLATION', snap.get('cancellationPolicy'))
+    # 2026-11-26 (walkthrough S1): a FREE_CANCELLATION plan with N=2 days is stored as FREE_UNTIL 48h before check-in
+    ck('R12', 'item snapshot policy FREE_UNTIL 48h (plan: free cancellation, 2 days before)',
+       snap.get('cancellationPolicy') == 'FREE_UNTIL' and snap.get('cancelFreeHoursBefore') == 48 and snap.get('freeCancellationUntil'),
+       (snap.get('cancellationPolicy'), snap.get('cancelFreeHoursBefore'), snap.get('freeCancellationUntil')))
     prev = must('GET', f'/api/orders/{oid2}/cancellation-preview', None, tok_c)
     expected = Decimal(str(q2['totalAmount']))
     ck('R12', 'preview: cancellable, refund == order total (free window)',
