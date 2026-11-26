@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/features/auth/AuthContext';
+import { setReturnTo } from '@/features/auth/gate';
 import type { FlightOffer } from '@/api';
 import { flightsApi } from '@/features/flights/api';
 import { useAsync } from '@/features/useAsync';
@@ -11,6 +13,8 @@ import { fmtLocal, money } from '@/features/format';
 export default function FlightOfferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const cart = useCart();
+  const router = useRouter();
+  const { user } = useAuth();
   const state = useAsync(() => flightsApi.offer(id), [id]);
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
@@ -29,6 +33,7 @@ export default function FlightOfferScreen() {
             <Field label="Yolcu adi" value={first} onChangeText={setFirst} autoCapitalize="words" />
             <Field label="Yolcu soyadi" value={last} onChangeText={setLast} autoCapitalize="words" />
             <Button title="Sepete ekle" disabled={!first.trim() || !last.trim()} onPress={() => {
+              if (!user) { setReturnTo(`/flight/${id}`); router.push('/(auth)/login'); return; }
               const ok = cart.add({
                 vertical: 'FLIGHT', label: `${o.flightNumber} ${first.trim()} ${last.trim()}`, amount: o.totalAmount, currency: o.currency,
                 request: { offerId: o.offerId, passengerFirstName: first.trim(), passengerLastName: last.trim() },

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 
 export default function Login() {
   const { login } = useAuth();
@@ -19,6 +19,7 @@ export default function Login() {
   return (
     <Screen>
       <Title>Waylo&apos;ya giris</Title>
+      <Muted>Waylo · Otel, ucus ve arac kiralama tek yerde</Muted>
       <ErrorBanner message={error} />
       <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
       <Field label="Sifre" value={password} onChangeText={setPassword} secureTextEntry />

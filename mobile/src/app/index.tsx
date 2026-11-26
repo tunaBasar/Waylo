@@ -1,7 +1,6 @@
 import { Redirect } from 'expo-router';
-import { useAuth } from '@/features/auth/AuthContext';
 
+/** Guests browse the catalog tabs, account pages ask for login. */
 export default function Index() {
-  const { user } = useAuth();
-  return <Redirect href={user ? '/(tabs)/hotels' : '/(auth)/login'} />;
+  return <Redirect href="/(tabs)/hotels" />;
 }

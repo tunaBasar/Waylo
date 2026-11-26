@@ -7,16 +7,20 @@ import { loadOrdersSnapshot, saveOrdersSnapshot } from '@/features/orders/cache'
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Card, Muted, Screen, Title } from '@/components/ui';
 import { money, orderStatusInfo } from '@/features/format';
+import { orderSummary } from '@/features/orders/summary';
 
 function OrderList({ orders }: { orders: Order[] }) {
   const router = useRouter();
   return orders.map((o) => {
     const status = orderStatusInfo(o.status).label;
+    const sum = orderSummary(o);
     return (
       <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Siparis ${o.id.slice(0, 8)}, ${status}, ${money(o.totalAmount, o.currency)}`}
         onPress={() => router.push(`/order/${o.id}`)}>
         <Card>
           <Text style={{ fontWeight: '700' }}>{`#${o.id.slice(0, 8)}`}</Text>
+          {sum.title ? <Text>{sum.title}</Text> : null}
+          {sum.count ? <Muted>{sum.count}</Muted> : null}
           <Muted>{status}</Muted>
           {o.status === 'EXPIRED' ? <Muted>Ödeme süresi doldu, ödeme yapılamaz.</Muted> : null}
           <Text>{money(o.totalAmount, o.currency)}</Text>

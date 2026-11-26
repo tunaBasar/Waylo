@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { Branch, CarOffer } from '@/api';
+import { useAuth } from '@/features/auth/AuthContext';
+import { setReturnTo } from '@/features/auth/gate';
 import { carsApi } from '@/features/cars/api';
 import { useAsync } from '@/features/useAsync';
 import { useCart } from '@/features/cart/CartContext';
@@ -13,6 +16,8 @@ type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; ret
 
 export default function Cars() {
   const cart = useCart();
+  const router = useRouter();
+  const { user } = useAuth();
   const branches = useAsync(() => carsApi.branches(), []);
   const [pickup, setPickup] = useState<string | null>(null);
   const [ret, setRet] = useState<string | null>(null);
@@ -63,6 +68,7 @@ export default function Cars() {
               <Muted>{`${o.category} · ${o.transmission} · ${o.seatCount} koltuk · ${o.chargeableDays} gun`}</Muted>
               <Text style={{ fontWeight: '700' }}>{money(o.totalAmount, o.currency)}</Text>
               <Button kind="secondary" title="Sepete ekle" onPress={() => {
+                if (!user) { setReturnTo('/cars'); router.push('/(auth)/login'); return; }
                 const ok = cart.add({
                   vertical: 'CAR', label: `${o.exampleModel}, ${q.pickupAt.slice(0, 16)}`, amount: o.totalAmount, currency: o.currency,
                   request: { pickupBranchId: o.pickupBranchId, returnBranchId: o.returnBranchId, category: o.category, transmission: o.transmission, pickupAt: q.pickupAt, returnAt: q.returnAt, driverAge: q.driverAge },

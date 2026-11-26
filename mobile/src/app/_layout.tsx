@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
@@ -18,14 +18,16 @@ function usePendingOrderLink(signedIn: boolean) {
 function Routes() {
   const { user, loading } = useAuth();
   usePendingOrderLink(!!user);
-  if (loading) return null;
+  // The stored session is restored first: deciding earlier would send a signed-in visitor to login.
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator accessibilityLabel="Yukleniyor" /></View>;
   return (
     <Stack screenOptions={{ headerShown: true }}>
+      {/* open to guests: the catalog is served anonymously */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="hotel/[id]" options={{ title: 'Otel' }} />
+      <Stack.Screen name="flight/[id]" options={{ title: 'Ucus teklifi' }} />
       <Stack.Protected guard={!!user}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="hotel/[id]" options={{ title: 'Otel' }} />
         <Stack.Screen name="quote/[id]" options={{ title: 'Teklif' }} />
-        <Stack.Screen name="flight/[id]" options={{ title: 'Ucus teklifi' }} />
         <Stack.Screen name="cart" options={{ title: 'Sepet' }} />
         <Stack.Screen name="order/[id]" options={{ title: 'Siparis' }} />
         <Stack.Screen name="reviews" options={{ title: 'Yorumlar' }} />

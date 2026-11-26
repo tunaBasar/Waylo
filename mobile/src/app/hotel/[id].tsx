@@ -1,3 +1,5 @@
+import { useAuth } from '@/features/auth/AuthContext';
+import { setReturnTo } from '@/features/auth/gate';
 import { useState } from 'react';
 import { Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +28,7 @@ export function shiftedStay(checkIn: string, checkOut: string, next: string): { 
 
 export default function HotelDetail() {
   const router = useRouter();
+  const { user } = useAuth();
   const p = useLocalSearchParams<{ id: string; checkIn: string; checkOut: string; rooms: string; adults: string; childrenAges?: string | string[] }>();
   const ages = ([] as string[]).concat(p.childrenAges ?? []).map(Number).filter((n) => !Number.isNaN(n));
   const stay = { checkIn: p.checkIn, checkOut: p.checkOut, rooms: Number(p.rooms) || 1, adults: Number(p.adults) || 1, childrenAges: ages };
@@ -38,6 +41,13 @@ export default function HotelDetail() {
   const [error, setError] = useState<string | null>(null);
 
   async function pick(roomTypeId: string, ratePlanId: string, key: string) {
+    if (!user) {
+      const qs = new URLSearchParams({ checkIn: p.checkIn ?? '', checkOut: p.checkOut ?? '', rooms: String(stay.rooms), adults: String(stay.adults) });
+      ages.forEach((a) => qs.append('childrenAges', String(a)));
+      setReturnTo(`/hotel/${p.id}?${qs}`);
+      router.push('/(auth)/login');
+      return;
+    }
     setBusy(key); setError(null);
     try {
       const q = await hotelsApi.createQuote({ hotelId: p.id, roomTypeId, ratePlanId, ...stay });
