@@ -55,12 +55,22 @@ export function hasMixedCurrency(items: CartItem[]): boolean {
 }
 
 /**
+ * A name the backend accepts as hotel lead guest (package-booking guestName: 1-80 letters incl. Turkish, spaces,
+ * hyphen, apostrophe). Account names are only checked for not-blank at registration, so they can contain digits.
+ */
+export function isValidGuestName(v: string | null | undefined): boolean {
+  const t = (v ?? '').trim();
+  return t.length > 0 && t.length <= 80 && /^[\p{L} '\-]+$/u.test(t);
+}
+
+/**
  * Package order body. A hotel item carries the lead guest name (F31: the hotel desk must see who is coming); the cart
- * has no guest form, so it is the logged-in customer's name. Other verticals already carry passengers.
+ * has no guest form, so it is the logged-in customer's name, sent only when the backend would accept it. The name is
+ * optional: an account name like "Musteri E2E" must never block the purchase (seen in e2e 2026-11-26).
  */
 export function toPackageRequest(items: CartItem[], promoCode?: string, guest?: { firstName?: string | null; lastName?: string | null }) {
-  const first = guest?.firstName?.trim();
-  const last = guest?.lastName?.trim();
+  const first = isValidGuestName(guest?.firstName) ? guest!.firstName!.trim() : undefined;
+  const last = isValidGuestName(guest?.lastName) ? guest!.lastName!.trim() : undefined;
   return {
     items: items.map(i => ({
       vertical: i.vertical,

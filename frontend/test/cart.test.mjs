@@ -44,6 +44,15 @@ test('toPackageRequest puts the customer as lead guest on hotel items only (F31)
   // no name known: nothing is sent, the backend stores null
   assert.deepEqual(toPackageRequest([item('a', 'HOTEL', { quoteId: 'q' })], undefined, { firstName: '  ', lastName: null }).items[0],
     { vertical: 'HOTEL', quoteId: 'q' });
+  // e2e 2026-11-26: the account "Musteri" / "E2E" made the backend reject the whole purchase; invalid parts are dropped
+  assert.deepEqual(toPackageRequest([item('a', 'HOTEL', { quoteId: 'q' })], undefined, { firstName: 'Musteri', lastName: 'E2E' }).items[0],
+    { vertical: 'HOTEL', quoteId: 'q', guestFirstName: 'Musteri' });
+});
+
+test('isValidGuestName mirrors the backend rule', async () => {
+  const { isValidGuestName } = await mod();
+  for (const ok of ['Ayşe', 'Hacı Mehmet', 'Öztürk-Şahin', "O'Neil", 'İlker']) assert.equal(isValidGuestName(ok), true, ok);
+  for (const bad of ['', '   ', 'E2E', 'Ali1', 'a'.repeat(81), 'x@y', null, undefined]) assert.equal(isValidGuestName(bad), false, String(bad));
 });
 
 test('parseCart is defensive; itemIndexMessage', async () => {

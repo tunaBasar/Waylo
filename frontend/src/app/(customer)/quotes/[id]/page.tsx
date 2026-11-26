@@ -16,6 +16,7 @@ import { MEAL_PLAN_LABEL } from '@/lib/partner';
 import { offerPolicyText } from '@/lib/cancellation';
 import { useAuth } from '@/lib/auth';
 import { guestNameOrUndefined } from '@/lib/guest';
+import { isValidGuestName } from '@/lib/cart';
 import { PromoCodeField } from '@/components/PromoCodeField';
 import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 
@@ -115,8 +116,9 @@ function QuoteContent() {
   const [promoCode, setPromoCode] = useState('');
   const [guestFirstEdit, setGuestFirstEdit] = useState<string | null>(null);
   const [guestLastEdit, setGuestLastEdit] = useState<string | null>(null);
-  const guestFirst = guestFirstEdit ?? user?.firstName ?? '';
-  const guestLast = guestLastEdit ?? user?.lastName ?? '';
+  // Prefill only names the backend accepts (account names may contain digits, e.g. "Musteri E2E")
+  const guestFirst = guestFirstEdit ?? (isValidGuestName(user?.firstName) ? user!.firstName : '');
+  const guestLast = guestLastEdit ?? (isValidGuestName(user?.lastName) ? user!.lastName : '');
   const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Load quote
@@ -318,8 +320,8 @@ function QuoteContent() {
               vertical: 'HOTEL', label: `${hotelName || 'Otel'} - ${quote.roomTypeName}`, amount: quote.totalAmount,
               currency: quote.currency, expiresAt: quote.expiresAt, request: {
                 quoteId: quote.quoteId,
-                ...(guestNameOrUndefined(guestFirst) ? { guestFirstName: guestNameOrUndefined(guestFirst) } : {}),
-                ...(guestNameOrUndefined(guestLast) ? { guestLastName: guestNameOrUndefined(guestLast) } : {}),
+                ...(isValidGuestName(guestFirst) ? { guestFirstName: guestNameOrUndefined(guestFirst) } : {}),
+                ...(isValidGuestName(guestLast) ? { guestLastName: guestNameOrUndefined(guestLast) } : {}),
               },
             })} />
           </div>
