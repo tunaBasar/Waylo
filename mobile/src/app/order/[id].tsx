@@ -9,7 +9,7 @@ import { useOnline } from '@/features/network/NetworkContext';
 import { orderLinkOpened } from '@/features/deeplinks';
 import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
-import { fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, policyText, refundText } from '@/features/format';
+import { fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText } from '@/features/format';
 
 function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: OrderCheckin | undefined; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -98,7 +98,7 @@ export default function OrderDetail() {
               <Text>{money(o.totalAmount, o.currency)}</Text>
               {(o.items ?? []).map((i) => (
                 <View key={i.id} style={{ gap: 4 }}>
-                  <Muted>{`${i.description} · ${policyText(i.cancellationPolicy, i.cancelFreeHoursBefore)}`}</Muted>
+                  <Muted>{`${i.description} · ${orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)}`}</Muted>
                   {i.vertical === 'FLIGHT' && i.flight ? (
                     <>
                       <Muted>{`Yolcu: ${i.flight.passengerFirstName} ${i.flight.passengerLastName}${i.flight.pnr ? ` · PNR ${i.flight.pnr}` : ''}`}</Muted>

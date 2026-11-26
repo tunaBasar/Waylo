@@ -142,7 +142,7 @@ public class OrderServiceImpl implements OrderService {
                     + hold.rooms() + " oda");
             item.setCheckIn(hold.checkIn());
             item.setCheckOut(hold.checkOut());
-            policyResolver.applyHotel(item, hold.cancellationPolicy());
+            policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
             item.setQuantity(1);
             item.setCurrency(hold.currency());
             priced.applyTo(item);
@@ -416,7 +416,7 @@ public class OrderServiceImpl implements OrderService {
                                     + hold.rooms() + " oda");
                             item.setCheckIn(hold.checkIn());
                             item.setCheckOut(hold.checkOut());
-                            policyResolver.applyHotel(item, hold.cancellationPolicy());
+                            policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
                         });
             }
             case CAR -> {
@@ -862,6 +862,16 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
+    private static java.time.Instant freeCancellationUntil(OrderItem item) {
+        if ("NON_REFUNDABLE".equals(item.getCancellationPolicy())) return null;
+        java.time.Instant start = CancellationPolicyResolver.serviceStart(item);
+        if (start == null) return null;
+        if ("FREE_UNTIL".equals(item.getCancellationPolicy()) && item.getCancelFreeHoursBefore() != null) {
+            return start.minus(java.time.Duration.ofHours(item.getCancelFreeHoursBefore()));
+        }
+        return "FREE_CANCELLATION".equals(item.getCancellationPolicy()) ? start : null;
+    }
+
     private OrderItemResponse toItemResponse(OrderItem item) {
         return new OrderItemResponse(
                 item.getId(),
@@ -892,7 +902,8 @@ public class OrderServiceImpl implements OrderService {
                 item.getCancellationPolicy(),
                 item.getCancelFreeHoursBefore(),
                 item.getCancelOutcome(),
-                item.getRefundAmount()
+                item.getRefundAmount(),
+                freeCancellationUntil(item)
         );
     }
 }

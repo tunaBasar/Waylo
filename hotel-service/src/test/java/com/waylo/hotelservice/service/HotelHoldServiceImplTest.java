@@ -249,6 +249,19 @@ class HotelHoldServiceImplTest {
     }
 
     @Test
+    void hold_response_carriesFreeCancellationDaysBefore() {
+        HotelQuote quote = createQuote(QUOTE_ID);
+        quote.setCancellationPolicy(com.waylo.hotelservice.domain.CancellationPolicy.FREE_CANCELLATION);
+        quote.setFreeCancellationDaysBefore(2);
+        when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        HotelHold existing = createHeldHold(UUID.randomUUID(), QUOTE_ID);
+        when(holdRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
+
+        assertThat(service.hold(createHoldRequest()).freeCancellationDaysBefore()).isEqualTo(2);
+    }
+
+    @Test
     void hold_existingHeldHold_sameKeyDifferentQuote_throwsIdempotencyConflict() {
         HotelQuote quote = createQuote(QUOTE_ID);
         when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));

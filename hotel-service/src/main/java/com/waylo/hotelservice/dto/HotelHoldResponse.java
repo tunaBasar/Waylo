@@ -29,5 +29,7 @@ public record HotelHoldResponse(
         Instant releasedAt,
         Instant createdAt,
         /** Rate plan cancellation policy snapshot of the quote (FREE_CANCELLATION | NON_REFUNDABLE). */
-        String cancellationPolicy
+        String cancellationPolicy,
+        /** Days before check-in until which cancellation is free (null for NON_REFUNDABLE or unknown). */
+        Integer freeCancellationDaysBefore
 ) {}

@@ -6,7 +6,7 @@ import { hotelsApi } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
 import { useCart } from '@/features/cart/CartContext';
 import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
-import { money } from '@/features/format';
+import { money, offerPolicyText } from '@/features/format';
 import { checkoutErrorMessage } from '@/features/orders/api';
 
 export default function QuoteScreen() {
@@ -37,7 +37,7 @@ export default function QuoteScreen() {
             <Title>{q.roomTypeName}</Title>
             <Card>
               <Muted>{`${q.ratePlanName} · ${q.checkIn} - ${q.checkOut} · ${q.nights} gece`}</Muted>
-              <Muted>{q.cancellationPolicy === 'NON_REFUNDABLE' ? 'Iade edilemez' : 'Ucretsiz iptal'}</Muted>
+              <Muted>{offerPolicyText(q.cancellationPolicy, q.freeCancellationDaysBefore, q.checkIn)}</Muted>
               <Text style={{ fontWeight: '700', fontSize: 18 }}>{money(q.totalAmount, q.currency)}</Text>
               <Muted>{`Gecerlilik: ${new Date(q.expiresAt).toLocaleTimeString('tr-TR')}`}</Muted>
             </Card>

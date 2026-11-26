@@ -11,7 +11,8 @@ import {
 } from '@/lib/hotel-stay';
 import { emptyReasonText, shiftStay, type StayQuery, type AvailableOffer, type EmptyReason } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
-import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
+import { MEAL_PLAN_LABEL } from '@/lib/partner';
+import { offerPolicyText } from '@/lib/cancellation';
 import { useAuth } from '@/lib/auth';
 import { HotelReviews } from '@/components/HotelReviews';
 import { scoreLabel } from '@/lib/reviews';
@@ -195,13 +196,7 @@ function OfferCard({ offer, query, onLockPrice, pending }: OfferCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const cancellationText = (() => {
-    if (offer.cancellationPolicy === 'FREE_CANCELLATION' && offer.freeCancellationDaysBefore != null) {
-      return `Giristen ${offer.freeCancellationDaysBefore} gun oncesine kadar ucretsiz iptal`;
-    }
-    if (offer.cancellationPolicy === 'NON_REFUNDABLE') {
-      return 'Iade edilemez';
-    }
-    return CANCELLATION_POLICY_LABEL[offer.cancellationPolicy] ?? '';
+    return offerPolicyText(offer.cancellationPolicy, offer.freeCancellationDaysBefore, query.checkIn);
   })();
 
   return (

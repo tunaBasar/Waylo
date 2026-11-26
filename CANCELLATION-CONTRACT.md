@@ -7,7 +7,7 @@ Source decisions: PRODUCT-DISCUSSION-NOTES.md "Ödeme modeli: emanet + QR" (canc
 `order_items` gains `cancellation_policy` (`FREE_CANCELLATION | FREE_UNTIL | NON_REFUNDABLE`, default `FREE_CANCELLATION`), `cancel_free_hours_before` (int, required iff `FREE_UNTIL`), `cancel_outcome` (`REFUND | NO_REFUND | NO_SHOW`), `refund_amount`. The policy is written once at order creation and never re-read from the supplier. Old rows keep `FREE_CANCELLATION` (= today's full refund).
 
 Source per vertical:
-- HOTEL: the rate plan `CancellationPolicy` (`FREE_CANCELLATION | NON_REFUNDABLE`), exposed as `cancellationPolicy` on the hotel-service hold response (read from the quote snapshot). `freeCancellationDaysBefore` of the rate plan is NOT evaluated yet (open decision 2).
+- HOTEL: the rate plan `CancellationPolicy`, exposed with `freeCancellationDaysBefore` (N) on the hotel-service hold response (quote snapshot). `FREE_CANCELLATION` with N becomes `FREE_UNTIL` with hours = N*24 before check-in 00:00 Europe/Istanbul (no refund after); N null stays `FREE_CANCELLATION`; `NON_REFUNDABLE` unchanged. Order items expose `freeCancellationUntil` (FREE_UNTIL: serviceStart - hours, FREE_CANCELLATION: serviceStart, NON_REFUNDABLE or unknown start: null).
 - CAR, BUS, FLIGHT: no supplier exposes cancellation terms today, so the platform configuration applies: `waylo.cancellation.{car,bus,flight}.policy` (env `WAYLO_CANCELLATION_{CAR,BUS,FLIGHT}_POLICY`) and `...free-hours-before` (env `WAYLO_CANCELLATION_{CAR,BUS,FLIGHT}_FREE_HOURS_BEFORE`). Unset means `FREE_CANCELLATION`. No commercial numbers are shipped. If a supplier hold response later carries terms, they take precedence over configuration.
 
 `FREE_UNTIL`: full refund while `now <= serviceStart - hours`, else no refund. `serviceStart`: hotel check-in 00:00, car/bus `pickupAt`, flight `departureAt`.
@@ -40,6 +40,6 @@ Scheduled job in package-booking-service (`waylo.cancellation.no-show-interval-m
 ## Open user decisions
 
 1. CAR, BUS and FLIGHT have no configured cancellation policy, so they default to `FREE_CANCELLATION`. Provide per-vertical policy and hours (and whether suppliers should supply them).
-2. Hotel `freeCancellationDaysBefore` exists on rate plans but is not evaluated: `FREE_CANCELLATION` means free until the service time. Decide whether the days-before cutoff should apply.
+2. RESOLVED 2026-11-26: hotel `freeCancellationDaysBefore` N is evaluated as `FREE_UNTIL` with N*24 hours before check-in 00:00 Europe/Istanbul. Old orders keep their stored snapshot.
 3. Partial refunds (e.g. keep first night or a cancellation fee) are out of scope.
 4. A refund of an already released flight ticket with the external supplier is not handled.

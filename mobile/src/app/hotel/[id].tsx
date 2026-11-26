@@ -6,7 +6,7 @@ import { getHotelOrNotPublic, hotelsApi, type HotelResult } from '@/features/hot
 import { useAsync } from '@/features/useAsync';
 import { HotelGallery } from '@/features/hotels/HotelGallery';
 import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
-import { money } from '@/features/format';
+import { money, offerPolicyText } from '@/features/format';
 import { reviewsApi, scoreLabel, type HotelReviewPage } from '@/features/reviews/api';
 import { ApiError } from '@/api';
 import { checkoutErrorMessage } from '@/features/orders/api';
@@ -69,6 +69,7 @@ export default function HotelDetail() {
             <Card key={key}>
               <Text style={{ fontWeight: '700' }}>{o.roomTypeName}</Text>
               <Muted>{`${o.ratePlanName} · ${o.mealPlan} · ${o.nights} gece`}</Muted>
+              <Muted>{offerPolicyText(o.cancellationPolicy, o.freeCancellationDaysBefore, p.checkIn)}</Muted>
               <Text style={{ fontWeight: '700' }}>{money(o.totalAmount, o.currency)}</Text>
               <Button title={busy === key ? 'Teklif aliniyor...' : 'Teklif al'} disabled={busy !== null} onPress={() => pick(o.roomTypeId, o.ratePlanId, key)} />
             </Card>

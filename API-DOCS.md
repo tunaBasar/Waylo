@@ -1016,7 +1016,7 @@ the failure mode of a missing field was not documented precisely.
 `OrderResponse`: `{id, customerId, status, currency, quoteId, totalAmount, notes, version, items: [OrderItemResponse], createdAt, updatedAt, holdExpiresAt}`.
 `OrderItemResponse` includes `{id, orderId, vertical, supplierOrganizationId, productRef, fulfillmentRef, description, unitAmount, quantity, subtotal,
 currency, createdAt, pickupAt, returnAt, flight: {flightNumber, departureAt, seatNumber, passengerFirstName, passengerLastName, pnr, ticketNumber, supplier},
-grossAmount, discountAmount, discountFundedBy, netAmount, taxAmount, promoCode, cancellationPolicy, cancelFreeHoursBefore, cancelOutcome, refundAmount}`.
+grossAmount, discountAmount, discountFundedBy, netAmount, taxAmount, promoCode, cancellationPolicy, cancelFreeHoursBefore, freeCancellationUntil (Instant: FREE_UNTIL = serviceStart - hours, FREE_CANCELLATION = serviceStart, null for NON_REFUNDABLE or unknown start), cancelOutcome, refundAmount}`. Hotel hold response also carries `freeCancellationDaysBefore` (nullable).
 
 #### `GET /api/orders/{id}/cancellation-preview` - Preview cancellation (customer)
 

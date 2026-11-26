@@ -47,9 +47,18 @@ public class CancellationPolicyResolver {
     }
 
     /** Hotel: rate plan policy from the hold. A missing value (older hotel-service) falls back to FREE_CANCELLATION. */
-    public void applyHotel(OrderItem item, String holdPolicy) {
-        item.setCancellationPolicy("NON_REFUNDABLE".equals(holdPolicy) ? "NON_REFUNDABLE" : "FREE_CANCELLATION");
-        item.setCancelFreeHoursBefore(null);
+    public void applyHotel(OrderItem item, String holdPolicy, Integer freeDaysBefore) {
+        if ("NON_REFUNDABLE".equals(holdPolicy)) {
+            item.setCancellationPolicy("NON_REFUNDABLE");
+            item.setCancelFreeHoursBefore(null);
+        } else if (freeDaysBefore != null && freeDaysBefore >= 0) {
+            // N days before check-in 00:00 Europe/Istanbul (see CANCELLATION-CONTRACT.md, decision 2)
+            item.setCancellationPolicy("FREE_UNTIL");
+            item.setCancelFreeHoursBefore(freeDaysBefore * 24);
+        } else {
+            item.setCancellationPolicy("FREE_CANCELLATION");
+            item.setCancelFreeHoursBefore(null);
+        }
     }
 
     public void applyConfigured(OrderItem item) {

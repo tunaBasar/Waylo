@@ -71,7 +71,7 @@ class PackageOrderTest {
     private HotelHoldClient.HoldDto hotelHold(UUID id) {
         return new HotelHoldClient.HoldDto(id, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD", "TRY",
-                new BigDecimal("1000.00"), hotelExpiry, "FREE_CANCELLATION");
+                new BigDecimal("1000.00"), hotelExpiry, "FREE_CANCELLATION", null);
     }
 
     private CarHoldClient.HoldDto carHold(UUID id) {

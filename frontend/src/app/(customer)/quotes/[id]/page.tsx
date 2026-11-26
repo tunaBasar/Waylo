@@ -12,7 +12,8 @@ import {
 } from '@/lib/hotel-stay';
 import type { Quote } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
-import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
+import { MEAL_PLAN_LABEL } from '@/lib/partner';
+import { offerPolicyText } from '@/lib/cancellation';
 import { useAuth } from '@/lib/auth';
 import { PromoCodeField } from '@/components/PromoCodeField';
 import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
@@ -225,13 +226,7 @@ function QuoteContent() {
           <span className="flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px]">cancel</span>
             {(() => {
-              if (quote.cancellationPolicy === 'FREE_CANCELLATION' && quote.freeCancellationDaysBefore != null) {
-                return `Giristen ${quote.freeCancellationDaysBefore} gun oncesine kadar ucretsiz iptal`;
-              }
-              if (quote.cancellationPolicy === 'NON_REFUNDABLE') {
-                return 'Iade edilemez';
-              }
-              return CANCELLATION_POLICY_LABEL[quote.cancellationPolicy] ?? '';
+              return offerPolicyText(quote.cancellationPolicy, quote.freeCancellationDaysBefore, quote.checkIn);
             })()}
           </span>
         </div>

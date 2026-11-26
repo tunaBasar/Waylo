@@ -47,10 +47,28 @@ class CancellationPolicyResolverTest {
     void hotelPolicyComesFromHold() {
         CancellationPolicyResolver r = new CancellationPolicyResolver("", "", "", "", "", "");
         OrderItem i = item(OrderItemVertical.HOTEL);
-        r.applyHotel(i, "NON_REFUNDABLE");
+        r.applyHotel(i, "NON_REFUNDABLE", null);
         assertThat(i.getCancellationPolicy()).isEqualTo("NON_REFUNDABLE");
-        r.applyHotel(i, null);
+        r.applyHotel(i, "NON_REFUNDABLE", 2);
+        assertThat(i.getCancellationPolicy()).isEqualTo("NON_REFUNDABLE");
+        assertThat(i.getCancelFreeHoursBefore()).isNull();
+        r.applyHotel(i, null, null);
         assertThat(i.getCancellationPolicy()).isEqualTo("FREE_CANCELLATION");
+        assertThat(i.getCancelFreeHoursBefore()).isNull();
+        r.applyHotel(i, "FREE_CANCELLATION", null);
+        assertThat(i.getCancellationPolicy()).isEqualTo("FREE_CANCELLATION");
+    }
+
+    @Test
+    void hotelFreeDays_becomeFreeUntilHours() {
+        CancellationPolicyResolver r = new CancellationPolicyResolver("", "", "", "", "", "");
+        OrderItem i = item(OrderItemVertical.HOTEL);
+        r.applyHotel(i, "FREE_CANCELLATION", 2);
+        assertThat(i.getCancellationPolicy()).isEqualTo("FREE_UNTIL");
+        assertThat(i.getCancelFreeHoursBefore()).isEqualTo(48);
+        r.applyHotel(i, "FREE_CANCELLATION", 0);
+        assertThat(i.getCancellationPolicy()).isEqualTo("FREE_UNTIL");
+        assertThat(i.getCancelFreeHoursBefore()).isEqualTo(0);
     }
 
     @Test

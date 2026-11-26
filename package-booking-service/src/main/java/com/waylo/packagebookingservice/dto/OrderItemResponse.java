@@ -32,5 +32,7 @@ public record OrderItemResponse(
         String cancellationPolicy,
         Integer cancelFreeHoursBefore,
         String cancelOutcome,
-        BigDecimal refundAmount
+        BigDecimal refundAmount,
+        /** Last instant of a full refund: FREE_UNTIL = serviceStart - hours, FREE_CANCELLATION = serviceStart, NON_REFUNDABLE or unknown start = null. */
+        Instant freeCancellationUntil
 ) {}

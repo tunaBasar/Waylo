@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
-import { policyText, refundText } from '@/lib/cancellation';
+import { orderPolicyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
 import { REVIEW_WHEN_HINT, reviewApi, type ReviewableItem } from '@/lib/reviews';
 import { ReviewForm } from '@/components/ReviewForm';
@@ -29,6 +29,7 @@ interface OrderItem {
   promoCode?: string | null;
   cancellationPolicy?: string | null;
   cancelFreeHoursBefore?: number | null;
+  freeCancellationUntil?: string | null;
   cancelOutcome?: string | null;
   refundAmount?: number | null;
   pickupAt: string | null;
@@ -401,7 +402,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
               {item.taxAmount != null && ` · Vergi dahil: ${money(item.taxAmount, item.currency)}`}
             </p>
           )}
-          <p data-testid="item-policy">Iptal kosulu: {policyText(item.cancellationPolicy, item.cancelFreeHoursBefore)}</p>
+          <p data-testid="item-policy">Iptal kosulu: {orderPolicyText(item.cancellationPolicy, item.cancelFreeHoursBefore, item.freeCancellationUntil)}</p>
           {item.cancelOutcome && (
             <p data-testid="item-cancel-outcome">
               {item.cancelOutcome === 'REFUND' ? `Iade edildi: ${money(item.refundAmount ?? 0, item.currency)}` : item.cancelOutcome === 'NO_SHOW' ? 'Gelinmedi, iade yapilmadi' : 'Iade yapilmadi'}

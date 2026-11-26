@@ -153,6 +153,7 @@ export interface OrderItem {
   currency: string;
   cancellationPolicy?: string | null;
   cancelFreeHoursBefore?: number | null;
+  freeCancellationUntil?: string | null;
   cancelOutcome?: string | null;
   refundAmount?: number | null;
   flight?: {
