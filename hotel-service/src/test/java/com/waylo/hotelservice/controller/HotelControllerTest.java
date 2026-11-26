@@ -240,6 +240,21 @@ class HotelControllerTest {
     }
 
     @Test
+    void getAll_publicCatalogue_carriesCoverMediaId() {
+        // F61: the customer list loads GET /api/hotels first; its cards need the cover too, not only /search.
+        HotelResponse withPhoto = buildResponse(hotelId);
+        HotelResponse without = buildResponse(UUID.randomUUID());
+        UUID cover = UUID.randomUUID();
+        when(hotelService.getAll()).thenReturn(List.of(withPhoto, without));
+        when(mediaService.coverIds(java.util.Set.of(withPhoto.id(), without.id()))).thenReturn(java.util.Map.of(hotelId, cover));
+
+        List<HotelResponse> body = controller.getAll(null, null, null).getBody().data();
+
+        assertThat(body.get(0).coverMediaId()).isEqualTo(cover);
+        assertThat(body.get(1).coverMediaId()).isNull();
+    }
+
+    @Test
     void search_carriesCoverMediaId_nullWhenNoPhoto() {
         HotelResponse withPhoto = buildResponse(hotelId);
         HotelResponse without = buildResponse(UUID.randomUUID());

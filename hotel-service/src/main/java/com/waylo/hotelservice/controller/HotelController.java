@@ -78,7 +78,8 @@ public class HotelController {
             @RequestParam(required = false) UUID organizationId) {
         List<HotelResponse> hotels;
         if (organizationId == null) {
-            hotels = hotelService.getAll();
+            // Public catalogue: the customer list loads this first, so it needs the cover photo too (F61).
+            return ResponseEntity.ok(ApiResponse.of(withCovers(reviewService.enrich(hotelService.getAll()))));
         } else if (accessGuard.canReadOrganization(userId, role, organizationId)) {
             hotels = hotelService.getByOrganization(organizationId);
         } else {
