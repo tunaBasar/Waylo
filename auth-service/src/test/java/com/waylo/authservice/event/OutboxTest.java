@@ -57,6 +57,7 @@ class OutboxTest {
         assertThat(m.get("userId")).isEqualTo(userId.toString());
         assertThat(m.get("token")).isEqualTo("tok");
         assertThat(m.get("eventId")).isNotNull();
+        assertThat(java.time.Instant.parse((String) m.get("occurredAt"))).isBeforeOrEqualTo(java.time.Instant.now());
         // Exactly the bytes the direct JsonSerializer send produced before.
         byte[] direct = new JsonSerializer<Object>().serialize("auth-events", new RecordHeaders(), inner);
         assertThat(payload).isEqualTo(new String(direct, StandardCharsets.UTF_8));

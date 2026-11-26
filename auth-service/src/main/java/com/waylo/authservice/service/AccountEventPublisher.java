@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.waylo.authservice.event.OutboxWriter;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public class AccountEventPublisher {
         payload.put("eventType", event.eventType());
         payload.put("userId", event.userId().toString());
         payload.put("eventId", UUID.randomUUID().toString());
+        payload.put("occurredAt", Instant.now().toString());
         if (event.email() != null) payload.put("email", event.email());
         if (event.name() != null) payload.put("name", event.name());
         if (event.token() != null) payload.put("token", event.token());

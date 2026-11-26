@@ -177,14 +177,14 @@ class ListenerFailurePropagationTest {
     void auth_emailFailure_propagates() {
         EmailService email = mock(EmailService.class);
         doThrow(new IllegalStateException("smtp down")).when(email).sendWelcomeEmail(any(), any());
-        var l = new AuthEventListener(email, new ObjectMapper());
+        var l = new AuthEventListener(email, new ObjectMapper().findAndRegisterModules(), mock(ProcessedEventRepository.class), java.time.Duration.ofHours(24));
         assertThrows(IllegalStateException.class, () -> l.handleAuthEvent(
-                "{\"eventType\":\"WELCOME\",\"userId\":\"" + UUID.randomUUID() + "\",\"email\":\"a@b.com\",\"name\":\"A\"}"));
+                "{\"eventType\":\"WELCOME\",\"userId\":\"" + UUID.randomUUID() + "\",\"occurredAt\":\"" + java.time.Instant.now() + "\",\"email\":\"a@b.com\",\"name\":\"A\"}"));
     }
 
     @Test
     void auth_malformedJson_isNonRetryableIllegalArgument() {
-        var l = new AuthEventListener(mock(EmailService.class), new ObjectMapper());
+        var l = new AuthEventListener(mock(EmailService.class), new ObjectMapper().findAndRegisterModules(), mock(ProcessedEventRepository.class), java.time.Duration.ofHours(24));
         assertThrows(IllegalArgumentException.class, () -> l.handleAuthEvent("{nope"));
     }
 }

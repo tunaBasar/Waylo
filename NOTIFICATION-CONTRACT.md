@@ -20,6 +20,7 @@ notification-service consumes Kafka events and stores one `notifications` row pe
 | Check-in reminder | - | not built | - | skipped (optional) |
 
 Failure handling: a failed crm lookup logs and skips the mail but still acknowledges the event (no poison loop). An event is recorded in `processed_events` only after the notification row is written or deliberately skipped.
+Auth e-mails (`auth-events`) are idempotent by `eventId` and are not sent when the event is older than 24h (`waylo.mail.auth-event-max-age`) or has no `occurredAt` (replay safety).
 
 ## 2. Access rules `/api/notifications/**` (gateway sets `X-User-Id`, `X-User-Role`; route already exists)
 
