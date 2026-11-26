@@ -25,7 +25,7 @@ class SupportEventListenerTest {
     private final CrmServiceClient crm = mock(CrmServiceClient.class);
     private final NotificationService notifications = mock(NotificationService.class);
     private final Acknowledgment ack = mock(Acknowledgment.class);
-    private final SupportEventListener listener = new SupportEventListener(processed, crm, notifications);
+    private final SupportEventListener listener = new SupportEventListener(processed, crm, notifications, "https://waylo.example/");
     private final UUID customerId = UUID.randomUUID();
 
     private SupportCaseUpdatedEvent event(String kind) {
@@ -57,6 +57,8 @@ class SupportEventListenerTest {
         assertThat(r.customerId()).isEqualTo(customerId);
         assertThat(r.subject()).isEqualTo("Destek talebiniz yanıtlandı");
         assertThat(r.body()).contains("Bag question").contains("Yanıtı görmek için Waylo hesabınızda Destek sayfasını açın.");
+        // walkthrough F40: a direct link to the customer's support page (trailing slash of the base URL trimmed)
+        assertThat(r.body()).endsWith("\nhttps://waylo.example/support");
         verify(processed).save(any());
         verify(ack).acknowledge();
     }

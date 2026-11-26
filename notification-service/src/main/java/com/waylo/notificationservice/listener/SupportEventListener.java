@@ -10,6 +10,7 @@ import com.waylo.notificationservice.service.NotificationService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -28,13 +29,16 @@ public class SupportEventListener {
     private final ProcessedEventRepository processedEventRepository;
     private final CrmServiceClient crmServiceClient;
     private final NotificationService notificationService;
+    private final String appBaseUrl;
 
     public SupportEventListener(ProcessedEventRepository processedEventRepository,
                                 CrmServiceClient crmServiceClient,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                @Value("${waylo.mail.app-base-url:http://localhost:3000}") String appBaseUrl) {
         this.processedEventRepository = processedEventRepository;
         this.crmServiceClient = crmServiceClient;
         this.notificationService = notificationService;
+        this.appBaseUrl = appBaseUrl;
     }
 
     @KafkaListener(topics = "support-events", groupId = GROUP,
@@ -63,9 +67,23 @@ public class SupportEventListener {
             return;
         }
         String subject = "CLOSED".equals(e.getKind()) ? CLOSED_SUBJECT : ANSWERED_SUBJECT;
-        String body = (e.getSubject() == null ? "" : e.getSubject() + "\n\n") + HINT;
+        String body = body(e.getSubject(), appBaseUrl);
         sendCustomerEmail(e, subject, body);
         processedEventRepository.save(new ProcessedEvent(e.getEventId(), GROUP));
+    }
+
+    /**
+     * Case subject, the hint and a direct link to the customer's support page (walkthrough F40: the mail named the
+     * Destek page but gave no link). The reply text itself stays out of the mail on purpose (contract section 1).
+     */
+    static String body(String caseSubject, String appBaseUrl) {
+        StringBuilder sb = new StringBuilder();
+        if (caseSubject != null && !caseSubject.isBlank()) sb.append(caseSubject).append("\n\n");
+        sb.append(HINT);
+        String base = appBaseUrl == null ? "" : appBaseUrl.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        if (!base.isEmpty()) sb.append("\n").append(base).append("/support");
+        return sb.toString();
     }
 
     /** Fails soft like BookingEventListener: no e-mail found means log and skip, never fail the event. */

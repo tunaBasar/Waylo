@@ -175,7 +175,7 @@ class PartnerEventListenerTest {
     @Test
     void customerListenerIgnoresCreatedAndCustomerMessage() {
         CrmServiceClient crm = mock(CrmServiceClient.class);
-        SupportEventListener customerListener = new SupportEventListener(processed, crm, notifications);
+        SupportEventListener customerListener = new SupportEventListener(processed, crm, notifications, "http://localhost:3000");
         customerListener.handleSupportEvent(new ConsumerRecord<>("support-events", 0, 0L, "k", support("CREATED", orgA)), ack);
         customerListener.handleSupportEvent(new ConsumerRecord<>("support-events", 0, 0L, "k", support("CUSTOMER_MESSAGE", orgA)), ack);
         verifyNoInteractions(notifications, crm);
