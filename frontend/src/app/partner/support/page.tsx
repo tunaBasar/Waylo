@@ -6,10 +6,12 @@ import { partnerErrorMessage } from '@/lib/partner';
 import { supportApi, type SupportCase } from '@/lib/support';
 import { Card, EmptyState, LoadingRows, PageHeader } from '@/components/partner/ui';
 import { SupportStatusPill, SupportThread } from '@/components/SupportThread';
+import { useSingleFlight } from '@/lib/use-single-flight';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function PartnerSupportPage() {
+  const flight = useSingleFlight();
   const { organizationId, loading: workspaceLoading } = usePartner();
   const [cases, setCases] = useState<SupportCase[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export default function PartnerSupportPage() {
       </div>
       {shown && organizationId && (
         <SupportThread detail={shown} role="PARTNER"
-          onReply={async body => { setDetail((await supportApi.partnerReply(organizationId, shown.id, body)).data); loadList(); }} />
+          onReply={async body => { await flight(`support-reply:${shown.id}`, async () => { setDetail((await supportApi.partnerReply(organizationId, shown.id, body)).data); loadList(); }); }} />
       )}
     </div>
   );

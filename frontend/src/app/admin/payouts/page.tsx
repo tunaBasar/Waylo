@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { ApiError } from '@/lib/api';
 import {
   adminApi, type AdminBankAccount, type AdminPayout, type AdminPayoutAction, type AdminPayoutBalance,
@@ -30,6 +31,7 @@ type Dialog =
 
 export default function AdminPayoutsPage() {
   const toast = useToast();
+  const flight = useSingleFlight();
   const [tab, setTab] = useState<Tab>('REQUESTED');
   const [payouts, setPayouts] = useState<AdminPayout[]>([]);
   const [banks, setBanks] = useState<AdminBankAccount[]>([]);
@@ -85,28 +87,32 @@ export default function AdminPayoutsPage() {
   }
 
   async function act(p: AdminPayout, action: AdminPayoutAction, body: { reason?: string; reference?: string; paidAt?: string } = {}) {
-    setBusy(p.id);
-    try {
-      await adminApi.payoutAction(p.id, action, { ...body, expectedVersion: p.version });
-      setConflict(false);
-      setError(null);
-      toast.success('Islem tamamlandi');
-      setDialog(null);
-      await load(tab);
-    } catch (e) {
-      handleError(e, 'Islem yapilamadi');
-      throw e;
-    } finally { setBusy(null); }
+    await flight(`payout-${action}:${p.id}`, async () => {
+      setBusy(p.id);
+      try {
+        await adminApi.payoutAction(p.id, action, { ...body, expectedVersion: p.version });
+        setConflict(false);
+        setError(null);
+        toast.success('Islem tamamlandi');
+        setDialog(null);
+        await load(tab);
+      } catch (e) {
+        handleError(e, 'Islem yapilamadi');
+        throw e;
+      } finally { setBusy(null); }
+    });
   }
 
   async function bankAction(a: AdminBankAccount, reject?: string) {
-    setBusy(a.id);
-    try {
-      if (reject !== undefined) await adminApi.rejectBankAccount(a.id, reject); else await adminApi.verifyBankAccount(a.id);
-      toast.success('Islem tamamlandi');
-      setDialog(null);
-      await load('BANKS');
-    } catch (e) { handleError(e, 'Islem yapilamadi'); throw e; } finally { setBusy(null); }
+    await flight(`bank-${reject !== undefined ? 'reject' : 'verify'}:${a.id}`, async () => {
+      setBusy(a.id);
+      try {
+        if (reject !== undefined) await adminApi.rejectBankAccount(a.id, reject); else await adminApi.verifyBankAccount(a.id);
+        toast.success('Islem tamamlandi');
+        setDialog(null);
+        await load('BANKS');
+      } catch (e) { handleError(e, 'Islem yapilamadi'); throw e; } finally { setBusy(null); }
+    });
   }
 
   async function showBalance(orgId: string) {

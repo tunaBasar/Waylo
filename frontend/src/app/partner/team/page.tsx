@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import { ROLE_LABEL, partnerErrorMessage, partnerApi, type PartnerRole, type TeamMember } from '@/lib/partner';
 import { formatDate } from '@/lib/utils';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader } from '@/components/partner/ui';
 
 const GRANTABLE: PartnerRole[] = ['HOTEL_MANAGER', 'HOTEL_STAFF', 'HOTEL_OWNER'];
 
 export default function PartnerTeamPage() {
   const { organizationId, hotels, hotelId, isCarRentalOrg, isBusOrg, loading: workspaceLoading } = usePartner();
+  const flight = useSingleFlight();
   const [reloads, setReloads] = useState(0);
   const key = `${organizationId}|${reloads}`;
   const [result, setResult] = useState<{ key: string; members: TeamMember[]; error: string | null } | null>(null);
@@ -39,33 +41,37 @@ export default function PartnerTeamPage() {
   async function invite(e: React.FormEvent) {
     e.preventDefault();
     if (!organizationId || !targetHotel) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      await partnerApi.grantRole(organizationId, { email: email.trim(), role, hotelId: targetHotel });
-      setEmail('');
-      setNotice('Rol verildi');
-      await load();
-    } catch (err) {
-      setNotice(partnerErrorMessage(err, 'Rol verilemedi'));
-    } finally {
-      setBusy(false);
-    }
+    await flight(`team-invite:${organizationId}`, async () => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        await partnerApi.grantRole(organizationId, { email: email.trim(), role, hotelId: targetHotel });
+        setEmail('');
+        setNotice('Rol verildi');
+        await load();
+      } catch (err) {
+        setNotice(partnerErrorMessage(err, 'Rol verilemedi'));
+      } finally {
+        setBusy(false);
+      }
+    });
   }
 
   async function remove(m: TeamMember) {
     if (!organizationId || !window.confirm(`${m.email} icin ${ROLE_LABEL[m.role]} rolu kaldirilsin mi?`)) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      await partnerApi.revokeRole(organizationId, m.grantId);
-      setNotice('Rol kaldirildi');
-      await load();
-    } catch (err) {
-      setNotice(partnerErrorMessage(err, 'Rol kaldirilamadi'));
-    } finally {
-      setBusy(false);
-    }
+    await flight(`team-remove:${m.grantId}`, async () => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        await partnerApi.revokeRole(organizationId, m.grantId);
+        setNotice('Rol kaldirildi');
+        await load();
+      } catch (err) {
+        setNotice(partnerErrorMessage(err, 'Rol kaldirilamadi'));
+      } finally {
+        setBusy(false);
+      }
+    });
   }
 
   if (workspaceLoading || loading) return <LoadingRows />;

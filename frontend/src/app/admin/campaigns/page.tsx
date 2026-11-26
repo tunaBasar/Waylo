@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { ApiError } from '@/lib/api';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import {
   campaignActive, discountLabel, FUNDED_BY_LABEL, pricingApi, VERTICAL_LABEL,
   type Campaign, type DiscountType, type PricingVertical, type PromoCode, type TaxRate,
@@ -18,6 +19,7 @@ function errorText(cause: unknown, fallback: string): string {
 }
 
 function CodesPanel({ campaign }: { campaign: Campaign }) {
+  const flight = useSingleFlight();
   const [codes, setCodes] = useState<PromoCode[] | null>(null);
   const [code, setCode] = useState('');
   const [maxUses, setMaxUses] = useState('');
@@ -35,16 +37,18 @@ function CodesPanel({ campaign }: { campaign: Campaign }) {
 
   async function add(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    try {
-      await pricingApi.createPromoCode(campaign.id, code.trim().toUpperCase(), campaign.startAt, campaign.endAt,
-        maxUses ? Number(maxUses) : undefined);
-      setCode('');
-      setMaxUses('');
-      await load();
-    } catch (cause) {
-      setError(errorText(cause, 'Kod olusturulamadi'));
-    }
+    await flight(`promo-create:${campaign.id}`, async () => {
+      setError('');
+      try {
+        await pricingApi.createPromoCode(campaign.id, code.trim().toUpperCase(), campaign.startAt, campaign.endAt,
+          maxUses ? Number(maxUses) : undefined);
+        setCode('');
+        setMaxUses('');
+        await load();
+      } catch (cause) {
+        setError(errorText(cause, 'Kod olusturulamadi'));
+      }
+    });
   }
 
   return (
@@ -69,6 +73,7 @@ function CodesPanel({ campaign }: { campaign: Campaign }) {
 }
 
 export default function CampaignsPage() {
+  const flight = useSingleFlight();
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [taxRates, setTaxRates] = useState<TaxRate[] | null>(null);
   const [error, setError] = useState('');
@@ -102,34 +107,38 @@ export default function CampaignsPage() {
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      // Partner funded campaigns need the partner's consent (PRICING-CONTRACT.md section 9): admin creates PLATFORM only.
-      await pricingApi.createCampaign({
-        name: name.trim(), vertical, discountType, discountValue: Number(discountValue), fundedBy: 'PLATFORM',
-        startAt: withSeconds(startAt), endAt: withSeconds(endAt),
-        ...(maxGlobal ? { maxUsesGlobal: Number(maxGlobal) } : {}),
-        ...(maxPerUser ? { maxUsesPerUser: Number(maxPerUser) } : {}),
-        ...(minOrder ? { minOrderAmount: Number(minOrder) } : {}),
-      });
-      setName(''); setDiscountValue(''); setMaxGlobal(''); setMaxPerUser(''); setMinOrder('');
-      await load();
-    } catch (cause) {
-      setError(errorText(cause, 'Kampanya olusturulamadi'));
-    } finally {
-      setBusy(false);
-    }
+    await flight('campaign-create', async () => {
+      setBusy(true);
+      setError('');
+      try {
+        // Partner funded campaigns need the partner's consent (PRICING-CONTRACT.md section 9): admin creates PLATFORM only.
+        await pricingApi.createCampaign({
+          name: name.trim(), vertical, discountType, discountValue: Number(discountValue), fundedBy: 'PLATFORM',
+          startAt: withSeconds(startAt), endAt: withSeconds(endAt),
+          ...(maxGlobal ? { maxUsesGlobal: Number(maxGlobal) } : {}),
+          ...(maxPerUser ? { maxUsesPerUser: Number(maxPerUser) } : {}),
+          ...(minOrder ? { minOrderAmount: Number(minOrder) } : {}),
+        });
+        setName(''); setDiscountValue(''); setMaxGlobal(''); setMaxPerUser(''); setMinOrder('');
+        await load();
+      } catch (cause) {
+        setError(errorText(cause, 'Kampanya olusturulamadi'));
+      } finally {
+        setBusy(false);
+      }
+    });
   }
 
   async function end(id: string) {
-    setError('');
-    try {
-      await pricingApi.endCampaign(id);
-      await load();
-    } catch (cause) {
-      setError(errorText(cause, 'Kampanya sonlandirilamadi'));
-    }
+    await flight(`campaign-end:${id}`, async () => {
+      setError('');
+      try {
+        await pricingApi.endCampaign(id);
+        await load();
+      } catch (cause) {
+        setError(errorText(cause, 'Kampanya sonlandirilamadi'));
+      }
+    });
   }
 
   return (

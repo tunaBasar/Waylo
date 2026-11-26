@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { api } from '@/lib/api';
 import {
   VERTICAL_TR, hasIdenticalOverride, parseCommissionPercent, prefillPercent, verticalOf, type RateRow,
@@ -39,6 +40,7 @@ function orgDetails(o: AdminOrganization): string {
 
 export default function AdminOrganizationsPage() {
   const toast = useToast();
+  const flight = useSingleFlight();
   const [status, setStatus] = useState<OrgStatus>('PENDING');
   const [orgs, setOrgs] = useState<AdminOrganization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,20 +71,22 @@ export default function AdminOrganizationsPage() {
     return () => { cancelled = true; };
   }, [status, load]);
 
-  async function run(id: string, action: () => Promise<unknown>, done: string) {
+  async function run(id: string, action: () => Promise<unknown>, done: string, key = `org-action:${id}`) {
     if (busy) return;
-    setBusy(id);
-    try {
-      await action();
-      toast.success(done);
-      setSuspending(null);
-      setReason('');
-      await load(status);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Islem basarisiz');
-    } finally {
-      setBusy(null);
-    }
+    await flight(key, async () => {
+      setBusy(id);
+      try {
+        await action();
+        toast.success(done);
+        setSuspending(null);
+        setReason('');
+        await load(status);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Islem basarisiz');
+      } finally {
+        setBusy(null);
+      }
+    });
   }
 
   async function openApprove(o: AdminOrganization) {
@@ -105,31 +109,33 @@ export default function AdminOrganizationsPage() {
     const fraction = parseCommissionPercent(percent);
     if (!vertical) { setApproveError('Isletme tipi bilinmiyor, komisyon orani belirlenemiyor.'); return; }
     if (fraction == null) { setApproveError('Komisyon orani 0 ile 50 arasinda olmali. Ornek: 10 veya 12,5'); return; }
-    setBusy(o.id);
-    setApproveError(null);
-    try {
-      if (!hasIdenticalOverride(rateRows, vertical, o.id, fraction)) {
+    await flight(`org-approve:${o.id}`, async () => {
+      setBusy(o.id);
+      setApproveError(null);
+      try {
+        if (!hasIdenticalOverride(rateRows, vertical, o.id, fraction)) {
+          try {
+            await api.post('/api/admin/commission-rates', { vertical, supplierOrganizationId: o.id, rate: fraction });
+          } catch (e) {
+            setApproveError(`Komisyon orani kaydedilemedi, isletme onaylanmadi: ${e instanceof Error ? e.message : 'hata'}`);
+            return;
+          }
+        }
         try {
-          await api.post('/api/admin/commission-rates', { vertical, supplierOrganizationId: o.id, rate: fraction });
+          await adminApi.approveOrganization(o.id);
         } catch (e) {
-          setApproveError(`Komisyon orani kaydedilemedi, isletme onaylanmadi: ${e instanceof Error ? e.message : 'hata'}`);
+          setApproveError(`Komisyon orani kaydedildi ancak onay basarisiz: ${e instanceof Error ? e.message : 'hata'}. Tekrar Onayla deneyebilirsiniz.`);
+          const rows = (await api.get<RateRow[]>('/api/admin/commission-rates').catch(() => null))?.data;
+          if (rows) setRateRows(rows);
           return;
         }
+        toast.success('Isletme onaylandi');
+        setApproving(null);
+        await load(status);
+      } finally {
+        setBusy(null);
       }
-      try {
-        await adminApi.approveOrganization(o.id);
-      } catch (e) {
-        setApproveError(`Komisyon orani kaydedildi ancak onay basarisiz: ${e instanceof Error ? e.message : 'hata'}. Tekrar Onayla deneyebilirsiniz.`);
-        const rows = (await api.get<RateRow[]>('/api/admin/commission-rates').catch(() => null))?.data;
-        if (rows) setRateRows(rows);
-        return;
-      }
-      toast.success('Isletme onaylandi');
-      setApproving(null);
-      await load(status);
-    } finally {
-      setBusy(null);
-    }
+    });
   }
 
   return (
@@ -185,7 +191,7 @@ export default function AdminOrganizationsPage() {
                 {suspending === o.id && (
                   <form className="flex flex-wrap items-end gap-3" onSubmit={e => {
                     e.preventDefault();
-                    if (reason.trim()) void run(o.id, () => adminApi.suspendOrganization(o.id, reason.trim()), 'Isletme askiya alindi');
+                    if (reason.trim()) void run(o.id, () => adminApi.suspendOrganization(o.id, reason.trim()), 'Isletme askiya alindi', `org-suspend:${o.id}`);
                   }}>
                     <div className="flex-1 min-w-[220px]">
                       <Field label="Askiya alma nedeni">

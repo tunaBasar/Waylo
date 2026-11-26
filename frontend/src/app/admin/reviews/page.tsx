@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { reviewApi, type HotelReview, type HotelReviewPage } from '@/lib/reviews';
@@ -9,11 +10,12 @@ const PAGE_SIZE = 20;
 
 function Row({ review, onDone }: { review: HotelReview; onDone: () => void }) {
   const [reason, setReason] = useState('');
+  const flight = useSingleFlight();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const target = review.status === 'PUBLISHED' ? 'HIDDEN' : 'PUBLISHED';
 
-  const run = async () => {
+  const run = () => flight(`review-moderate:${review.id}`, async () => {
     setBusy(true);
     setError(null);
     try {
@@ -25,7 +27,7 @@ function Row({ review, onDone }: { review: HotelReview; onDone: () => void }) {
     } finally {
       setBusy(false);
     }
-  };
+  });
 
   return (
     <div className="bg-surface-container-lowest rounded-xl shadow-sm p-4 space-y-2">

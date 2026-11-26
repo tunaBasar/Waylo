@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { getAdminCarDocuments, approveCarDocument, rejectCarDocument, getAdminCarDocumentFile } from '@/lib/car';
 
 type DocFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -58,6 +59,7 @@ function AdminOnly() {
 
 export default function CarDocumentsPage() {
   const { user } = useAuth();
+  const flight = useSingleFlight();
   const isAdmin = user?.role === 'ADMIN';
   const [documents, setDocuments] = useState<AdminCarDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,31 +79,35 @@ export default function CarDocumentsPage() {
 
   async function handleReject(id: string) {
     const reason = rejectReason[id] || '';
-    setRejecting(id);
-    setError('');
-    try {
-      await rejectCarDocument(id, { reason });
-      setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: 'REJECTED' as const } : d));
-    } catch (cause) {
-      const apiError = cause as ApiError;
-      setError(apiError.message || 'Belge reddedilemedi.');
-    } finally {
-      setRejecting(null);
-    }
+    await flight(`car-doc-reject:${id}`, async () => {
+      setRejecting(id);
+      setError('');
+      try {
+        await rejectCarDocument(id, { reason });
+        setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: 'REJECTED' as const } : d));
+      } catch (cause) {
+        const apiError = cause as ApiError;
+        setError(apiError.message || 'Belge reddedilemedi.');
+      } finally {
+        setRejecting(null);
+      }
+    });
   }
 
   async function handleApprove(id: string) {
-    setRejecting(id);
-    setError('');
-    try {
-      await approveCarDocument(id);
-      setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: 'APPROVED' as const } : d));
-    } catch (cause) {
-      const apiError = cause as ApiError;
-      setError(apiError.message || 'Belge onaylanamadi.');
-    } finally {
-      setRejecting(null);
-    }
+    await flight(`car-doc-approve:${id}`, async () => {
+      setRejecting(id);
+      setError('');
+      try {
+        await approveCarDocument(id);
+        setDocuments(docs => docs.map(d => d.id === id ? { ...d, status: 'APPROVED' as const } : d));
+      } catch (cause) {
+        const apiError = cause as ApiError;
+        setError(apiError.message || 'Belge onaylanamadi.');
+      } finally {
+        setRejecting(null);
+      }
+    });
   }
 
   async function handleDownload(id: string) {

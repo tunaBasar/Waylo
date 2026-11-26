@@ -3,6 +3,7 @@
 /** Admin review of bus company and bus documents: list, open file, approve, reject with reason. */
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { adminBusApi, BUS_DOC_LABEL, type AdminBusDocument, type BusDocStatus } from '@/lib/bus';
 
 type Filter = 'ALL' | BusDocStatus;
@@ -12,6 +13,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export default function AdminBusDocumentsPage() {
   const { user } = useAuth();
+  const flight = useSingleFlight();
   const isAdmin = user?.role === 'ADMIN';
   const [items, setItems] = useState<AdminBusDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,18 +36,22 @@ export default function AdminBusDocumentsPage() {
   }
 
   async function approve(id: string) {
-    setBusy(id); setError('');
-    try { await adminBusApi.approve(id); patch(id, 'APPROVED', null); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Onaylanamadi.'); }
-    finally { setBusy(null); }
+    await flight(`bus-doc-approve:${id}`, async () => {
+      setBusy(id); setError('');
+      try { await adminBusApi.approve(id); patch(id, 'APPROVED', null); }
+      catch (e) { setError(e instanceof Error ? e.message : 'Onaylanamadi.'); }
+      finally { setBusy(null); }
+    });
   }
 
   async function reject(id: string) {
     if (!reason.trim()) { setError('Red nedeni gerekli.'); return; }
-    setBusy(id); setError('');
-    try { await adminBusApi.reject(id, reason.trim()); patch(id, 'REJECTED', reason.trim()); setRejectFor(null); setReason(''); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Reddedilemedi.'); }
-    finally { setBusy(null); }
+    await flight(`bus-doc-reject:${id}`, async () => {
+      setBusy(id); setError('');
+      try { await adminBusApi.reject(id, reason.trim()); patch(id, 'REJECTED', reason.trim()); setRejectFor(null); setReason(''); }
+      catch (e) { setError(e instanceof Error ? e.message : 'Reddedilemedi.'); }
+      finally { setBusy(null); }
+    });
   }
 
   async function download(i: AdminBusDocument) {

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Field, inputClass } from '@/components/partner/ui';
 import { SupportStatusPill, SupportThread } from '@/components/SupportThread';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { STATUS_LABEL, supportApi, type SupportCase, type SupportStatus } from '@/lib/support';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function AdminSupportPage() {
+  const flight = useSingleFlight();
   const [status, setStatus] = useState<SupportStatus | ''>('');
   const [cases, setCases] = useState<SupportCase[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -60,8 +62,8 @@ export default function AdminSupportPage() {
       </div>
       {shown && (
         <SupportThread detail={shown} role="ADMIN"
-          onReply={async body => { setDetail((await supportApi.adminReply(shown.id, body)).data); loadList(); }}
-          onClose={async () => { setDetail((await supportApi.adminClose(shown.id)).data); loadList(); }} />
+          onReply={async body => { await flight(`support-reply:${shown.id}`, async () => { setDetail((await supportApi.adminReply(shown.id, body)).data); loadList(); }); }}
+          onClose={async () => { await flight(`support-close:${shown.id}`, async () => { setDetail((await supportApi.adminClose(shown.id)).data); loadList(); }); }} />
       )}
     </div>
   );

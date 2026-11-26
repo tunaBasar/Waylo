@@ -10,6 +10,7 @@ import {
 import { ApiError } from '@/lib/api';
 import { formatMoney } from '@/lib/partner-car';
 import { formatDate } from '@/lib/utils';
+import { useSingleFlight } from '@/lib/use-single-flight';
 import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader, StatusPill } from '@/components/partner/ui';
 
 const VERTICAL_LABEL: Record<string, string> = { HOTEL: 'Otel', CAR: 'Arac', FLIGHT: 'Ucus', BUS: 'Otobus' };
@@ -191,6 +192,7 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
   const [amount, setAmount] = useState('');
   const [idemKey, setIdemKey] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const flight = useSingleFlight();
   const [busy, setBusy] = useState(false);
   const cur = b.currency;
 
@@ -204,15 +206,17 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
   async function submit() {
     const err = validatePayoutAmount(amount, b.payable, b.minimumPayout);
     if (err) { setFieldError(err); return; }
-    setBusy(true);
-    try {
-      await partnerApi.requestPayout(orgId, { currency: cur, amount: parseAmountInput(amount) ?? 0 }, idemKey);
-      setOpen(false);
-      await onDone('Odeme talebiniz alindi.');
-    } catch (e) {
-      setFieldError(payoutErrorMessage(e, 'Odeme talebi olusturulamadi'));
-      onError(payoutErrorMessage(e, 'Odeme talebi olusturulamadi'));
-    } finally { setBusy(false); }
+    await flight(`payout-request:${orgId}:${cur}`, async () => {
+      setBusy(true);
+      try {
+        await partnerApi.requestPayout(orgId, { currency: cur, amount: parseAmountInput(amount) ?? 0 }, idemKey);
+        setOpen(false);
+        await onDone('Odeme talebiniz alindi.');
+      } catch (e) {
+        setFieldError(payoutErrorMessage(e, 'Odeme talebi olusturulamadi'));
+        onError(payoutErrorMessage(e, 'Odeme talebi olusturulamadi'));
+      } finally { setBusy(false); }
+    });
   }
 
   return (
@@ -255,13 +259,16 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
 }
 
 function PayoutRow({ p, orgId, owner, onDone, onError }: { p: PartnerPayout } & Callbacks) {
+  const flight = useSingleFlight();
   const [busy, setBusy] = useState(false);
   async function cancel() {
-    setBusy(true);
-    try {
-      await partnerApi.cancelPayout(orgId, p.id);
-      await onDone('Odeme talebi iptal edildi.');
-    } catch (e) { onError(payoutErrorMessage(e, 'Talep iptal edilemedi')); } finally { setBusy(false); }
+    await flight(`payout-cancel:${p.id}`, async () => {
+      setBusy(true);
+      try {
+        await partnerApi.cancelPayout(orgId, p.id);
+        await onDone('Odeme talebi iptal edildi.');
+      } catch (e) { onError(payoutErrorMessage(e, 'Talep iptal edilemedi')); } finally { setBusy(false); }
+    });
   }
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-outline-variant/40 p-3 text-sm">
@@ -284,26 +291,31 @@ function BankSection({ bank, orgId, owner, onDone, onError }: { bank: PartnerBan
   const [editing, setEditing] = useState(false);
   const [holder, setHolder] = useState('');
   const [iban, setIban] = useState('');
+  const flight = useSingleFlight();
   const [busy, setBusy] = useState(false);
   const ibanError = iban && !isValidTrIban(iban) ? 'Gecerli bir TR IBAN girin (TR + 24 hane).' : null;
   const formOpen = editing || (!bank && owner);
 
   async function save() {
     if (holder.trim().length < 2 || !isValidTrIban(iban)) return;
-    setBusy(true);
-    try {
-      await partnerApi.saveBankAccount(orgId, { accountHolderName: holder.trim(), iban });
-      setIban(''); setHolder(''); setEditing(false);
-      await onDone('Banka hesabi kaydedildi, yonetici onayi bekleniyor.');
-    } catch (e) { onError(payoutErrorMessage(e, 'Banka hesabi kaydedilemedi')); } finally { setBusy(false); }
+    await flight(`bank-save:${orgId}`, async () => {
+      setBusy(true);
+      try {
+        await partnerApi.saveBankAccount(orgId, { accountHolderName: holder.trim(), iban });
+        setIban(''); setHolder(''); setEditing(false);
+        await onDone('Banka hesabi kaydedildi, yonetici onayi bekleniyor.');
+      } catch (e) { onError(payoutErrorMessage(e, 'Banka hesabi kaydedilemedi')); } finally { setBusy(false); }
+    });
   }
 
   async function remove() {
-    setBusy(true);
-    try {
-      await partnerApi.deleteBankAccount(orgId);
-      await onDone('Banka hesabi kaldirildi.');
-    } catch (e) { onError(payoutErrorMessage(e, 'Banka hesabi kaldirilamadi')); } finally { setBusy(false); }
+    await flight(`bank-remove:${orgId}`, async () => {
+      setBusy(true);
+      try {
+        await partnerApi.deleteBankAccount(orgId);
+        await onDone('Banka hesabi kaldirildi.');
+      } catch (e) { onError(payoutErrorMessage(e, 'Banka hesabi kaldirilamadi')); } finally { setBusy(false); }
+    });
   }
 
   return (
