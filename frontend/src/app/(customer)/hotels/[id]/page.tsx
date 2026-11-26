@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { currentLoginUrl } from '@/lib/surface';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from '@/lib/api';
@@ -282,6 +283,8 @@ function HotelsDetailContent() {
   const [emptyReason, setEmptyReason] = useState<EmptyReason | null>(null);
   const [nextCheckIn, setNextCheckIn] = useState<string | null>(null);
   const [offerLoading, setOfferLoading] = useState(false);
+  // Key of the query whose availability request completed: empty text only after that, never while loading
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [offerError, setOfferError] = useState<string | null>(null);
   const [pendingQuote, setPendingQuote] = useState(false);
   const [searchQuery, setSearchQuery] = useState<StayQuery | null>(
@@ -325,12 +328,15 @@ function HotelsDetailContent() {
     if (!searchQuery || !id || !hotel) return;
     setOfferLoading(true);
     setOfferError(null);
+    const key = stayQueryString(searchQuery);
     hotelStayApi.availability(id, searchQuery).then(res => {
+      setLoadedKey(key);
       setOffers(res.data.offers);
       setEmptyReason(res.data.emptyReason ?? null);
       setNextCheckIn(res.data.nextAvailableCheckIn ?? null);
       setOfferLoading(false);
     }).catch(err => {
+      setLoadedKey(key);
       setOfferError(err instanceof Error ? err.message : 'Araba sirasinda bir hata olustu');
       setOfferLoading(false);
     });
@@ -345,7 +351,7 @@ function HotelsDetailContent() {
 
   const handleLockPrice = useCallback((roomTypeId: string, ratePlanId: string, q: StayQuery) => {
     if (!authUser) {
-      router.push('/login');
+      router.push(currentLoginUrl());
       return;
     }
     if (!hotel) return;
@@ -448,8 +454,8 @@ function HotelsDetailContent() {
       <StayForm
         key={searchQuery ? stayQueryString(searchQuery) : 'default'}
         initial={searchQuery || {
-          checkIn: addDaysIso(todayIso(), 1),
-          checkOut: addDaysIso(todayIso(), 2),
+          checkIn: todayIso(),
+          checkOut: addDaysIso(todayIso(), 1),
           rooms: 1,
           adults: 1,
           childrenAges: [],
@@ -465,7 +471,7 @@ function HotelsDetailContent() {
       )}
 
       {/* Loading */}
-      {offerLoading && <LoadingState />}
+      {(offerLoading || (searchQuery && !offerError && loadedKey !== stayQueryString(searchQuery))) && <LoadingState />}
 
       {/* Error */}
       {offerError && (
@@ -475,7 +481,7 @@ function HotelsDetailContent() {
       )}
 
       {/* No offers */}
-      {!offerLoading && searchQuery && offers.length === 0 && !offerError && (
+      {!offerLoading && searchQuery && loadedKey === stayQueryString(searchQuery) && offers.length === 0 && !offerError && (
         <div className="text-center py-12">
           <span className="material-symbols-outlined text-outline text-5xl mb-3 block">hotel</span>
           <p className="text-on-surface-variant text-sm">{emptyReasonText(emptyReason)}</p>

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { guardRedirect, redirectUrl } from '@/lib/surface';
+import { guardRedirect, isPublicBrowsePath, redirectUrl } from '@/lib/surface';
 import { Spinner } from './SurfaceShell';
 
 /**
@@ -21,7 +21,8 @@ export function SurfaceGuard({ hasMembership = null, children }: { hasMembership
     if (target) router.replace(target);
   }, [target, router]);
 
-  // No user: AuthProvider sends the visitor to /login.
+  // Guests may browse the public pages, any other page: AuthProvider sends the visitor to /login.
+  if (!user && !loading && isPublicBrowsePath(pathname)) return <>{children}</>;
   if (loading || !user || target) return <Spinner />;
   return <>{children}</>;
 }

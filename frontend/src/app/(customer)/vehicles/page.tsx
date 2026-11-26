@@ -1,6 +1,7 @@
 'use client';
 
 import { AddToCartButton } from '@/components/AddToCartButton';
+import { currentLoginUrl } from '@/lib/surface';
 import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -36,6 +37,8 @@ function VehiclesContent() {
   // Results
   const [offers, setOffers] = useState<CarOffer[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [minPickupDate] = useState(() => new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10));
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [promoCode, setPromoCode] = useState('');
@@ -69,13 +72,7 @@ function VehiclesContent() {
     [branches, city],
   );
 
-  // Arrived from search hub: if params have city, run search
-  useEffect(() => {
-    if (params.get('city')) {
-      void Promise.resolve().then(() => searchOffers());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Arriving from the search hub with only ?city= just prefills the city (branches and dates are still needed to search).
 
   function resetForm() {
     setPickupBranchId('');
@@ -86,6 +83,7 @@ function VehiclesContent() {
     setReturnTime('09:00');
     setDriverAge('25');
     setOffers([]);
+    setSearched(false);
     setMessage('');
     setError('');
   }
@@ -102,13 +100,13 @@ function VehiclesContent() {
     }
     const pickupAt = toLocalDateTime(pickupDate, pickupTime);
     const returnAt = toLocalDateTime(returnDate, returnTime);
+    if (new Date(returnAt) <= new Date(pickupAt)) {
+      setError('Donus tarihi giden tarihinden sonra olamali.');
+      return;
+    }
     const leadError = pickupLeadError(pickupAt, Date.now());
     if (leadError) {
       setError(leadError);
-      return;
-    }
-    if (new Date(returnAt) <= new Date(pickupAt)) {
-      setError('Donus tarihi giden tarihinden sonra olamali.');
       return;
     }
     const age = Number(driverAge);
@@ -123,6 +121,7 @@ function VehiclesContent() {
     try {
       const res = await getCarOffers({ pickupBranchId, returnBranchId, pickupAt, returnAt, driverAge: age });
       setOffers(res.data);
+      setSearched(true);
     } catch (cause) {
       const apiError = cause as ApiError;
       setError(errorToMessage(apiError.code, 'Teklifler yuklenemedi.'));
@@ -133,7 +132,7 @@ function VehiclesContent() {
 
   async function bookOffer(offer: CarOffer) {
     if (authLoading || !user) {
-      router.push('/login');
+      router.push(currentLoginUrl());
       return;
     }
     const pickupAt = toLocalDateTime(pickupDate, pickupTime);
@@ -173,7 +172,7 @@ function VehiclesContent() {
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Arac Kiralama</h2>
 
       {/* Search form */}
-      <form onSubmit={searchOffers} className="grid gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm md:grid-cols-3 lg:grid-cols-4">
+      <form noValidate onSubmit={searchOffers} className="grid gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-sm md:grid-cols-3 lg:grid-cols-4">
         {/* City select */}
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Sehir</label>
@@ -208,7 +207,7 @@ function VehiclesContent() {
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Gidis tarihi</label>
           <input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)}
-            min={new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10)}
+            min={minPickupDate}
             className="w-full rounded-lg bg-surface-container px-3 py-2 text-sm" />
         </div>
 
@@ -225,7 +224,7 @@ function VehiclesContent() {
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Donus tarihi</label>
           <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)}
-            min={pickupDate || new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10)}
+            min={pickupDate || minPickupDate}
             className="w-full rounded-lg bg-surface-container px-3 py-2 text-sm" />
         </div>
 
@@ -264,8 +263,8 @@ function VehiclesContent() {
         <p className="py-12 text-center text-sm text-on-surface-variant">Subeler yukleniyor...</p>
       ) : loadingOffers ? (
         <p className="py-12 text-center text-sm text-on-surface-variant">Teklifler aranıyor...</p>
-      ) : offers.length === 0 && (pickupBranchId || returnBranchId) ? (
-        <p className="py-12 text-center text-sm text-on-surface-variant">Secilen kriterlerde teklif bulunamadi.</p>
+      ) : offers.length === 0 && searched ? (
+        <p className="py-12 text-center text-sm text-on-surface-variant">Secilen kriterlerde teklif bulunamadi. Sofor yasi, sube veya tarihleri degistirmeyi deneyin.</p>
       ) : (
         /* Offer cards */
         <div className="space-y-space-sm">
@@ -319,7 +318,7 @@ function VehiclesContent() {
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
                   {renting === `${offer.category}-${offer.transmission}` ? 'Kiralanıyor...' : 'Kirala'}
                 </button>
-                <span className="ml-2"><AddToCartButton disabled={renting !== null || !user} build={() => ({
+                <span className="ml-2"><AddToCartButton disabled={renting !== null} build={() => ({
                   vertical: 'CAR', label: `${offer.exampleModel}, ${formatLocalDateTime(toLocalDateTime(pickupDate, pickupTime))} - ${formatLocalDateTime(toLocalDateTime(returnDate, returnTime))}`, amount: offer.totalAmount,
                   currency: offer.currency, request: {
                     pickupBranchId: offer.pickupBranchId, returnBranchId: offer.returnBranchId, category: offer.category,

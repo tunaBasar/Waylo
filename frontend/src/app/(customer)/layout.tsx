@@ -21,23 +21,26 @@ const baseNav: NavItem[] = [
   { href: '/settings', label: 'Ayarlar', icon: 'settings' },
 ];
 
+const addBusinessLink: NavItem = { href: '/partner', label: 'Isletmeni ekle', icon: 'add_business' };
 const partnerLink: NavItem = { href: '/partner', label: 'Isletme Paneli', icon: 'storefront' };
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [hasMembership, setHasMembership] = useState(false);
+  const [membershipKnown, setMembershipKnown] = useState(false);
 
   // Customers who belong to an organization get one link to the partner surface.
   useEffect(() => {
     if (!user || user.role === 'ADMIN') return;
     let cancelled = false;
     partnerApi.myMemberships()
-      .then(res => { if (!cancelled) setHasMembership((res.data ?? []).some(m => m.status === 'ACTIVE')); })
+      .then(res => { if (!cancelled) { setHasMembership((res.data ?? []).some(m => m.status === 'ACTIVE')); setMembershipKnown(true); } })
       .catch(() => { if (!cancelled) setHasMembership(false); });
     return () => { cancelled = true; };
   }, [user]);
 
-  const nav = hasMembership ? [...baseNav.slice(0, -2), partnerLink, ...baseNav.slice(-2)] : baseNav;
+  const extra = hasMembership ? partnerLink : (user && user.role !== 'ADMIN' && membershipKnown ? addBusinessLink : null);
+  const nav = extra ? [...baseNav.slice(0, -2), extra, ...baseNav.slice(-2)] : baseNav;
 
   return (
     <SurfaceGuard>

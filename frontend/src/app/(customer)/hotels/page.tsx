@@ -23,8 +23,8 @@ function HotelsContent() {
 
   // Search form state
   const [formCity, setFormCity] = useState(initialCity);
-  const [formCheckIn, setFormCheckIn] = useState(() => addDaysIso(todayIso(), 1));
-  const [formCheckOut, setFormCheckOut] = useState(() => addDaysIso(todayIso(), 2));
+  const [formCheckIn, setFormCheckIn] = useState(() => todayIso());
+  const [formCheckOut, setFormCheckOut] = useState(() => addDaysIso(todayIso(), 1));
   const [formRooms, setFormRooms] = useState(1);
   const [formAdults, setFormAdults] = useState(1);
   const [formChildren, setFormChildren] = useState(0);
@@ -302,9 +302,6 @@ function HotelsContent() {
 
                     {/* Badges */}
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-secondary text-on-secondary">
-                        {hotel.active ? 'AKTIF' : 'PASIF'}
-                      </span>
                       <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-surface-container-lowest/90 text-on-surface flex items-center gap-0.5">
                         ★ {hotel.starRating}
                       </span>
@@ -322,17 +319,9 @@ function HotelsContent() {
 
                   {/* Hotel Details */}
                   <div className="p-4">
-                    {/* Room count + occupancy */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                        <span className="material-symbols-outlined text-[16px]">bed</span>
-                        <span>{hotel.roomCount} Oda</span>
-                      </div>
-                    </div>
-
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-primary">Fiyat icin tarih secin</p>
+                        {!searchActive && <p className="text-sm font-medium text-primary">Fiyat icin tarih secin</p>}
                         <p className="text-xs text-on-surface-variant">Musaitlik ve fiyatlari gor</p>
                       </div>
                       <span className="px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-medium shadow-sm flex items-center gap-1">

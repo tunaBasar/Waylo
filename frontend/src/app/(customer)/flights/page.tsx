@@ -1,5 +1,6 @@
 'use client';
 
+import { addDaysIso } from '@/lib/hotel-stay';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -87,6 +88,12 @@ function FlightsContent() {
         <div className="py-12 text-center">
           <span className="material-symbols-outlined text-outline text-5xl mb-3 block">flight_takeoff</span>
           <p className="text-sm text-on-surface-variant">Bu tarihte uygun ucus bulunamadi</p>
+          {from && to && date && (
+            <button type="button" onClick={() => router.push(`/flights?${new URLSearchParams({ from, to, date: addDaysIso(date, 1) })}`)}
+              className="mt-3 rounded-lg border border-outline-variant px-4 py-2 text-sm font-medium text-primary">
+              Sonraki gun ara
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-space-sm">

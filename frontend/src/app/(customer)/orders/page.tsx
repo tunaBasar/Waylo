@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
+import { showCreatedBanner } from '@/lib/order-banner';
 import { orderPolicyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
 import { REVIEW_WHEN_HINT, reviewApi, type ReviewableItem } from '@/lib/reviews';
@@ -171,9 +172,12 @@ function VoucherList({ orderId, testMode }: { orderId: string; testMode: boolean
 
 function PayPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
   const [busy, setBusy] = useState(false);
+  const payInFlight = useRef(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const pay = async (token: 'TEST_OK' | 'TEST_DECLINE') => {
+    if (payInFlight.current) return;
+    payInFlight.current = true;
     setBusy(true);
     setMsg(null);
     try {
@@ -191,6 +195,7 @@ function PayPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       }
     } finally {
       setBusy(false);
+      payInFlight.current = false;
     }
   };
 
@@ -466,7 +471,7 @@ function OrdersContent() {
   return (
     <div className="space-y-space-md">
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Siparislerim</h2>
-      {createdId && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu. 15 dakika icinde odeme yapin.</p>}
+      {showCreatedBanner(createdId, orders) && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu. 15 dakika icinde odeme yapin.</p>}
       {error && <p className="rounded-xl bg-error-container p-3 text-sm text-on-error-container">{error}</p>}
       {orders.some(o => o.status === 'CONFIRMED' && (o.items ?? []).some(i => i.vertical === 'HOTEL')) && (
         <p className="text-xs text-on-surface-variant" data-testid="review-when-hint">{REVIEW_WHEN_HINT}</p>

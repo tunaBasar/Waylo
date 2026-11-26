@@ -40,6 +40,25 @@ export function isPurchasePath(pathname: string): boolean {
     || under(pathname, '/rentals');
 }
 
+/** Customer pages an anonymous visitor may browse (the gateway allows the matching GET APIs). Actions on them need an account. */
+export function isPublicBrowsePath(pathname: string): boolean {
+  return pathname === '/'
+    || under(pathname, '/hotels')
+    || pathname === '/flights'
+    || pathname === '/vehicles'
+    || pathname === '/bus';
+}
+
+/** /login URL that returns to `current` (path plus query) after login. */
+export function loginUrl(current: string): string {
+  return current === '/' || !current ? '/login' : `/login?next=${encodeURIComponent(current)}`;
+}
+
+/** Browser only: login URL that returns to the current page including its query string. */
+export function currentLoginUrl(): string {
+  return loginUrl(typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search);
+}
+
 export function homeFor(role: string | null | undefined): string {
   return role === 'ADMIN' ? '/admin' : '/';
 }
@@ -59,7 +78,8 @@ export function guardRedirect(
   }
   if (surface === 'partner') {
     if (role === 'ADMIN') return { to: '/admin' };
-    if (hasMembership === false) return { to: '/', notice: PARTNER_REQUIRED_MESSAGE };
+    // A user without an organization may open the overview only: it holds the "create your business" form.
+    if (hasMembership === false && pathname !== '/partner') return { to: '/', notice: PARTNER_REQUIRED_MESSAGE };
     return null;
   }
   if (role === 'ADMIN' && !isAccountPath(pathname)) {

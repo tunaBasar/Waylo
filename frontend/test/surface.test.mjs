@@ -19,7 +19,9 @@ test('admin guard: only ADMIN may enter /admin', () => {
 test('partner guard: needs a membership, never for ADMIN', () => {
   assert.equal(m.guardRedirect('/partner', 'USER', true), null);
   assert.equal(m.guardRedirect('/partner/calendar', 'USER', null), null);
-  assert.deepEqual(m.guardRedirect('/partner', 'USER', false), { to: '/', notice: m.PARTNER_REQUIRED_MESSAGE });
+  assert.equal(m.guardRedirect('/partner', 'USER', false), null);
+  assert.deepEqual(m.guardRedirect('/partner/orders', 'USER', false), { to: '/', notice: m.PARTNER_REQUIRED_MESSAGE });
+  assert.deepEqual(m.guardRedirect('/partner/room-types', 'USER', false), { to: '/', notice: m.PARTNER_REQUIRED_MESSAGE });
   assert.deepEqual(m.guardRedirect('/partner', 'ADMIN', true), { to: '/admin' });
 });
 
@@ -47,4 +49,16 @@ test('post-login redirect', () => {
   assert.equal(m.postLoginTarget('USER', '//evil.com'), '/');
   assert.equal(m.postLoginTarget('USER', 'https://evil.com'), '/');
   assert.equal(m.postLoginTarget('USER', '/login'), '/');
+});
+
+test('public browse paths for guests', () => {
+  for (const p of ['/', '/hotels', '/hotels/abc', '/flights', '/vehicles', '/bus']) assert.equal(m.isPublicBrowsePath(p), true, p);
+  for (const p of ['/cart', '/orders', '/quotes/1', '/support', '/rentals', '/profile', '/settings', '/flights/offer', '/partner', '/admin', '/hotelsx']) {
+    assert.equal(m.isPublicBrowsePath(p), false, p);
+  }
+});
+
+test('loginUrl keeps path and query', () => {
+  assert.equal(m.loginUrl('/'), '/login');
+  assert.equal(m.loginUrl('/hotels/1?checkIn=2026-12-01'), '/login?next=%2Fhotels%2F1%3FcheckIn%3D2026-12-01');
 });

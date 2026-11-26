@@ -117,6 +117,10 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          <p className="mt-4 text-center text-xs text-on-surface-variant">
+            Otel, arac kiralama veya otobus isletmen mi? Kayit olduktan sonra &apos;Isletmeni ekle&apos; ile basvur.
+          </p>
+
           <div className="mt-4 text-center">
             <p className="text-sm text-on-surface-variant">
               Zaten hesabiniz var mi?{' '}

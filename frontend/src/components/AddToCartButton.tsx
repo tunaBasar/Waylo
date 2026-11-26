@@ -2,15 +2,21 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { currentLoginUrl } from '@/lib/surface';
 import { addToCart, type CartItem } from '@/lib/cart';
 
 /** "Sepete ekle" next to a direct buy button. `build` is called on click so it always sees the current form values. */
 export function AddToCartButton({ build, disabled }: { build: () => Omit<CartItem, 'id'> | null; disabled?: boolean }) {
   const [state, setState] = useState<'idle' | 'added' | 'dup'>('idle');
+  const { user } = useAuth();
+  const router = useRouter();
   return (
     <span className="inline-flex items-center gap-2">
       <button type="button" disabled={disabled}
         onClick={() => {
+          if (!user) { router.push(currentLoginUrl()); return; }
           const item = build();
           if (!item) return;
           setState(addToCart(item) ? 'added' : 'dup');

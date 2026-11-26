@@ -112,6 +112,11 @@ const hotelNav: NavItem[] = [
   { href: '/partner/redeem', label: 'QR Okut', icon: 'qr_code_scanner' },
 ];
 
+const onboardingNav: NavItem[] = [
+  { href: '/partner', label: 'Isletmeni ekle', icon: 'add_business', exact: true },
+  { href: '/', label: 'Musteri sayfasi', icon: 'home', exact: true },
+];
+
 // ── Car rental nav ─────────────────────────────────────────────────────────────
 
 const carNav: NavItem[] = [
@@ -251,7 +256,8 @@ function PartnerFrame({ children }: { children: React.ReactNode }) {
   const hasMembership = loading || error ? null : memberships.length > 0;
 
   // Determine nav and subtitle
-  const nav = isCarRentalOrg ? carNav : isBusOrg ? busNav : hotelNav;
+  const noOrg = !loading && !error && memberships.length === 0;
+  const nav = noOrg ? onboardingNav : isCarRentalOrg ? carNav : isBusOrg ? busNav : hotelNav;
   const subtitle = membership?.organizationName ?? 'Isletme Paneli';
 
   return (

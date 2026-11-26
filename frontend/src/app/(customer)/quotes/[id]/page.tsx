@@ -1,7 +1,7 @@
 'use client';
 
 import { AddToCartButton } from '@/components/AddToCartButton';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from '@/lib/api';
@@ -110,6 +110,7 @@ function QuoteContent() {
   const [hotelName, setHotelName] = useState<string | null>(null);
   const [hotelLoading, setHotelLoading] = useState(false);
   const [booking, setBooking] = useState(false);
+  const bookingInFlight = useRef(false);
   const [promoCode, setPromoCode] = useState('');
   const [bookingError, setBookingError] = useState<string | null>(null);
 
@@ -149,7 +150,8 @@ function QuoteContent() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const bookQuote = async () => {
-    if (!user || !quote) return;
+    if (!user || !quote || bookingInFlight.current) return;
+    bookingInFlight.current = true;
     setBooking(true);
     setBookingError(null);
     try {
@@ -173,6 +175,7 @@ function QuoteContent() {
       }
     } finally {
       setBooking(false);
+      bookingInFlight.current = false;
     }
   };
 

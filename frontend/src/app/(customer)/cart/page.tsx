@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from '@/lib/api';
@@ -23,6 +23,7 @@ export default function CartPage() {
   const [ready, setReady] = useState(false);
   const [promo, setPromo] = useState('');
   const [busy, setBusy] = useState(false);
+  const buyInFlight = useRef(false);
   const [error, setError] = useState('');
 
   const refresh = useCallback(() => setItems(loadCart()), []);
@@ -37,6 +38,8 @@ export default function CartPage() {
 
   async function buy() {
     if (authLoading || !user) { router.push('/login'); return; }
+    if (buyInFlight.current) return;
+    buyInFlight.current = true;
     setBusy(true);
     setError('');
     try {
@@ -58,6 +61,7 @@ export default function CartPage() {
       }
     } finally {
       setBusy(false);
+      buyInFlight.current = false;
     }
   }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { loginUrl } from '@/lib/surface';
 
 export interface NavItem {
   href: string;
@@ -40,6 +41,7 @@ export function Spinner() {
 export function SurfaceShell({ brand, subtitle, icon, nav, bottomNav, headerExtra, children }: SurfaceShellProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const next = pathname; // query is added by pages that start an action, the shell link returns to the page
 
   return (
     <>
@@ -85,11 +87,18 @@ export function SurfaceShell({ brand, subtitle, icon, nav, bottomNav, headerExtr
               </div>
             </div>
           )}
-          <button onClick={() => logout()}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-on-surface-variant hover:text-error hover:bg-error-container/50 rounded-xl transition-colors">
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            Cikis Yap
-          </button>
+          {user ? (
+            <button onClick={() => logout()}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-on-surface-variant hover:text-error hover:bg-error-container/50 rounded-xl transition-colors">
+              <span className="material-symbols-outlined text-[18px]">logout</span>
+              Cikis Yap
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Link href={loginUrl(next)} className="rounded-xl bg-primary px-3 py-2 text-center text-sm font-semibold text-on-primary">Giris Yap</Link>
+              <Link href="/register" className="rounded-xl border border-outline-variant px-3 py-2 text-center text-sm font-medium text-primary">Kayit Ol</Link>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -98,12 +107,17 @@ export function SurfaceShell({ brand, subtitle, icon, nav, bottomNav, headerExtr
           <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
           <span className="text-base font-bold text-on-surface">{brand}</span>
         </div>
-        <button onClick={() => logout()} aria-label="Cikis Yap"
-          className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-          <span className="text-xs font-bold text-on-primary">
-            {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+        {user ? (
+          <button onClick={() => logout()} aria-label="Cikis Yap"
+            className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <span className="text-xs font-bold text-on-primary">{`${user.firstName[0]}${user.lastName[0]}`}</span>
+          </button>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Link href={loginUrl(next)} className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary">Giris Yap</Link>
+            <Link href="/register" className="rounded-full border border-outline-variant px-3 py-1.5 text-xs font-medium text-primary">Kayit Ol</Link>
           </span>
-        </button>
+        )}
       </div>
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant flex items-center gap-1 overflow-x-auto no-scrollbar px-2 py-1.5 safe-area-bottom">

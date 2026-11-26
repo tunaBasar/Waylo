@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { postLoginTarget } from './surface';
+import { isPublicBrowsePath, loginUrl, postLoginTarget } from './surface';
 import { AuthError, verifyEmailSentPath } from './email-verification';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Redirect unauthenticated users
   useEffect(() => {
-    if (!loading && !user && !PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-      router.replace(pathname === '/' ? '/login' : `/login?next=${encodeURIComponent(pathname)}`);
+    if (!loading && !user && !PUBLIC_PATHS.some(p => pathname.startsWith(p)) && !isPublicBrowsePath(pathname)) {
+      router.replace(loginUrl(pathname + (typeof window === 'undefined' ? '' : window.location.search)));
     }
   }, [user, loading, pathname, router]);
 

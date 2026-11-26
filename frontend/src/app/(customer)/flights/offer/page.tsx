@@ -1,6 +1,7 @@
 'use client';
 
 import { AddToCartButton } from '@/components/AddToCartButton';
+import { currentLoginUrl } from '@/lib/surface';
 import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -65,7 +66,7 @@ function OfferContent() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!offer) return;
-    if (authLoading || !user) { router.push('/login'); return; }
+    if (authLoading || !user) { router.push(currentLoginUrl()); return; }
     if (!isValidPassengerName(firstName) || !isValidPassengerName(lastName)) {
       setError('Ad ve soyad yalnizca harf icermeli, kimlikteki gibi yazin.');
       return;
@@ -139,7 +140,7 @@ function OfferContent() {
                   {busy ? 'Siparis olusturuluyor...' : 'Siparis Olustur ve Ode'}
                 </button>
                 <div className="mt-2">
-                  <AddToCartButton disabled={busy || !user} build={() => {
+                  <AddToCartButton disabled={busy} build={() => {
                     if (!isValidPassengerName(firstName) || !isValidPassengerName(lastName)) {
                       setError('Ad ve soyad yalnizca harf icermeli, kimlikteki gibi yazin.');
                       return null;

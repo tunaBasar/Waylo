@@ -74,11 +74,11 @@ function NewOrganizationForm({ onDone }: { onDone: () => void }) {
           </select>
         </Field>
         {businessType !== 'BUS' && (
-          <Field label="Hukuki sekil">
+          <Field label="Hukuki sekil (sirket veya sahis)">
             <select className={inputClass} value={legalType}
               onChange={e => setLegalType(e.target.value as LegalType)}>
               <option value="COMPANY">Sirket</option>
-              <option value="INDIVIDUAL">Mukerrat</option>
+              <option value="INDIVIDUAL">Sahis (gercek kisi)</option>
             </select>
           </Field>
         )}
@@ -491,7 +491,7 @@ export default function PartnerOrganizationsPage() {
                 </div>
                 {m.organizationStatus === 'PENDING' && (
                   <p className="mt-3 text-xs text-on-surface-variant">
-                    Onay bekleniyor. Otel ve fiyat girebilirsiniz ancak onaydan once musterilere gosterilmez.
+                    Onay bekleniyor. Platform ekibi isletmenizi inceler. Bu sirada otel ve fiyat girebilirsiniz, ancak onaydan once musterilere gosterilmez.
                   </p>
                 )}
               </Card>
