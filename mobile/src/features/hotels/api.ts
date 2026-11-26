@@ -23,6 +23,11 @@ export function photoUrl(baseUrl: string, hotelId: string, mediaId: string): str
   return `${baseUrl.replace(/\/+$/, '')}/api/hotels/${encodeURIComponent(hotelId)}/media/${encodeURIComponent(mediaId)}`;
 }
 
+/** Cover photo url of a search result, or null when the hotel has no approved photo. */
+export function hotelCoverUrl(baseUrl: string, hotel: { id: string; coverMediaId?: string | null }): string | null {
+  return hotel.coverMediaId ? photoUrl(baseUrl, hotel.id, hotel.coverMediaId) : null;
+}
+
 /** width / height, falling back to 4:3 when either is missing or not positive. */
 export function photoAspect(width: number, height: number): number {
   return width > 0 && height > 0 ? width / height : 4 / 3;

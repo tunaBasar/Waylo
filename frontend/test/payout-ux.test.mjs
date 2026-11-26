@@ -61,6 +61,15 @@ test('F56 teamInviteErrorMessage explains an unknown invitee and the known confl
   assert.equal(partner.teamInviteErrorMessage(new Error('')), 'Rol verilemedi');
 });
 
+test('F62 pendingOrganizationHint: car and bus orgs are not told to add hotels', () => {
+  assert.match(partner.pendingOrganizationHint('CAR_RENTAL'), /subelerinizi ve araclarinizi/);
+  assert.doesNotMatch(partner.pendingOrganizationHint('CAR_RENTAL'), /otel/i);
+  assert.match(partner.pendingOrganizationHint('BUS'), /otobuslerinizi/);
+  assert.doesNotMatch(partner.pendingOrganizationHint('BUS'), /otel/i);
+  assert.match(partner.pendingOrganizationHint('HOTEL'), /otel ve fiyat/);
+  assert.match(partner.pendingOrganizationHint(undefined), /Onay bekleniyor/);
+});
+
 test('F53 paidAtProblem: not in the future, not before the request minute', () => {
   const requested = '2026-11-26T09:50:19.206Z';
   const now = new Date('2026-11-26T10:00:00Z');

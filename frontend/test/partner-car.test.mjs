@@ -29,6 +29,13 @@ test('formatTime basic HH:mm', () => {
   assert.strictEqual(m.formatTime('23:59'), '23:59');
 });
 
+test('formatTime drops the seconds the backend sends (F66)', () => {
+  assert.strictEqual(m.formatTime('07:00:00'), '7:00');
+  assert.strictEqual(m.formatTime('23:30:00'), '23:30');
+  assert.strictEqual(m.formatTime('23:30:00.000'), '23:30');
+  assert.strictEqual(m.formatTime('23:30:61'), '23:30:61');
+});
+
 test('formatTime invalid input returns raw', () => {
   assert.strictEqual(m.formatTime(''), '');
   assert.strictEqual(m.formatTime(null), '');
@@ -114,10 +121,19 @@ test('orgDocumentTypesFor undefined', () => {
 test('documentTypeLabel all values', () => {
   assert.strictEqual(m.documentTypeLabel('RENTAL_AUTHORIZATION'), 'Arac kiralama yetki belgesi');
   assert.strictEqual(m.documentTypeLabel('TAX_CERTIFICATE'), 'Vergi levhasi');
-  assert.strictEqual(m.documentTypeLabel('IDENTITY_DOCUMENT'), 'Nufus cüzdañi / kimlik');
-  assert.strictEqual(m.documentTypeLabel('VEHICLE_REGISTRATION'), 'Araç ruhsati');
-  assert.strictEqual(m.documentTypeLabel('RENTAL_INSURANCE'), 'Araç kiralama sigortasi (kasko)');
+  assert.strictEqual(m.documentTypeLabel('IDENTITY_DOCUMENT'), 'Nufus cuzdani / kimlik');
+  assert.strictEqual(m.documentTypeLabel('VEHICLE_REGISTRATION'), 'Arac ruhsati');
+  assert.strictEqual(m.documentTypeLabel('RENTAL_INSURANCE'), 'Arac kiralama sigortasi (kasko)');
   assert.strictEqual(m.documentTypeLabel('TRAFFIC_INSURANCE'), 'Zorunlu trafik sigortasi');
+});
+
+test('missingOrgDocumentsText uses Turkish labels, never the raw enum (F63)', () => {
+  const t = m.missingOrgDocumentsText(['IDENTITY_DOCUMENT']);
+  assert.strictEqual(t, 'Eksik isletme belgeleri: Nufus cuzdani / kimlik. Belgeler sayfasindan yukleyin.');
+  assert.ok(!t.includes('IDENTITY_DOCUMENT'));
+  assert.match(m.missingOrgDocumentsText(['RENTAL_AUTHORIZATION', 'TAX_CERTIFICATE']), /yetki belgesi, Vergi levhasi/);
+  // an unknown future type still shows something instead of crashing
+  assert.match(m.missingOrgDocumentsText(['SOMETHING_NEW']), /SOMETHING_NEW/);
 });
 
 // ── CATEGORY_LABEL ───────────────────────────────────────────────────────────

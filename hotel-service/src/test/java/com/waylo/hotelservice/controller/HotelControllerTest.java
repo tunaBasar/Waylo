@@ -39,6 +39,8 @@ class HotelControllerTest {
             mock(com.waylo.hotelservice.service.ReviewService.class, inv -> inv.getArguments()[0]);
     private final com.waylo.hotelservice.publication.HotelPublicationService publicationService =
             mock(com.waylo.hotelservice.publication.HotelPublicationService.class);
+    private final com.waylo.hotelservice.media.HotelMediaService mediaService =
+            mock(com.waylo.hotelservice.media.HotelMediaService.class);
     @InjectMocks
     private HotelController controller;
 
@@ -235,6 +237,20 @@ class HotelControllerTest {
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody()).isNotNull();
+    }
+
+    @Test
+    void search_carriesCoverMediaId_nullWhenNoPhoto() {
+        HotelResponse withPhoto = buildResponse(hotelId);
+        HotelResponse without = buildResponse(UUID.randomUUID());
+        UUID cover = UUID.randomUUID();
+        when(hotelService.search("Istanbul", "Turkey", 4)).thenReturn(List.of(withPhoto, without));
+        when(mediaService.coverIds(java.util.Set.of(withPhoto.id(), without.id()))).thenReturn(java.util.Map.of(hotelId, cover));
+
+        List<HotelResponse> body = controller.search("Istanbul", "Turkey", 4, null, null, 1, 1, null).getBody().data();
+
+        assertThat(body.get(0).coverMediaId()).isEqualTo(cover);
+        assertThat(body.get(1).coverMediaId()).isNull();
     }
 
     @Test

@@ -1,4 +1,4 @@
-import { photoAspect, photoUrl } from '@/features/hotels/api';
+import { hotelCoverUrl, photoAspect, photoUrl } from '@/features/hotels/api';
 
 describe('photoUrl', () => {
   it('builds the media url', () => {
@@ -14,5 +14,15 @@ describe('photoAspect', () => {
   it('falls back to 4:3', () => {
     expect(photoAspect(0, 100)).toBeCloseTo(4 / 3);
     expect(photoAspect(100, 0)).toBeCloseTo(4 / 3);
+  });
+});
+
+describe('hotelCoverUrl', () => {
+  it('builds the cover url from coverMediaId', () => {
+    expect(hotelCoverUrl('http://h:8080', { id: 'a', coverMediaId: 'b' })).toBe('http://h:8080/api/hotels/a/media/b');
+  });
+  it('is null without a cover', () => {
+    expect(hotelCoverUrl('http://h', { id: 'a' })).toBeNull();
+    expect(hotelCoverUrl('http://h', { id: 'a', coverMediaId: null })).toBeNull();
   });
 });

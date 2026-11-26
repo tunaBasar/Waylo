@@ -313,4 +313,35 @@ class HotelMediaServiceTest {
         assertThatThrownBy(() -> service.review(null, mediaId, "APPROVE", null)).isInstanceOf(PublicationException.class);
         verify(decisions, never()).save(any());
     }
+
+    // ---- cover ids (search list)
+
+    @Test
+    void coverIds_oneBatchedQueryForManyHotels_andMissingHotelsAbsent() {
+        UUID other = UUID.randomUUID();
+        UUID noPhotos = UUID.randomUUID();
+        UUID c1 = UUID.randomUUID();
+        UUID c2 = UUID.randomUUID();
+        java.util.Set<UUID> ids = java.util.Set.of(hotelId, other, noPhotos);
+        when(media.findCovers(ids)).thenReturn(List.of(cover(hotelId, c1), cover(other, c2)));
+
+        var covers = service.coverIds(ids);
+
+        assertThat(covers).containsEntry(hotelId, c1).containsEntry(other, c2);
+        assertThat(covers.get(noPhotos)).isNull();
+        verify(media, org.mockito.Mockito.times(1)).findCovers(any());
+    }
+
+    @Test
+    void coverIds_emptyInputSkipsTheQuery() {
+        assertThat(service.coverIds(java.util.Set.of())).isEmpty();
+        verify(media, never()).findCovers(any());
+    }
+
+    private static HotelMediaRepository.CoverRow cover(UUID hotel, UUID mediaId) {
+        return new HotelMediaRepository.CoverRow() {
+            public UUID getHotelId() { return hotel; }
+            public UUID getMediaId() { return mediaId; }
+        };
+    }
 }

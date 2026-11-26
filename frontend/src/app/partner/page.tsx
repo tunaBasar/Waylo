@@ -16,6 +16,7 @@ import { usePartner } from '@/lib/partner-context';
 import {
   partnerApi, ORGANIZATION_STATUS_LABEL, ROLE_LABEL, PUBLICATION_STATUS_LABEL, PUBLICATION_STATUS_TONE, REVISION_STATUS_LABEL,
   canManageHotel, submitBlockReason, contentDiff, isErrorCode, hotelMediaApi, pendingPhotoIds, publicationMediaErrorMessage, MAX_REQUEST_MEDIA,
+  pendingOrganizationHint,
   type HotelRequest, type OrganizationStatus, type BusinessType, type LegalType, type PartnerHotel,
   type PublicationRequestSummary, type HotelContentView, type HotelContent, type HotelMediaItem,
 } from '@/lib/partner';
@@ -467,7 +468,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage, photosVersion 
 }
 
 export default function PartnerOrganizationsPage() {
-  const { loading, error, memberships, membership, organizationId, hotels, hotelId, hotel, selectHotel, isBusOrg } = usePartner();
+  const { loading, error, memberships, membership, organizationId, hotels, hotelId, hotel, selectHotel, isBusOrg, isCarRentalOrg } = usePartner();
   const [showOrgForm, setShowOrgForm] = useState(false);
   const [showHotelForm, setShowHotelForm] = useState(false);
   const [photosVersion, setPhotosVersion] = useState(0);
@@ -509,7 +510,7 @@ export default function PartnerOrganizationsPage() {
                 </div>
                 {m.organizationStatus === 'PENDING' && (
                   <p className="mt-3 text-xs text-on-surface-variant">
-                    Onay bekleniyor. Platform ekibi isletmenizi inceler. Bu sirada otel ve fiyat girebilirsiniz, ancak onaydan once musterilere gosterilmez.
+                    {pendingOrganizationHint(m.organizationBusinessType)}
                   </p>
                 )}
               </Card>
@@ -518,7 +519,21 @@ export default function PartnerOrganizationsPage() {
         )}
       </section>
 
-      {organizationId && !isBusOrg && (
+      {organizationId && isCarRentalOrg && (
+        <section className="space-y-space-sm" data-testid="car-next-steps">
+          <PageHeader title="Arac kiralama" subtitle="Satisa acilmak icin sirasiyla tamamlayin" />
+          <Card className="p-4 text-sm">
+            <ol className="list-decimal space-y-1 pl-5 text-on-surface">
+              <li><a className="underline" href="/partner/car/documents">Belgeler</a>: isletme belgelerinizi yukleyin.</li>
+              <li><a className="underline" href="/partner/car/branches">Subeler</a>: araclarin teslim alinacagi subeleri ekleyin.</li>
+              <li><a className="underline" href="/partner/car/vehicles">Filo</a>: araclarinizi ve arac belgelerini ekleyin.</li>
+              <li><a className="underline" href="/partner/car/rates">Fiyatlar</a>: gunluk fiyatlari girin.</li>
+            </ol>
+          </Card>
+        </section>
+      )}
+
+      {organizationId && !isBusOrg && !isCarRentalOrg && (
         <section className="space-y-space-sm">
           <PageHeader
             title="Oteller"

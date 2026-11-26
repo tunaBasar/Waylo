@@ -9,8 +9,11 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
+import { useToast } from '@/components/Toast';
 import {
   partnerCarApi,
+  documentTypeLabel,
+  type DocumentType,
   type Vehicle,
   type VehicleCreateRequest,
   type VehicleUpdateRequest,
@@ -162,14 +165,17 @@ function VehicleForm({ vehicle, organizationId, branches, onDone }: {
   );
 }
 
-function VehicleRow({ vehicle, organizationId, branches }: {
+function VehicleRow({ vehicle, organizationId, branches, onSaved }: {
   vehicle: Vehicle;
   organizationId: string;
   branches: { id: string; name: string }[];
+  /** Re-fetch the list after an edit, so the card shows the saved values. */
+  onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [active, setActive] = useState(vehicle.active);
   const { setHasUnsavedChanges } = usePartner();
+  const toast = useToast();
   const inFlight = useRef(false);
 
   return (
@@ -192,7 +198,7 @@ function VehicleRow({ vehicle, organizationId, branches }: {
 
       {vehicle.missingDocuments.length > 0 && (
         <div className="mt-2 rounded-lg bg-error-container/10 p-2 text-xs text-error">
-          {vehicle.missingDocuments.join(', ')}
+          Eksik belgeler: {vehicle.missingDocuments.map(d => documentTypeLabel(d as DocumentType) ?? d).join(', ')}
         </div>
       )}
 
@@ -212,7 +218,7 @@ function VehicleRow({ vehicle, organizationId, branches }: {
                 }
                 setActive(!active);
               } catch (err) {
-                alert(err instanceof Error ? err.message : 'Isletilemedi');
+                toast.error(err instanceof Error ? err.message : 'Islem yapilamadi');
               } finally {
                 inFlight.current = false;
               }
@@ -229,7 +235,7 @@ function VehicleRow({ vehicle, organizationId, branches }: {
           vehicle={vehicle}
           organizationId={organizationId}
           branches={branches}
-          onDone={() => { setEditing(false); setHasUnsavedChanges(false); }}
+          onDone={(saved) => { setEditing(false); setHasUnsavedChanges(false); if (saved) onSaved(); }}
         />
       )}
     </Card>
@@ -243,6 +249,8 @@ export default function VehiclesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  // Bumped after a create or an edit: the list is fetched again (the walk saw "Henuz arac yok" after a 201).
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -257,7 +265,7 @@ export default function VehiclesPage() {
       .catch(e => { if (alive) setError(e instanceof Error ? e.message : 'Yuklenemedi'); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [organizationId]);
+  }, [organizationId, reloads]);
 
   useEffect(() => {
     let alive = true;
@@ -285,7 +293,7 @@ export default function VehiclesPage() {
         <VehicleForm
           organizationId={organizationId!}
           branches={branches}
-          onDone={() => { setShowForm(false); }}
+          onDone={(saved) => { setShowForm(false); if (saved) setReloads(n => n + 1); }}
         />
       )}
 
@@ -298,7 +306,8 @@ export default function VehiclesPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {items.map(v => (
-            <VehicleRow key={v.id} vehicle={v} organizationId={organizationId!} branches={branches} />
+            <VehicleRow key={`${v.id}:${reloads}`} vehicle={v} organizationId={organizationId!} branches={branches}
+              onSaved={() => setReloads(n => n + 1)} />
           ))}
         </div>
       )}

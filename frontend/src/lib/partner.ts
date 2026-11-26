@@ -594,6 +594,14 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   SUPERSEDED: 'Yenisiyle degisti',
 };
 
+/** Hint under a PENDING organization card, per business type (F62: a car or bus org must not be told to add hotels). */
+export function pendingOrganizationHint(businessType: BusinessType | null | undefined): string {
+  const base = 'Onay bekleniyor. Platform ekibi isletmenizi inceler.';
+  if (businessType === 'CAR_RENTAL') return `${base} Bu sirada belgelerinizi, subelerinizi ve araclarinizi girebilirsiniz; onaydan once musterilere gosterilmez.`;
+  if (businessType === 'BUS') return `${base} Bu sirada belgelerinizi, otobuslerinizi ve seferlerinizi girebilirsiniz; onaydan once musterilere gosterilmez.`;
+  return `${base} Bu sirada otel ve fiyat girebilirsiniz, ancak onaydan once musterilere gosterilmez.`;
+}
+
 /** HOTEL_MANAGE holders: organization owner, or owner/manager granted on this very hotel (HOTEL_STAFF cannot). */
 export function canManageHotel(roles: RoleGrant[], hotelId: string): boolean {
   return roles.some(r =>

@@ -172,6 +172,14 @@ public class HotelMediaService {
 
     // ---- public
 
+    /** Cover photo id per hotel in ONE query; hotels without a publicly servable photo are absent from the map. */
+    @Transactional(readOnly = true)
+    public Map<UUID, UUID> coverIds(Set<UUID> hotelIds) {
+        if (hotelIds == null || hotelIds.isEmpty()) return Map.of();
+        return media.findCovers(hotelIds).stream()
+                .collect(Collectors.toMap(HotelMediaRepository.CoverRow::getHotelId, HotelMediaRepository.CoverRow::getMediaId, (a, b) -> a));
+    }
+
     @Transactional(readOnly = true)
     public List<PublicMedia> publicList(UUID hotelId, boolean hotelPublic) {
         if (!hotelPublic) return List.of();

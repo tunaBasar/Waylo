@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
+import { Image } from 'expo-image';
+import { API_URL } from '@/config';
 import { useRouter } from 'expo-router';
 import type { Hotel, StayQuery } from '@/api';
-import { hotelsApi, stayQueryString } from '@/features/hotels/api';
+import { hotelCoverUrl, hotelsApi, stayQueryString } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { DateField } from '@/components/DateField';
@@ -52,6 +54,9 @@ export default function Hotels() {
           {(hotels) => hotels.map((h) => (
             <Pressable key={h.id} accessibilityRole="button" accessibilityLabel={`${h.name}, ${h.city}`} onPress={() => router.push(`/hotel/${h.id}?${stayQueryString(query)}`)}>
               <Card>
+                {hotelCoverUrl(API_URL, h) && (
+                  <Image source={{ uri: hotelCoverUrl(API_URL, h) as string }} accessibilityLabel={h.name} contentFit="cover" style={{ width: '100%', height: 140, borderRadius: 8, marginBottom: 8 }} />
+                )}
                 <Text style={{ fontWeight: '700' }}>{h.name}</Text>
                 <Muted>{`${h.city}, ${h.country} · ${h.starRating} yildiz`}</Muted>
               </Card>

@@ -74,14 +74,20 @@ export type DocumentType = OrgDocumentType | VehicleDocumentType;
 const DOCUMENT_TYPE_LABEL: Record<DocumentType, string> = {
   RENTAL_AUTHORIZATION: 'Arac kiralama yetki belgesi',
   TAX_CERTIFICATE: 'Vergi levhasi',
-  IDENTITY_DOCUMENT: 'Nufus cüzdañi / kimlik',
-  VEHICLE_REGISTRATION: 'Araç ruhsati',
-  RENTAL_INSURANCE: 'Araç kiralama sigortasi (kasko)',
+  IDENTITY_DOCUMENT: 'Nufus cuzdani / kimlik',
+  VEHICLE_REGISTRATION: 'Arac ruhsati',
+  RENTAL_INSURANCE: 'Arac kiralama sigortasi (kasko)',
   TRAFFIC_INSURANCE: 'Zorunlu trafik sigortasi',
 };
 
 export function documentTypeLabel(t: DocumentType): string {
   return DOCUMENT_TYPE_LABEL[t];
+}
+
+/** Banner text for missing organization documents (F63): Turkish labels, never the raw enum. */
+export function missingOrgDocumentsText(types: string[]): string {
+  const labels = types.map(t => DOCUMENT_TYPE_LABEL[t as DocumentType] ?? t);
+  return `Eksik isletme belgeleri: ${labels.join(', ')}. Belgeler sayfasindan yukleyin.`;
 }
 
 /** Returns the set of valid document types for this legal type at the org level. */
@@ -421,7 +427,8 @@ export function sortRatesByOrder(items: CategoryRateItem[]): CategoryRateItem[] 
  */
 export function formatTime(t: string): string {
   if (!t || typeof t !== 'string') return t || '';
-  const match = t.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  // The backend sends LocalTime as "07:00:00" (F66): seconds are accepted and dropped.
+  const match = t.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
   if (!match) return t;
   return `${match[1].replace(/^0/, '')}:${match[2]}`;
 }

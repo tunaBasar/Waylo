@@ -1879,6 +1879,8 @@ Public (no token): `GET /api/hotels/{id}/media` -> `[{id, caption, sortOrder, wi
 `GET /api/hotels/{id}/media/{mediaId}` -> image bytes, both only for scan CLEAN + review APPROVED photos of a public hotel
 (else 404), `Cache-Control: public, max-age=300`, `X-Content-Type-Options: nosniff`.
 
+`GET /api/hotels/search` results carry `coverMediaId` (UUID or null): the first CLEAN + APPROVED photo (sortOrder, then createdAt) of a PUBLISHED hotel, served from `GET /api/hotels/{id}/media/{coverMediaId}`.
+
 Admin (`ADMIN`): `GET /api/admin/hotel-media?status=&page=&size=`, `GET /api/admin/hotel-media/{mediaId}/file`,
 `POST /api/admin/hotel-media/{mediaId}/decisions` `{decision: APPROVE | REJECT, reason}` (reason required for REJECT;
 409 `ALREADY_DECIDED`). Every decision is an append-only row in `hotel_media_decisions`.

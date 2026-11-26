@@ -4,6 +4,7 @@ import com.waylo.hotelservice.dto.ApiResponse;
 import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
+import com.waylo.hotelservice.media.HotelMediaService;
 import com.waylo.hotelservice.publication.HotelPublicationService;
 import com.waylo.hotelservice.security.HotelAccessGuard;
 import com.waylo.hotelservice.service.HotelService;
@@ -36,10 +37,13 @@ public class HotelController {
     private final HotelAccessGuard accessGuard;
     private final HotelSearchService hotelSearchService;
     private final ReviewService reviewService;
+    private final HotelMediaService mediaService;
     private final HotelPublicationService publicationService;
 
     public HotelController(HotelService hotelService, HotelAccessGuard accessGuard, HotelSearchService hotelSearchService,
-                           ReviewService reviewService, HotelPublicationService publicationService) {
+                           ReviewService reviewService, HotelPublicationService publicationService,
+                           HotelMediaService mediaService) {
+        this.mediaService = mediaService;
         this.publicationService = publicationService;
         this.reviewService = reviewService;
         this.hotelService = hotelService;
@@ -94,10 +98,16 @@ public class HotelController {
             @RequestParam(defaultValue = "1") int adults,
             @RequestParam(required = false) List<Integer> childrenAges) {
         if (checkIn == null && checkOut == null) {
-            return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(hotelService.search(city, country, minStars))));
+            return ResponseEntity.ok(ApiResponse.of(withCovers(reviewService.enrich(hotelService.search(city, country, minStars)))));
         }
-        return ResponseEntity.ok(ApiResponse.of(reviewService.enrich(hotelSearchService.search(
-                city, country, minStars, checkIn, checkOut, rooms, adults, childrenAges))));
+        return ResponseEntity.ok(ApiResponse.of(withCovers(reviewService.enrich(hotelSearchService.search(
+                city, country, minStars, checkIn, checkOut, rooms, adults, childrenAges)))));
+    }
+
+    private List<HotelResponse> withCovers(List<HotelResponse> hotels) {
+        java.util.Map<UUID, UUID> covers = mediaService.coverIds(
+                hotels.stream().map(HotelResponse::id).collect(java.util.stream.Collectors.toSet()));
+        return hotels.stream().map(h -> h.withCover(covers.get(h.id()))).toList();
     }
 
     @PutMapping("/{id}")

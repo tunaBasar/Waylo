@@ -52,6 +52,7 @@ export interface Hotel {
   createdAt: string;
   updatedAt: string;
   averageScore?: number | null;
+  coverMediaId?: string | null;
   reviewCount?: number;
 }
 

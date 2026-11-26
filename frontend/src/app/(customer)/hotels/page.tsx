@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import type { Hotel } from '@/lib/types';
+import { hotelCoverUrl } from '@/lib/hotel-media';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 import {
   todayIso,
   addDaysIso,
@@ -295,9 +298,14 @@ function HotelsContent() {
                 <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                   {/* Hotel Image */}
                   <div className="relative h-48 bg-surface-container overflow-hidden">
-                    <div className="w-full h-full flex items-center justify-center bg-surface-container-high">
-                      <span className="material-symbols-outlined text-outline text-6xl">hotel</span>
-                    </div>
+                    {hotelCoverUrl(API_BASE, hotel) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={hotelCoverUrl(API_BASE, hotel) as string} alt={hotel.name} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-surface-container-high">
+                        <span className="material-symbols-outlined text-outline text-6xl">hotel</span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
                     {/* Badges */}

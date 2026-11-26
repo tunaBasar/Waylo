@@ -38,6 +38,7 @@ export interface Hotel {
   description: string | null;
   averageScore?: number | null;
   reviewCount?: number | null;
+  coverMediaId?: string | null;
 }
 
 export interface StayQuery {

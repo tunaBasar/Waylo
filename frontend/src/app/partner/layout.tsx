@@ -7,7 +7,7 @@ import { PartnerProvider, usePartner } from '@/lib/partner-context';
 import { SurfaceShell, type NavItem } from '@/components/SurfaceShell';
 import { SurfaceGuard } from '@/components/SurfaceGuard';
 import { inputClass } from '@/components/partner/ui';
-import { partnerCarApi, type PartnerCarStatus } from '@/lib/partner-car';
+import { missingOrgDocumentsText, partnerCarApi, type PartnerCarStatus } from '@/lib/partner-car';
 import { partnerBusApi, type BusPartnerStatus } from '@/lib/bus';
 
 const UNSAVED_LEAVE_MESSAGE =
@@ -49,7 +49,7 @@ function CarStatusBanner() {
       {status.missingOrgDocuments.length > 0 && (
         <div className="flex items-start gap-2">
           <span className="material-symbols-outlined text-[20px]">description</span>
-          <span>Eksik organizasyon belgeleri: {status.missingOrgDocuments.join(', ')}. Tamamlayin.</span>
+          <span>{missingOrgDocumentsText(status.missingOrgDocuments)} <a href="/partner/car/documents" className="font-semibold underline">Belgelere git</a></span>
         </div>
       )}
       {/* No sellable vehicles (missingOrgDocuments empty) */}

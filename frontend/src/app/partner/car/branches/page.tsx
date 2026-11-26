@@ -191,7 +191,7 @@ export default function BranchesPage() {
               <p className="text-xs text-outline mt-2">{b.address}</p>
               {b.phone && <p className="text-xs text-outline">{b.phone}</p>}
               <p className="text-xs text-outline mt-1">
-                {formatTime(b.openTime)} - {formatTime(b.closeTime)} (hergun)
+                {formatTime(b.openTime)} - {formatTime(b.closeTime)} (her gun)
               </p>
               <div className="mt-3 flex gap-2">
                 <Button variant="ghost" onClick={() => { setShowForm(false); setEditing(b); }}>Duzenle</Button>
