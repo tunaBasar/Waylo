@@ -5,7 +5,7 @@ import { useToast } from '@/components/Toast';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { api } from '@/lib/api';
 import {
-  VERTICAL_TR, hasIdenticalOverride, parseCommissionPercent, prefillPercent, verticalOf, type RateRow,
+  VERTICAL_TR, hasIdenticalOverride, keepTypedPercent, parseCommissionPercent, prefillPercent, verticalOf, type RateRow,
 } from '@/lib/commission';
 import { adminApi, type AdminOrganization, type OrgStatus } from '@/lib/admin';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
@@ -97,7 +97,10 @@ export default function AdminOrganizationsPage() {
     try {
       const rows = (await api.get<RateRow[]>('/api/admin/commission-rates')).data ?? [];
       setRateRows(rows);
-      setPercent(prefillPercent(rows, verticalOf(o.businessType), o.id));
+      // The rates arrive after the form is open: only prefill an untouched field, never overwrite what the admin
+      // already typed (the full Playwright run caught "12,5" being wiped and the button staying disabled).
+      const suggestion = prefillPercent(rows, verticalOf(o.businessType), o.id);
+      setPercent(current => keepTypedPercent(current, suggestion));
     } catch {
       setRateRows([]);
     }

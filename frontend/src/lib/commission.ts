@@ -28,6 +28,11 @@ export function prefillPercent(rows: RateRow[], vertical: RateVertical | null, o
   return own ? ratePercentText(own.rate) : '';
 }
 
+/** The rate suggestion arrives after the approve form opened: it only fills an empty field, typed input wins. */
+export function keepTypedPercent(current: string, suggestion: string): string {
+  return current.trim() ? current : suggestion;
+}
+
 /** 0 < x <= 50, Turkish decimal comma allowed. Returns the fraction (x/100, 4 decimals) or null. */
 export function parseCommissionPercent(raw: string): number | null {
   const n = parseTrAmount(raw);

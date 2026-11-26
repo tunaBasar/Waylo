@@ -35,6 +35,14 @@ test('prefill prefers the vertical default, then the org override', () => {
   assert.equal(m.ratePercentText(0.125), '12,5');
 });
 
+test('keepTypedPercent: a late rate suggestion never overwrites what the admin typed', () => {
+  assert.equal(m.keepTypedPercent('', '12'), '12');
+  assert.equal(m.keepTypedPercent('   ', '12'), '12');
+  assert.equal(m.keepTypedPercent('12,5', '12'), '12,5');
+  assert.equal(m.keepTypedPercent('12,5', ''), '12,5');
+  assert.equal(m.keepTypedPercent('', ''), '');
+});
+
 test('identical override detection and missing defaults', () => {
   const rows = [{ id: '2', vertical: 'CAR', supplierOrganizationId: 'o1', rate: 0.1 }, { id: '1', vertical: 'HOTEL', supplierOrganizationId: null, rate: 0.12 }];
   assert.equal(m.hasIdenticalOverride(rows, 'CAR', 'o1', 0.1), true);

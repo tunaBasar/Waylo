@@ -68,17 +68,25 @@ test.describe.serial('partner payouts and hotel photos', () => {
     const save = page.getByRole('button', { name: 'Kaydet' });
     await holder.fill('E2E Otelcilik A.S.');
 
-    // invalid IBAN: client-side message, save disabled, nothing sent
+    // invalid IBAN (right shape, wrong mod-97 check digits): client-side message, save disabled, nothing sent.
+    // F48 (2026-11-26): this case names the check digits instead of blaming the length.
     let sent = 0;
     page.on('request', r => { if (r.method() === 'PUT' && r.url().includes('/bank-account')) sent++; });
     await iban.fill('TR120006200000000000000001');
-    await expect(page.getByText('Gecerli bir TR IBAN girin')).toBeVisible();
+    await expect(page.getByText('IBAN kontrol hanesi tutmuyor')).toBeVisible();
+    await expect(save).toBeDisabled();
+    expect(sent).toBe(0);
+
+    // wrong shape (too short): the length/format message
+    await iban.fill('TR12 0006 2000');
+    await expect(page.getByText('IBAN TR ile baslamali ve 24 rakam icermeli')).toBeVisible();
     await expect(save).toBeDisabled();
     expect(sent).toBe(0);
 
     // valid IBAN
     await iban.fill(VALID_TR_IBAN);
-    await expect(page.getByText('Gecerli bir TR IBAN girin')).toHaveCount(0);
+    await expect(page.getByText('IBAN kontrol hanesi tutmuyor')).toHaveCount(0);
+    await expect(page.getByText('IBAN TR ile baslamali')).toHaveCount(0);
     await expect(save).toBeEnabled();
     await save.click();
     await expect(page.getByText('Banka hesabi kaydedildi')).toBeVisible();
