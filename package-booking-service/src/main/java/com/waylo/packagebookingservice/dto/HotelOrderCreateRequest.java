@@ -13,5 +13,9 @@ public record HotelOrderCreateRequest(
         @Size(max = 1000, message = "Notes must be at most 1000 characters")
         String notes,
 
-        @Size(max = 50) String promoCode
+        @Size(max = 50) String promoCode,
+
+        /** Optional lead guest name, validated in the service (GUEST_NAME_INVALID). Stored in passenger_first/last_name. */
+        String guestFirstName,
+        String guestLastName
 ) {}

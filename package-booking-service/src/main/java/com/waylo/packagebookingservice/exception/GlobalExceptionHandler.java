@@ -130,6 +130,7 @@ public class GlobalExceptionHandler {
         else if (c instanceof BusRejectedException e) r = handleBusRejected(e, request);
         else if (c instanceof BusinessRuleException e) r = handleBusinessRule(e, request);
         else if (c instanceof PricingUnavailableException e) r = handlePricingUnavailable(e, request);
+        else if (c instanceof GuestNameInvalidException e) r = handleGuestNameInvalid(e, request);
         else if (c instanceof IllegalArgumentException e) r = handleIllegalArgument(e, request);
         else if (c instanceof HotelUnavailableException || c instanceof feign.FeignException) r = handleHotelUnavailable(c, request);
         else r = handleGeneric(c, request);
@@ -245,6 +246,13 @@ public class GlobalExceptionHandler {
                 message,
                 request.getRequestURI()
         );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(GuestNameInvalidException.class)
+    public ResponseEntity<ErrorResponse> handleGuestNameInvalid(GuestNameInvalidException ex, HttpServletRequest request) {
+        var response = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "GUEST_NAME_INVALID", ex.getMessage(),
+                request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 

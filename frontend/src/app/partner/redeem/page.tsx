@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { usePartner } from '@/lib/partner-context';
 import { parseVoucherPayload, redeemErrorMessage } from '@/lib/voucher';
 import { displayItemText } from '@/lib/order-text';
+import { guestLine } from '@/lib/guest';
 
 interface RedeemResult {
   voucherId: string;
@@ -13,6 +14,10 @@ interface RedeemResult {
   amountReleased: number | null;
   currency: string;
   redeemedAt: string;
+  guestFirstName?: string | null;
+  guestLastName?: string | null;
+  adults?: number | null;
+  childrenCount?: number | null;
 }
 
 interface BarcodeDetectorLike {
@@ -148,6 +153,9 @@ export default function RedeemPage() {
         <div role="status" className="rounded-xl bg-tertiary-container p-4 text-on-tertiary-container space-y-1">
           <p className="font-semibold">Kupon kullanildi</p>
           <p className="text-sm">{displayItemText(result.description)}</p>
+          {guestLine(result.guestFirstName, result.guestLastName, result.adults, result.childrenCount) && (
+            <p className="text-sm">{guestLine(result.guestFirstName, result.guestLastName, result.adults, result.childrenCount)}</p>
+          )}
           {result.amountReleased != null && (
             <p className="text-lg font-bold">
               {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: result.currency }).format(result.amountReleased)} isletmeye aktarildi

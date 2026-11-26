@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** Internal hotel-service hold API. Signed X-Service-Token is added globally (service-auth-common). */
@@ -46,6 +47,8 @@ public interface HotelHoldClient {
             String cancellationPolicy,
             Integer freeCancellationDaysBefore,
             String hotelName,
-            String roomTypeName
+            String roomTypeName,
+            Integer adults,
+            List<Integer> childrenAges
     ) {}
 }

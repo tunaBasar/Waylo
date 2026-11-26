@@ -26,5 +26,7 @@ public record PartnerOrderItemResponse(
         String cancelOutcome,
         BigDecimal refundAmount,
         Instant checkedOutAt,
-        Long stayVersion
+        Long stayVersion,
+        Integer adults,
+        Integer childrenCount
 ) {}

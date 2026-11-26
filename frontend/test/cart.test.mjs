@@ -35,6 +35,17 @@ test('toPackageRequest flattens request and trims promo', async () => {
   assert.deepEqual(toPackageRequest([item('a', 'HOTEL', { quoteId: 'q' })], '  '), { items: [{ vertical: 'HOTEL', quoteId: 'q' }] });
 });
 
+test('toPackageRequest puts the customer as lead guest on hotel items only (F31)', async () => {
+  const { toPackageRequest } = await mod();
+  const r = toPackageRequest([item('a', 'HOTEL', { quoteId: 'q' }), item('b', 'CAR', { offerId: 'o' })], undefined,
+    { firstName: ' Ayşe ', lastName: 'Yılmaz' });
+  assert.deepEqual(r.items[0], { vertical: 'HOTEL', quoteId: 'q', guestFirstName: 'Ayşe', guestLastName: 'Yılmaz' });
+  assert.deepEqual(r.items[1], { vertical: 'CAR', offerId: 'o' });
+  // no name known: nothing is sent, the backend stores null
+  assert.deepEqual(toPackageRequest([item('a', 'HOTEL', { quoteId: 'q' })], undefined, { firstName: '  ', lastName: null }).items[0],
+    { vertical: 'HOTEL', quoteId: 'q' });
+});
+
 test('parseCart is defensive; itemIndexMessage', async () => {
   const { parseCart, itemIndexMessage } = await mod();
   assert.deepEqual(parseCart('nope'), []);

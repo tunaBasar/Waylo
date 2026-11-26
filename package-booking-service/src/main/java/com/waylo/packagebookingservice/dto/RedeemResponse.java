@@ -6,4 +6,5 @@ import java.util.UUID;
 
 /** amountReleased is the supplier share (gross minus commission) paid out by payment-service. */
 public record RedeemResponse(UUID voucherId, UUID orderItemId, String description, BigDecimal amountReleased,
-                             String currency, Instant redeemedAt) {}
+                             String currency, Instant redeemedAt,
+                             String guestFirstName, String guestLastName, Integer adults, Integer childrenCount) {}

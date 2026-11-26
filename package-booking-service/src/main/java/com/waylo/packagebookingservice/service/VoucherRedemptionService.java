@@ -115,7 +115,8 @@ public class VoucherRedemptionService {
         PaymentEscrowClient.EscrowDto escrow = paymentEscrowClient.release(item.getId()).data();
         log.info("Voucher {} redeemed by org {}", v.getId(), orgId);
         return new RedeemResponse(v.getId(), item.getId(), item.getDescription(),
-                escrow == null ? null : escrow.supplierAmount(), escrow == null ? item.getCurrency() : escrow.currency(), now);
+                escrow == null ? null : escrow.supplierAmount(), escrow == null ? item.getCurrency() : escrow.currency(), now,
+                item.getPassengerFirstName(), item.getPassengerLastName(), item.getAdults(), item.getChildrenCount());
     }
 
     private void publishRedeemed(OrderItem item) {

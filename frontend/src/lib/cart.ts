@@ -54,9 +54,20 @@ export function hasMixedCurrency(items: CartItem[]): boolean {
   return new Set(items.map(i => i.currency).filter(Boolean)).size > 1;
 }
 
-export function toPackageRequest(items: CartItem[], promoCode?: string) {
+/**
+ * Package order body. A hotel item carries the lead guest name (F31: the hotel desk must see who is coming); the cart
+ * has no guest form, so it is the logged-in customer's name. Other verticals already carry passengers.
+ */
+export function toPackageRequest(items: CartItem[], promoCode?: string, guest?: { firstName?: string | null; lastName?: string | null }) {
+  const first = guest?.firstName?.trim();
+  const last = guest?.lastName?.trim();
   return {
-    items: items.map(i => ({ vertical: i.vertical, ...i.request })),
+    items: items.map(i => ({
+      vertical: i.vertical,
+      ...i.request,
+      ...(i.vertical === 'HOTEL' && first ? { guestFirstName: first } : {}),
+      ...(i.vertical === 'HOTEL' && last ? { guestLastName: last } : {}),
+    })),
     ...(promoCode && promoCode.trim() ? { promoCode: promoCode.trim() } : {}),
   };
 }

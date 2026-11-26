@@ -426,7 +426,10 @@ public class HotelHoldServiceImpl implements HotelHoldService {
                 quote.map(q -> q.getCancellationPolicy().name()).orElse(null),
                 quote.map(q -> q.getFreeCancellationDaysBefore()).orElse(null),
                 hotel.map(h -> h.getName()).orElse(null),
-                quote.map(q -> q.getRoomTypeName()).orElse(null)
+                quote.map(q -> q.getRoomTypeName()).orElse(null),
+                quote.map(q -> q.getAdults()).orElse(0),
+                quote.map(q -> com.waylo.hotelservice.domain.HotelQuote.decodeChildrenAges(q.getChildrenAges()))
+                        .orElse(java.util.List.of())
         );
     }
 }

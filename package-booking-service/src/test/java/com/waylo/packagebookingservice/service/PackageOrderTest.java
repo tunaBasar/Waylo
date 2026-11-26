@@ -71,7 +71,7 @@ class PackageOrderTest {
     private HotelHoldClient.HoldDto hotelHold(UUID id) {
         return new HotelHoldClient.HoldDto(id, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD", "TRY",
-                new BigDecimal("1000.00"), hotelExpiry, "FREE_CANCELLATION", null, null, null);
+                new BigDecimal("1000.00"), hotelExpiry, "FREE_CANCELLATION", null, null, null, 2, java.util.List.of(5));
     }
 
     private CarHoldClient.HoldDto carHold(UUID id) {
@@ -82,13 +82,13 @@ class PackageOrderTest {
 
     private PackageOrderCreateRequest.Item hotelItem() {
         return new PackageOrderCreateRequest.Item(OrderItemVertical.HOTEL, UUID.randomUUID(), null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null);
     }
 
     private PackageOrderCreateRequest.Item carItem() {
         return new PackageOrderCreateRequest.Item(OrderItemVertical.CAR, null, UUID.randomUUID(), UUID.randomUUID(), "ECONOMY",
                 "AUTOMATIC", LocalDateTime.of(2026, 12, 1, 10, 0), LocalDateTime.of(2026, 12, 3, 10, 0), 30,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 
     private void stubSaves() {

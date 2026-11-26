@@ -42,7 +42,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
                 i.unitAmount * i.quantity, i.currency, i.fulfillmentRef, i.pickupAt, i.returnAt,
                 cast(i.vertical as string), i.checkIn, i.checkOut, i.passengerFirstName, i.passengerLastName,
                 cast(v.status as string), i.cancelOutcome, i.refundAmount,
-                v.checkedOutAt, v.version)
+                v.checkedOutAt, v.version, i.adults, i.childrenCount)
             from OrderItem i join Order o on o.id = i.orderId
             left join Voucher v on v.orderItemId = i.id
             where i.supplierOrganizationId = :orgId

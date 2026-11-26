@@ -115,6 +115,8 @@ public class OrderServiceImpl implements OrderService {
         UUID orderId = UUID.randomUUID();
         String idempotencyKey = "ho-" + UUID.nameUUIDFromBytes(
                 (actorUserId + ":" + request.quoteId()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String guestFirst = guestName(request.guestFirstName(), "guestFirstName");
+        String guestLast = guestName(request.guestLastName(), "guestLastName");
         HotelHoldClient.HoldDto hold = hotelHoldClient.hold(new HotelHoldClient.HoldRequest(
                 request.quoteId(), idempotencyKey, actorUserId, orderId)).data();
 
@@ -142,6 +144,7 @@ public class OrderServiceImpl implements OrderService {
             item.setCheckIn(hold.checkIn());
             item.setCheckOut(hold.checkOut());
             policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
+            applyGuests(item, hold, guestFirst, guestLast);
             item.setQuantity(1);
             item.setCurrency(hold.currency());
             priced.applyTo(item);
@@ -407,6 +410,8 @@ public class OrderServiceImpl implements OrderService {
         String key = "pk-" + UUID.nameUUIDFromBytes((orderId + ":" + index).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         switch (r.vertical()) {
             case HOTEL -> {
+                String guestFirst = guestName(r.guestFirstName(), "guestFirstName");
+                String guestLast = guestName(r.guestLastName(), "guestLastName");
                 var hold = hotelHoldClient.hold(new HotelHoldClient.HoldRequest(r.quoteId(), key, user, orderId)).data();
                 return new Held(OrderItemVertical.HOTEL, "OTEL", hold.organizationId(), hold.totalAmount(), hold.currency(),
                         hold.expiresAt(), hold.holdId(), item -> {
@@ -415,6 +420,7 @@ public class OrderServiceImpl implements OrderService {
                             item.setCheckIn(hold.checkIn());
                             item.setCheckOut(hold.checkOut());
                             policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
+                            applyGuests(item, hold, guestFirst, guestLast);
                         });
             }
             case CAR -> {
@@ -868,6 +874,26 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
+    private static final java.util.regex.Pattern GUEST_NAME = java.util.regex.Pattern.compile("^[\\p{L} '\\-]+$");
+
+    /** Optional guest name: null/blank becomes null, otherwise trimmed, 1-80 chars of letters, spaces, hyphen, apostrophe. */
+    static String guestName(String raw, String field) {
+        if (raw == null || raw.isBlank()) return null;
+        String v = raw.trim();
+        if (v.length() > 80 || !GUEST_NAME.matcher(v).matches()) {
+            throw new com.waylo.packagebookingservice.exception.GuestNameInvalidException(
+                    field + " must be 1-80 letters, spaces, hyphens or apostrophes");
+        }
+        return v;
+    }
+
+    private static void applyGuests(OrderItem item, HotelHoldClient.HoldDto hold, String first, String last) {
+        item.setAdults(hold.adults());
+        item.setChildrenCount(hold.childrenAges() == null ? null : hold.childrenAges().size());
+        item.setPassengerFirstName(first);
+        item.setPassengerLastName(last);
+    }
+
     private static final java.time.format.DateTimeFormatter DMY = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     /** "Hotel · Room type · 27.11.2026-29.11.2026, 2 gece, 1 oda"; missing names are left out. */
@@ -920,7 +946,11 @@ public class OrderServiceImpl implements OrderService {
                 item.getCancelFreeHoursBefore(),
                 item.getCancelOutcome(),
                 item.getRefundAmount(),
-                freeCancellationUntil(item)
+                freeCancellationUntil(item),
+                item.getAdults(),
+                item.getChildrenCount(),
+                item.getVertical() == OrderItemVertical.HOTEL ? item.getPassengerFirstName() : null,
+                item.getVertical() == OrderItemVertical.HOTEL ? item.getPassengerLastName() : null
         );
     }
 }

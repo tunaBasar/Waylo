@@ -44,7 +44,7 @@ export default function CartPage() {
     setError('');
     try {
       const res = await api.post<{ id: string }>('/api/orders/package',
-        toPackageRequest(items, promo.trim() ? normalizePromoCode(promo) : undefined));
+        toPackageRequest(items, promo.trim() ? normalizePromoCode(promo) : undefined, { firstName: user.firstName, lastName: user.lastName }));
       saveCart([]);
       router.push(`/orders?created=${encodeURIComponent(res.data.id)}`);
     } catch (err) {

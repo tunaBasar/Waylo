@@ -77,6 +77,8 @@ public class OrderItem {
     @Column(name = "seat_number", length = 5) private String seatNumber;
     @Column(name = "passenger_first_name", length = 80) private String passengerFirstName;
     @Column(name = "passenger_last_name", length = 80) private String passengerLastName;
+    @Column(name = "adults") private Integer adults;
+    @Column(name = "children_count") private Integer childrenCount;
     @Column(name = "pnr", length = 8) private String pnr;
     @Column(name = "ticket_number", length = 20) private String ticketNumber;
     @Column(name = "supplier", length = 20) private String supplier;
@@ -165,6 +167,10 @@ public class OrderItem {
     public void setDepartureAt(Instant v) { this.departureAt = v; }
     public String getSeatNumber() { return seatNumber; }
     public void setSeatNumber(String v) { this.seatNumber = v; }
+    public Integer getAdults() { return adults; }
+    public void setAdults(Integer v) { this.adults = v; }
+    public Integer getChildrenCount() { return childrenCount; }
+    public void setChildrenCount(Integer v) { this.childrenCount = v; }
     public String getPassengerFirstName() { return passengerFirstName; }
     public void setPassengerFirstName(String v) { this.passengerFirstName = v; }
     public String getPassengerLastName() { return passengerLastName; }

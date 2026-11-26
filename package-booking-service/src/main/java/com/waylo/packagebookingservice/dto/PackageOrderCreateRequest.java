@@ -25,5 +25,6 @@ public record PackageOrderCreateRequest(
             LocalDateTime pickupAt, LocalDateTime returnAt, Integer driverAge,
             String offerId, String seatNumber, String passengerFirstName, String passengerLastName,
             UUID tripId, Integer fromSeq, Integer toSeq,
-            @Valid List<BusOrderCreateRequest.Passenger> passengers) {}
+            @Valid List<BusOrderCreateRequest.Passenger> passengers,
+            String guestFirstName, String guestLastName) {}
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { guestLine } from '@/lib/guest';
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
@@ -119,7 +120,10 @@ export default function PartnerOrdersPage() {
                       {VERTICAL_LABEL[i.vertical] ?? i.vertical} · Siparis tarihi {formatDate(i.orderCreatedAt)}
                     </p>
                     {range && <p className="text-sm text-on-surface-variant">{range}</p>}
-                    {guest && <p className="text-sm text-on-surface-variant">Misafir/yolcu: {guest}</p>}
+                    {i.vertical === 'HOTEL'
+                      ? guestLine(i.passengerFirstName, i.passengerLastName, i.adults, i.childrenCount) && (
+                        <p className="text-sm text-on-surface-variant">{guestLine(i.passengerFirstName, i.passengerLastName, i.adults, i.childrenCount)}</p>)
+                      : guest && <p className="text-sm text-on-surface-variant">Misafir/yolcu: {guest}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusPill tone={statusTone(i.orderStatus)}>{ORDER_STATUS_LABEL[i.orderStatus]}</StatusPill>

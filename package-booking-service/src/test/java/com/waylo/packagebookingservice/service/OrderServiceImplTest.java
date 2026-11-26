@@ -466,7 +466,7 @@ class OrderServiceImplTest {
     private HotelHoldClient.HoldDto hold() {
         return new HotelHoldClient.HoldDto(UUID.randomUUID(), quoteId, UUID.randomUUID(), orgId, UUID.randomUUID(),
                 UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD",
-                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"), "FREE_CANCELLATION", 2, "Waylo Boutique Antalya", "Standart oda");
+                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"), "FREE_CANCELLATION", 2, "Waylo Boutique Antalya", "Standart oda", 2, java.util.List.of(4, 9));
     }
 
     private void stubSaves() {
@@ -485,7 +485,7 @@ class OrderServiceImplTest {
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
         stubSaves();
 
-        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, "hi", null));
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, "hi", null, null, null));
 
         ArgumentCaptor<HotelHoldClient.HoldRequest> req = ArgumentCaptor.forClass(HotelHoldClient.HoldRequest.class);
         verify(hotelHoldClient).hold(req.capture());
@@ -520,12 +520,12 @@ class OrderServiceImplTest {
         HotelHoldClient.HoldDto h = hold();
         HotelHoldClient.HoldDto noDays = new HotelHoldClient.HoldDto(h.holdId(), h.quoteId(), h.hotelId(), h.organizationId(),
                 h.roomTypeId(), h.ratePlanId(), h.checkIn(), h.checkOut(), h.nights(), h.rooms(), h.status(), h.currency(),
-                h.totalAmount(), h.expiresAt(), "FREE_CANCELLATION", null, null, null);
+                h.totalAmount(), h.expiresAt(), "FREE_CANCELLATION", null, null, null, 2, java.util.List.of());
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, noDays, null));
         stubSaves();
 
-        var item = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)).items().get(0);
+        var item = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, null, null)).items().get(0);
 
         assertThat(item.description()).isEqualTo("01.12.2026-03.12.2026, 2 gece, 1 oda");
         assertThat(item.cancellationPolicy()).isEqualTo("FREE_CANCELLATION");
@@ -533,14 +533,51 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void createHotelOrder_storesGuestsAndLeadGuestName() {
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
+        when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold(), null));
+        stubSaves();
+
+        var item = service.createHotelOrder(customerId,
+                new HotelOrderCreateRequest(quoteId, null, null, "  Şule-Ayşe ", "O'Brien")).items().get(0);
+
+        assertThat(item.adults()).isEqualTo(2);
+        assertThat(item.childrenCount()).isEqualTo(2);
+        assertThat(item.guestFirstName()).isEqualTo("Şule-Ayşe");
+        assertThat(item.guestLastName()).isEqualTo("O'Brien");
+    }
+
+    @Test
+    void createHotelOrder_withoutGuestNames_leavesNamesNullButStoresCounts() {
+        when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
+        when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold(), null));
+        stubSaves();
+
+        var item = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, " ", null)).items().get(0);
+
+        assertThat(item.guestFirstName()).isNull();
+        assertThat(item.guestLastName()).isNull();
+        assertThat(item.adults()).isEqualTo(2);
+    }
+
+    @Test
+    void createHotelOrder_invalidGuestName_rejectedBeforeHold() {
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, "Ali1", "Veli")))
+                .isInstanceOf(com.waylo.packagebookingservice.exception.GuestNameInvalidException.class);
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, "Ali", "a".repeat(81))))
+                .isInstanceOf(com.waylo.packagebookingservice.exception.GuestNameInvalidException.class);
+        verifyNoInteractions(hotelHoldClient);
+    }
+
+    @Test
     void createHotelOrder_requestRecordHasNoPriceFields() {
         assertThat(HotelOrderCreateRequest.class.getRecordComponents())
-                .extracting(c -> c.getName()).containsExactlyInAnyOrder("quoteId", "notes", "promoCode");
+                .extracting(c -> c.getName()).containsExactlyInAnyOrder("quoteId", "notes", "promoCode", "guestFirstName", "guestLastName");
     }
 
     @Test
     void createHotelOrder_noIdentity_throws() {
-        assertThatThrownBy(() -> service.createHotelOrder(null, new HotelOrderCreateRequest(quoteId, null, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(null, new HotelOrderCreateRequest(quoteId, null, null, null, null)))
                 .isInstanceOf(AuthenticationRequiredException.class);
         verifyNoInteractions(hotelHoldClient);
     }
@@ -552,7 +589,7 @@ class OrderServiceImplTest {
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of(existing));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(List.of());
 
-        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null));
+        OrderResponse r = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, null, null));
 
         assertThat(r.id()).isEqualTo(orderId);
         verifyNoInteractions(hotelHoldClient);
@@ -563,11 +600,11 @@ class OrderServiceImplTest {
     void createHotelOrder_hotelRejects_noOrderSaved() {
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
         when(hotelHoldClient.hold(any())).thenThrow(new HotelRejectedException(404, "NOT_FOUND", "no quote"));
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, null, null)))
                 .isInstanceOf(HotelRejectedException.class);
 
         doThrow(new HotelUnavailableException("down")).when(hotelHoldClient).hold(any());
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, null, null)))
                 .isInstanceOf(HotelUnavailableException.class);
 
         verify(orderRepository, never()).saveAndFlush(any());
@@ -581,7 +618,7 @@ class OrderServiceImplTest {
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, hold, null));
         when(orderRepository.saveAndFlush(any(Order.class))).thenThrow(new IllegalStateException("db down"));
 
-        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)))
+        assertThatThrownBy(() -> service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null, null, null)))
                 .isInstanceOf(IllegalStateException.class).hasMessage("db down");
         verify(hotelHoldClient).release(hold.holdId());
     }

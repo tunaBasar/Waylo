@@ -34,5 +34,10 @@ public record OrderItemResponse(
         String cancelOutcome,
         BigDecimal refundAmount,
         /** Last instant of a full refund: FREE_UNTIL = serviceStart - hours, FREE_CANCELLATION = serviceStart, NON_REFUNDABLE or unknown start = null. */
-        Instant freeCancellationUntil
+        Instant freeCancellationUntil,
+        /** Hotel stay guests (null for other verticals and legacy rows); lead guest name is in flight-style passenger fields of the item. */
+        Integer adults,
+        Integer childrenCount,
+        String guestFirstName,
+        String guestLastName
 ) {}

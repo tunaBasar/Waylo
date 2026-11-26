@@ -380,6 +380,9 @@ export interface PartnerOrderItem {
   checkedOutAt?: string | null;
   /** Optimistic version of the stay record, sent back as expectedVersion. */
   stayVersion?: number | null;
+  /** Hotel stay guests (null for other verticals / legacy rows). */
+  adults?: number | null;
+  childrenCount?: number | null;
 }
 
 export interface PartnerOrderPage {

@@ -269,6 +269,22 @@ class HotelHoldServiceImplTest {
     }
 
     @Test
+    void hold_response_carriesAdultsAndChildrenAges() {
+        HotelQuote quote = createQuote(QUOTE_ID);
+        quote.setAdults(2);
+        quote.setChildrenAges("4,9");
+        when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        HotelHold existing = createHeldHold(UUID.randomUUID(), QUOTE_ID);
+        when(holdRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
+
+        HotelHoldResponse r = service.hold(createHoldRequest());
+
+        assertThat(r.adults()).isEqualTo(2);
+        assertThat(r.childrenAges()).containsExactly(4, 9);
+    }
+
+    @Test
     void hold_response_carriesFreeCancellationDaysBefore() {
         HotelQuote quote = createQuote(QUOTE_ID);
         quote.setFreeCancellationDaysBefore(2);

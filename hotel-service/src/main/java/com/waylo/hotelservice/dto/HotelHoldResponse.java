@@ -5,6 +5,7 @@ import com.waylo.hotelservice.domain.HoldStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -34,5 +35,8 @@ public record HotelHoldResponse(
         Integer freeCancellationDaysBefore,
         /** Display names for order cards, vouchers and mails (nullable). */
         String hotelName,
-        String roomTypeName
+        String roomTypeName,
+        /** Guests of the quote (0 / empty when the quote is gone). */
+        int adults,
+        List<Integer> childrenAges
 ) {}

@@ -943,10 +943,12 @@ Cancelling releases the car hold via the payment escrow refund flow.
 
 #### `POST /api/orders/hotel` - Create hotel order (201)
 
-Body: `{ "quoteId": "uuid", "notes": "optional" }`. Price/currency come from the hotel-service hold, client price
+Body: `{ "quoteId": "uuid", "notes": "optional", "guestFirstName": "optional", "guestLastName": "optional" }`. Price/currency come from the hotel-service hold, client price
 fields are ignored. Repeating the same quote returns the same order. Errors: 401 no identity,
 403 `ADMIN_CANNOT_PURCHASE` (platform ADMIN), 404/409/422 passed through from hotel-service (hold rejected, inventory
 unavailable), 503 `HOTEL_SERVICE_UNAVAILABLE`.
+Optional lead guest `guestFirstName`/`guestLastName` (trimmed, 1-80 letters incl. Turkish, spaces, hyphen, apostrophe; else 400 `GUEST_NAME_INVALID`; null when absent) is stored in the item's passenger name columns. Package `items[]` of vertical HOTEL accept the same two fields.
+Hotel order items carry `adults`, `childrenCount` (from the hold) and `guestFirstName`/`guestLastName`; partner order items carry `adults`, `childrenCount`, `passengerFirstName/LastName`; `RedeemResponse` adds `guestFirstName, guestLastName, adults, childrenCount`; the internal hotel hold response adds `adults` and `childrenAges` (list).
 Response: `{success, data: {id, customerId, status, currency, quoteId, totalAmount, notes, version, holdExpiresAt,
 items:[{id, orderId, vertical, supplierOrganizationId, productRef, fulfillmentRef, description, unitAmount, quantity,
 subtotal, currency, createdAt}], createdAt, updatedAt}}`.

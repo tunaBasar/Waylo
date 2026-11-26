@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/utils';
 import { MEAL_PLAN_LABEL } from '@/lib/partner';
 import { offerPolicyText } from '@/lib/cancellation';
 import { useAuth } from '@/lib/auth';
+import { guestNameOrUndefined } from '@/lib/guest';
 import { PromoCodeField } from '@/components/PromoCodeField';
 import { normalizePromoCode, promoErrorMessage } from '@/lib/pricing';
 
@@ -112,6 +113,10 @@ function QuoteContent() {
   const [booking, setBooking] = useState(false);
   const bookingInFlight = useRef(false);
   const [promoCode, setPromoCode] = useState('');
+  const [guestFirstEdit, setGuestFirstEdit] = useState<string | null>(null);
+  const [guestLastEdit, setGuestLastEdit] = useState<string | null>(null);
+  const guestFirst = guestFirstEdit ?? user?.firstName ?? '';
+  const guestLast = guestLastEdit ?? user?.lastName ?? '';
   const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Load quote
@@ -158,12 +163,15 @@ function QuoteContent() {
       const response = await api.post<{ id: string }>('/api/orders/hotel', {
         quoteId: quote.quoteId,
         notes: null,
+        ...(guestNameOrUndefined(guestFirst) ? { guestFirstName: guestNameOrUndefined(guestFirst) } : {}),
+        ...(guestNameOrUndefined(guestLast) ? { guestLastName: guestNameOrUndefined(guestLast) } : {}),
         ...(promoCode.trim() ? { promoCode: normalizePromoCode(promoCode) } : {}),
       });
       router.push(`/orders?created=${response.data.id}`);
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.code === 'ADMIN_CANNOT_PURCHASE') setBookingError(ADMIN_CANNOT_PURCHASE_MESSAGE);
+        else if (error.code === 'GUEST_NAME_INVALID') setBookingError('Misafir adi veya soyadi gecersiz (sadece harf, bosluk, tire ve kesme isareti)');
         else if (error.status === 404) setBookingError('Teklif bulunamadi');
         else if (error.status === 409) setBookingError('Secilen oda icin musaitlik kalmadi veya teklif baska bir islemde kullaniliyor');
         else if (promoErrorMessage(error.code)) setBookingError(promoErrorMessage(error.code));
@@ -291,6 +299,16 @@ function QuoteContent() {
           <div className="mx-auto mb-4 max-w-sm text-left">
             <PromoCodeField vertical="OTEL" grossAmount={quote.totalAmount} currency={quote.currency} code={promoCode} onCodeChange={setPromoCode} />
           </div>
+          <div className="mx-auto mb-4 grid max-w-sm grid-cols-2 gap-3 text-left">
+            <label className="text-xs font-medium text-on-surface-variant">Misafir adi
+              <input value={guestFirst} onChange={e => setGuestFirstEdit(e.target.value)} maxLength={80} autoComplete="given-name"
+                className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface" />
+            </label>
+            <label className="text-xs font-medium text-on-surface-variant">Misafir soyadi
+              <input value={guestLast} onChange={e => setGuestLastEdit(e.target.value)} maxLength={80} autoComplete="family-name"
+                className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface" />
+            </label>
+          </div>
           {bookingError && <p className="text-sm text-error mb-3">{bookingError}</p>}
           <div className="flex items-center justify-center gap-3">
             <button onClick={bookQuote} disabled={booking || !user} className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50">
@@ -298,7 +316,11 @@ function QuoteContent() {
             </button>
             <AddToCartButton disabled={!user} build={() => ({
               vertical: 'HOTEL', label: `${hotelName || 'Otel'} - ${quote.roomTypeName}`, amount: quote.totalAmount,
-              currency: quote.currency, expiresAt: quote.expiresAt, request: { quoteId: quote.quoteId },
+              currency: quote.currency, expiresAt: quote.expiresAt, request: {
+                quoteId: quote.quoteId,
+                ...(guestNameOrUndefined(guestFirst) ? { guestFirstName: guestNameOrUndefined(guestFirst) } : {}),
+                ...(guestNameOrUndefined(guestLast) ? { guestLastName: guestNameOrUndefined(guestLast) } : {}),
+              },
             })} />
           </div>
         </div>
