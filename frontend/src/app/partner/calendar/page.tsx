@@ -401,10 +401,12 @@ export default function CalendarPage() {
         </Card>
       )}
       {missingPrices.size > 0 && (
-        <Card className="p-3 text-sm text-on-surface" role="alert">
-          <span className="font-medium">Fiyatsiz kisi sayisi var: </span>
-          {[...missingPrices.entries()].map(([d, occ]) => `${d} (${occ.join(', ')} kisi)`).join('; ')}.
-          {' '}Bu gecelerde oda var ama bazi kisi sayilari icin fiyat yok, bu yuzden musteriler bu tarihleri goremeyebilir.
+        <Card className="p-3 text-sm text-on-surface">
+          <div role="status" data-testid="calendar-missing-prices">
+            <span className="font-medium">Fiyatsiz kisi sayisi var: </span>
+            {[...missingPrices.entries()].map(([d, occ]) => `${d} (${occ.join(', ')} kisi)`).join('; ')}.
+            {' '}Bu gecelerde oda var ama bazi kisi sayilari icin fiyat yok, bu yuzden musteriler bu tarihleri goremeyebilir.
+          </div>
         </Card>
       )}
       <Card className={cn('overflow-x-auto', gridBlocked && 'opacity-60 pointer-events-none')}>
