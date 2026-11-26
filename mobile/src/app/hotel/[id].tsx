@@ -11,6 +11,19 @@ import { reviewsApi, scoreLabel, type HotelReviewPage } from '@/features/reviews
 import { ApiError } from '@/api';
 import { checkoutErrorMessage } from '@/features/orders/api';
 
+export function emptyReasonText(r: Availability['emptyReason']): string {
+  if (!r) return 'Bu tarihlerde musait oda yok.';
+  const d = r.date ? ` (${r.date})` : '';
+  if (r.code === 'NO_STOCK') return `Bu tarihlerde oda kalmadi${d}.`;
+  if (r.code === 'NO_PRICE_FOR_OCCUPANCY') return `Bu kisi sayisi icin fiyat tanimli degil${d}.`;
+  return 'Bu grup icin uygun oda tipi yok.';
+}
+
+export function shiftedStay(checkIn: string, checkOut: string, next: string): { checkIn: string; checkOut: string } {
+  const nights = Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86_400_000);
+  return { checkIn: next, checkOut: new Date(Date.parse(next) + nights * 86_400_000).toISOString().slice(0, 10) };
+}
+
 export default function HotelDetail() {
   const router = useRouter();
   const p = useLocalSearchParams<{ id: string; checkIn: string; checkOut: string; rooms: string; adults: string; childrenAges?: string | string[] }>();
@@ -42,8 +55,15 @@ export default function HotelDetail() {
       {notPublic ? null : (<>
       {photos.data && photos.data.length > 0 ? <HotelGallery hotelId={p.id} photos={photos.data} /> : null}
       <ErrorBanner message={error} />
-      <AsyncView<Availability> state={avail} isEmpty={(a) => a.offers.length === 0} emptyText="Bu tarihlerde musait oda yok.">
-        {(a) => a.offers.map((o) => {
+      <AsyncView<Availability> state={avail} isEmpty={() => false} emptyText="Bu tarihlerde musait oda yok.">
+        {(a) => a.offers.length === 0 ? (
+          <Card>
+            <Text>{emptyReasonText(a.emptyReason)}</Text>
+            {a.nextAvailableCheckIn ? (
+              <Button title={`Su tarihleri goster: ${a.nextAvailableCheckIn}`} onPress={() => router.setParams(shiftedStay(p.checkIn, p.checkOut, a.nextAvailableCheckIn!))} />
+            ) : null}
+          </Card>
+        ) : a.offers.map((o) => {
           const key = `${o.roomTypeId}:${o.ratePlanId}`;
           return (
             <Card key={key}>

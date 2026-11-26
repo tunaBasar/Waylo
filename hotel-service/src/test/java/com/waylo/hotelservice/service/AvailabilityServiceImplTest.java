@@ -699,4 +699,94 @@ class AvailabilityServiceImplTest {
                     .hasMessageContaining("Hotel is not bookable");
         }
     }
+
+    // === Empty-result explanations ===
+
+    private void stubCatalog(HotelRoomType rt, RatePlan rp) {
+        when(hotelRepository.findById(hotelId)).thenReturn(Optional.of(buildHotel(hotelId, true)));
+        when(roomTypeRepository.findByHotelIdAndStatusOrderByNameAsc(eq(hotelId), eq(CatalogStatus.ACTIVE)))
+                .thenReturn(List.of(rt));
+        when(ratePlanRepository.findByHotelIdAndStatusOrderByNameAsc(eq(hotelId), eq(CatalogStatus.ACTIVE)))
+                .thenReturn(List.of(rp));
+    }
+
+    @Test
+    void emptyReason_noStock_reportsFirstUnstockedNight() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 4, 2), buildRatePlan(ratePlanId));
+        LocalDate lastNight = checkOut.minusDays(1);
+        when(dailyInventoryRepository.findByHotelIdAndStayDateBetween(eq(hotelId), any(), any()))
+                .thenReturn(List.of(buildDailyInventory(hotelId, roomTypeId, checkIn, 5, false)));
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 2, List.of());
+
+        assertThat(r.offers()).isEmpty();
+        assertThat(r.emptyReason().code()).isEqualTo("NO_STOCK");
+        assertThat(r.emptyReason().date()).isEqualTo(lastNight);
+    }
+
+    @Test
+    void emptyReason_noPriceForOccupancy() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 4, 2), buildRatePlan(ratePlanId));
+        LocalDate lastNight = checkOut.minusDays(1);
+        when(dailyInventoryRepository.findByHotelIdAndStayDateBetween(eq(hotelId), any(), any()))
+                .thenReturn(List.of(
+                        buildDailyInventory(hotelId, roomTypeId, checkIn, 5, false),
+                        buildDailyInventory(hotelId, roomTypeId, lastNight, 5, false)));
+        // Only priced for 1 guest, request is for 2
+        when(dailyRateRepository.findByHotelIdAndDateRange(eq(hotelId), any(), any(), any(), any()))
+                .thenReturn(List.of(buildDailyRate(hotelId, roomTypeId, ratePlanId, checkIn, 1, BigDecimal.TEN)));
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 2, List.of());
+
+        assertThat(r.emptyReason().code()).isEqualTo("NO_PRICE_FOR_OCCUPANCY");
+        assertThat(r.emptyReason().date()).isEqualTo(checkIn);
+        assertThat(r.nextAvailableCheckIn()).isNull();
+    }
+
+    @Test
+    void emptyReason_noRoomTypeForGroup() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 2, 0), buildRatePlan(ratePlanId));
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 3, List.of());
+
+        assertThat(r.emptyReason().code()).isEqualTo("NO_ROOM_TYPE_FOR_GROUP");
+        assertThat(r.emptyReason().date()).isNull();
+        assertThat(r.nextAvailableCheckIn()).isNull();
+    }
+
+    @Test
+    void nextAvailableCheckIn_foundWithinSixtyDays() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 4, 2), buildRatePlan(ratePlanId));
+        LocalDate freeFrom = checkIn.plusDays(5);
+        List<DailyInventory> inv = List.of(
+                buildDailyInventory(hotelId, roomTypeId, freeFrom, 5, false),
+                buildDailyInventory(hotelId, roomTypeId, freeFrom.plusDays(1), 5, false));
+        List<DailyRate> rates = List.of(
+                buildDailyRate(hotelId, roomTypeId, ratePlanId, freeFrom, 2, BigDecimal.TEN),
+                buildDailyRate(hotelId, roomTypeId, ratePlanId, freeFrom.plusDays(1), 2, BigDecimal.TEN));
+        when(dailyInventoryRepository.findByHotelIdAndStayDateBetween(eq(hotelId), any(), any())).thenReturn(inv);
+        when(dailyRateRepository.findByHotelIdAndDateRange(eq(hotelId), any(), any(), any(), any())).thenReturn(rates);
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 2, List.of());
+
+        assertThat(r.offers()).isEmpty();
+        assertThat(r.emptyReason().code()).isEqualTo("NO_STOCK");
+        assertThat(r.nextAvailableCheckIn()).isEqualTo(freeFrom);
+    }
+
+    @Test
+    void nextAvailableCheckIn_ignoresDatesBeyondSixtyDays() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 4, 2), buildRatePlan(ratePlanId));
+        LocalDate far = checkIn.plusDays(61);
+        when(dailyInventoryRepository.findByHotelIdAndStayDateBetween(eq(hotelId), any(), any()))
+                .thenReturn(List.of(buildDailyInventory(hotelId, roomTypeId, far, 5, false),
+                        buildDailyInventory(hotelId, roomTypeId, far.plusDays(1), 5, false)));
+        when(dailyRateRepository.findByHotelIdAndDateRange(eq(hotelId), any(), any(), any(), any()))
+                .thenReturn(List.of(buildDailyRate(hotelId, roomTypeId, ratePlanId, far, 2, BigDecimal.TEN),
+                        buildDailyRate(hotelId, roomTypeId, ratePlanId, far.plusDays(1), 2, BigDecimal.TEN)));
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 2, List.of());
+
+        assertThat(r.nextAvailableCheckIn()).isNull();
+    }
 }

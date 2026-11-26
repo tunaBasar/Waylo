@@ -259,3 +259,17 @@ test('parseStayQuery ignores non-numeric childrenAges', () => {
   assert(parsed !== null);
   assert.deepStrictEqual(parsed.childrenAges, [3, 5]);
 });
+
+test('emptyReasonText explains each reason', async () => {
+  const { emptyReasonText } = await mod();
+  assert.match(emptyReasonText({ code: 'NO_STOCK', date: '2026-12-02' }), /oda kalmadi.*2026-12-02/);
+  assert.match(emptyReasonText({ code: 'NO_PRICE_FOR_OCCUPANCY', date: '2026-12-02' }), /fiyat/);
+  assert.match(emptyReasonText({ code: 'NO_ROOM_TYPE_FOR_GROUP', date: null }), /oda tipi/);
+  assert.match(emptyReasonText(null), /uygun oda yok/);
+});
+
+test('shiftStay keeps the number of nights', async () => {
+  const { shiftStay } = await mod();
+  assert.deepEqual(shiftStay({ checkIn: '2026-12-01', checkOut: '2026-12-04' }, '2026-12-10'),
+    { checkIn: '2026-12-10', checkOut: '2026-12-13' });
+});

@@ -52,6 +52,31 @@ export interface Availability {
   childrenAges: number[];
   occupancy: number;
   offers: AvailableOffer[];
+  emptyReason?: EmptyReason | null;
+  nextAvailableCheckIn?: string | null;
+}
+
+export interface EmptyReason {
+  code: 'NO_STOCK' | 'NO_PRICE_FOR_OCCUPANCY' | 'NO_ROOM_TYPE_FOR_GROUP';
+  date: string | null;
+}
+
+/** Turkish, customer-facing sentence for an empty availability result. */
+export function emptyReasonText(r: EmptyReason | null | undefined): string {
+  if (!r) return 'Bu tarihlerde uygun oda yok';
+  const d = r.date ? ` (${r.date})` : '';
+  switch (r.code) {
+    case 'NO_STOCK': return `Bu tarihlerde oda kalmadi${d}`;
+    case 'NO_PRICE_FOR_OCCUPANCY': return `Bu kisi sayisi icin fiyat tanimli degil${d}`;
+    case 'NO_ROOM_TYPE_FOR_GROUP': return 'Bu grup icin uygun oda tipi yok';
+  }
+}
+
+/** Shifts a stay so it starts on newCheckIn and keeps the same number of nights. */
+export function shiftStay(q: { checkIn: string; checkOut: string }, newCheckIn: string): { checkIn: string; checkOut: string } {
+  const nights = Math.round((Date.parse(q.checkOut) - Date.parse(q.checkIn)) / 86_400_000);
+  const out = new Date(Date.parse(newCheckIn) + nights * 86_400_000).toISOString().slice(0, 10);
+  return { checkIn: newCheckIn, checkOut: out };
 }
 
 export interface Quote {

@@ -176,6 +176,24 @@ export default function CalendarPage() {
     return map;
   }, [rates, roomType]);
 
+  // Nights that have stock but lack a price for some occupancy (1..maxOccupancy) on an active plan.
+  const missingPrices = useMemo(() => {
+    const result = new Map<IsoDate, number[]>();
+    if (!roomType) return result;
+    const priced = new Set(rates.map(r => `${r.ratePlanId}|${r.stayDate}|${r.occupancy}`));
+    for (const row of inventory) {
+      if (row.stopSell || row.allotment - row.held - row.confirmed <= 0) continue;
+      const missing = new Set<number>();
+      for (const plan of activePlans) {
+        for (let occ = 1; occ <= roomType.maxOccupancy; occ++) {
+          if (!priced.has(`${plan.id}|${row.stayDate}|${occ}`)) missing.add(occ);
+        }
+      }
+      if (missing.size > 0) result.set(row.stayDate, [...missing].sort((a, b) => a - b));
+    }
+    return result;
+  }, [inventory, rates, roomType, activePlans]);
+
   const editable = (date: IsoDate) => daysBetween(today, date) >= -1 && daysBetween(today, date) <= MAX_AHEAD_DAYS;
 
   const allotmentValue = (date: IsoDate) =>
@@ -380,6 +398,13 @@ export default function CalendarPage() {
         <Card className="p-3 flex items-center gap-3 text-error">
           <span className="flex-1 text-sm">{gridError}. Duzenlemeleriniz korunuyor. Devam etmeden once takvimi yeniden yukleyin.</span>
           <Button variant="ghost" onClick={() => { if (hotelId && roomTypeId) void loadGrid(hotelId, roomTypeId, from); }}>Tekrar dene</Button>
+        </Card>
+      )}
+      {missingPrices.size > 0 && (
+        <Card className="p-3 text-sm text-on-surface" role="alert">
+          <span className="font-medium">Fiyatsiz kisi sayisi var: </span>
+          {[...missingPrices.entries()].map(([d, occ]) => `${d} (${occ.join(', ')} kisi)`).join('; ')}.
+          {' '}Bu gecelerde oda var ama bazi kisi sayilari icin fiyat yok, bu yuzden musteriler bu tarihleri goremeyebilir.
         </Card>
       )}
       <Card className={cn('overflow-x-auto', gridBlocked && 'opacity-60 pointer-events-none')}>

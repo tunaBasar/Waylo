@@ -9,7 +9,7 @@ import {
   todayIso, addDaysIso, validateStay, stayQueryString, parseStayQuery,
   hotelStayApi,
 } from '@/lib/hotel-stay';
-import type { StayQuery, AvailableOffer } from '@/lib/hotel-stay';
+import { emptyReasonText, shiftStay, type StayQuery, type AvailableOffer, type EmptyReason } from '@/lib/hotel-stay';
 import { formatCurrency } from '@/lib/utils';
 import { MEAL_PLAN_LABEL, CANCELLATION_POLICY_LABEL } from '@/lib/partner';
 import { useAuth } from '@/lib/auth';
@@ -284,6 +284,8 @@ function HotelsDetailContent() {
   const [hotelLoading, setHotelLoading] = useState(true);
   const [hotelError, setHotelError] = useState<string | null>(null);
   const [offers, setOffers] = useState<AvailableOffer[]>([]);
+  const [emptyReason, setEmptyReason] = useState<EmptyReason | null>(null);
+  const [nextCheckIn, setNextCheckIn] = useState<string | null>(null);
   const [offerLoading, setOfferLoading] = useState(false);
   const [offerError, setOfferError] = useState<string | null>(null);
   const [pendingQuote, setPendingQuote] = useState(false);
@@ -330,6 +332,8 @@ function HotelsDetailContent() {
     setOfferError(null);
     hotelStayApi.availability(id, searchQuery).then(res => {
       setOffers(res.data.offers);
+      setEmptyReason(res.data.emptyReason ?? null);
+      setNextCheckIn(res.data.nextAvailableCheckIn ?? null);
       setOfferLoading(false);
     }).catch(err => {
       setOfferError(err instanceof Error ? err.message : 'Araba sirasinda bir hata olustu');
@@ -479,7 +483,16 @@ function HotelsDetailContent() {
       {!offerLoading && searchQuery && offers.length === 0 && !offerError && (
         <div className="text-center py-12">
           <span className="material-symbols-outlined text-outline text-5xl mb-3 block">hotel</span>
-          <p className="text-on-surface-variant text-sm">Bu tarihlerde uygun oda yok</p>
+          <p className="text-on-surface-variant text-sm">{emptyReasonText(emptyReason)}</p>
+          {nextCheckIn && (
+            <button
+              type="button"
+              className="mt-3 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold"
+              onClick={() => setSearchQuery({ ...searchQuery, ...shiftStay(searchQuery, nextCheckIn) })}
+            >
+              {`Su tarihleri goster: ${nextCheckIn}`}
+            </button>
+          )}
         </div>
       )}
 

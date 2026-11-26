@@ -65,6 +65,8 @@ export interface Availability {
   hotelId: string;
   nights: number;
   offers: AvailableOffer[];
+  emptyReason?: { code: 'NO_STOCK' | 'NO_PRICE_FOR_OCCUPANCY' | 'NO_ROOM_TYPE_FOR_GROUP'; date: string | null } | null;
+  nextAvailableCheckIn?: string | null;
 }
 
 export interface Quote {

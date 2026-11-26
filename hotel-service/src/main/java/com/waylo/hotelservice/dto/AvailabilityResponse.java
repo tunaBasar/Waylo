@@ -16,5 +16,13 @@ public record AvailabilityResponse(
         int adults,
         List<Integer> childrenAges,
         int occupancy,
-        List<AvailableOfferResponse> offers
-) {}
+        List<AvailableOfferResponse> offers,
+        EmptyReason emptyReason,
+        LocalDate nextAvailableCheckIn
+) {
+    public AvailabilityResponse(UUID hotelId, LocalDate checkIn, LocalDate checkOut, int nights, int rooms,
+                                int adults, List<Integer> childrenAges, int occupancy,
+                                List<AvailableOfferResponse> offers) {
+        this(hotelId, checkIn, checkOut, nights, rooms, adults, childrenAges, occupancy, offers, null, null);
+    }
+}

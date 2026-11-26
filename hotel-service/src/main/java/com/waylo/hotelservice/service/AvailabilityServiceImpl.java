@@ -10,6 +10,7 @@ import com.waylo.hotelservice.domain.HotelRoomType;
 import com.waylo.hotelservice.domain.RatePlan;
 import com.waylo.hotelservice.dto.AvailableOfferResponse;
 import com.waylo.hotelservice.dto.AvailabilityResponse;
+import com.waylo.hotelservice.dto.EmptyReason;
 import com.waylo.hotelservice.dto.NightlyRateResponse;
 import com.waylo.hotelservice.exception.BusinessRuleException;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
@@ -37,6 +38,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
 
     private static final Logger log = LoggerFactory.getLogger(AvailabilityServiceImpl.class);
     private static final int MAX_NIGHTS = 30;
+    static final int NEXT_AVAILABLE_WINDOW_DAYS = 60;
 
     private final HotelRepository hotelRepository;
     private final HotelRoomTypeRepository roomTypeRepository;
@@ -115,47 +117,83 @@ public class AvailabilityServiceImpl implements AvailabilityService {
             return new AvailabilityResponse(
                     hotelId, checkIn, checkOut,
                     (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut),
-                    rooms, adults, ages, occupancy, List.of());
+                    rooms, adults, ages, occupancy, List.of(),
+                    new EmptyReason(roomTypes.isEmpty() ? EmptyReason.NO_ROOM_TYPE_FOR_GROUP
+                            : EmptyReason.NO_PRICE_FOR_OCCUPANCY, null),
+                    null);
+        }
+
+        int nights = (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
+        List<HotelRoomType> fitting = new ArrayList<>();
+        for (HotelRoomType roomType : roomTypes) {
+            if (fitsGroup(roomType, adults, occupancy, ages.size())) {
+                fitting.add(roomType);
+            }
         }
 
         // 6. Index inventory and rates for all nights of the stay
         LocalDate lastNight = checkOut.minusDays(1);
-        List<DailyInventory> allInventory = dailyInventoryRepository
-                .findByHotelIdAndStayDateBetween(hotelId, checkIn, lastNight);
+        Index index = new Index(
+                dailyInventoryRepository.findByHotelIdAndStayDateBetween(hotelId, checkIn, lastNight),
+                dailyRateRepository.findByHotelIdAndDateRange(hotelId, checkIn, lastNight, null, null));
 
-        // 7. Index rates for all dates in the range
-        List<DailyRate> allRates = dailyRateRepository
-                .findByHotelIdAndDateRange(hotelId, checkIn, lastNight, null, null);
-
-        // Group inventory by (roomTypeId, stayDate)
-        Map<String, DailyInventory> inventoryMap = new HashMap<>();
-        for (DailyInventory di : allInventory) {
-            String key = di.getRoomTypeId() + "|" + di.getStayDate();
-            inventoryMap.put(key, di);
+        List<AvailableOfferResponse> offers = buildOffers(fitting, ratePlans, index, checkIn, checkOut, rooms, occupancy);
+        if (!offers.isEmpty()) {
+            return new AvailabilityResponse(hotelId, checkIn, checkOut, nights, rooms, adults, ages, occupancy, offers);
         }
 
-        // Group rates by (roomTypeId, ratePlanId, stayDate, occupancy)
-        Map<String, DailyRate> rateMap = new HashMap<>();
-        for (DailyRate dr : allRates) {
-            String key = dr.getRoomTypeId() + "|" + dr.getRatePlanId() + "|" + dr.getStayDate() + "|" + dr.getOccupancy();
-            rateMap.put(key, dr);
+        // 7. No offers: explain why and look for the next workable check-in date
+        EmptyReason reason = explainEmpty(fitting, ratePlans, index, checkIn, checkOut, rooms, occupancy);
+        LocalDate next = null;
+        if (!fitting.isEmpty()) {
+            LocalDate searchEnd = checkIn.plusDays(NEXT_AVAILABLE_WINDOW_DAYS);
+            Index wide = new Index(
+                    dailyInventoryRepository.findByHotelIdAndStayDateBetween(
+                            hotelId, checkIn, searchEnd.plusDays(nights - 1L)),
+                    dailyRateRepository.findByHotelIdAndDateRange(
+                            hotelId, checkIn, searchEnd.plusDays(nights - 1L), null, null));
+            next = findNextCheckIn(fitting, ratePlans, wide, checkIn, nights, rooms, occupancy);
+        }
+        return new AvailabilityResponse(hotelId, checkIn, checkOut, nights, rooms, adults, ages, occupancy,
+                List.of(), reason, next);
+    }
+
+    private static boolean fitsGroup(HotelRoomType rt, int adults, int occupancy, int children) {
+        return adults <= rt.getMaxAdults() && occupancy <= rt.getMaxOccupancy() && children <= rt.getMaxChildren();
+    }
+
+    /** Inventory and rate lookups keyed for quick per-night access. */
+    private static final class Index {
+        private final Map<String, DailyInventory> inventory = new HashMap<>();
+        private final Map<String, DailyRate> rates = new HashMap<>();
+
+        Index(List<DailyInventory> inv, List<DailyRate> rt) {
+            for (DailyInventory di : inv) {
+                inventory.put(di.getRoomTypeId() + "|" + di.getStayDate(), di);
+            }
+            for (DailyRate dr : rt) {
+                rates.put(dr.getRoomTypeId() + "|" + dr.getRatePlanId() + "|" + dr.getStayDate() + "|" + dr.getOccupancy(), dr);
+            }
         }
 
-        // 8. Build offers for each (roomType, ratePlan) pair
+        boolean hasStock(UUID roomTypeId, LocalDate date, int rooms) {
+            DailyInventory inv = inventory.get(roomTypeId + "|" + date);
+            return inv != null && !inv.isStopSell() && inv.getAvailable() >= rooms;
+        }
+
+        DailyRate rate(UUID roomTypeId, UUID ratePlanId, LocalDate date, int occupancy) {
+            return rates.get(roomTypeId + "|" + ratePlanId + "|" + date + "|" + occupancy);
+        }
+    }
+
+    private List<AvailableOfferResponse> buildOffers(List<HotelRoomType> roomTypes, List<RatePlan> ratePlans,
+                                                      Index index, LocalDate checkIn, LocalDate checkOut,
+                                                      int rooms, int occupancy) {
         List<AvailableOfferResponse> offers = new ArrayList<>();
+        LocalDate lastNight = checkOut.minusDays(1);
+        int nights = (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
 
         for (HotelRoomType roomType : roomTypes) {
-            // Validate occupancy against room type limits
-            if (adults > roomType.getMaxAdults()) {
-                continue;
-            }
-            if (occupancy > roomType.getMaxOccupancy()) {
-                continue;
-            }
-            if (ages.size() > roomType.getMaxChildren()) {
-                continue;
-            }
-
             for (RatePlan ratePlan : ratePlans) {
                 List<NightlyRateResponse> nightlyRates = new ArrayList<>();
                 BigDecimal totalAmount = BigDecimal.ZERO;
@@ -163,30 +201,22 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                 boolean sellable = true;
 
                 for (LocalDate date = checkIn; !date.isAfter(lastNight); date = date.plusDays(1)) {
-                    // Check inventory
-                    String invKey = roomType.getId() + "|" + date;
-                    DailyInventory inv = inventoryMap.get(invKey);
-                    if (inv == null || inv.isStopSell() || inv.getAvailable() < rooms) {
+                    if (!index.hasStock(roomType.getId(), date, rooms)) {
                         sellable = false;
                         break;
                     }
-
-                    // Check rate
-                    String rateKey = roomType.getId() + "|" + ratePlan.getId() + "|" + date + "|" + occupancy;
-                    DailyRate rate = rateMap.get(rateKey);
+                    DailyRate rate = index.rate(roomType.getId(), ratePlan.getId(), date, occupancy);
                     if (rate == null) {
                         sellable = false;
                         break;
                     }
-
-                    // Check currency consistency - mark sellable=false, not throw
+                    // Mixed currency marks the offer unsellable instead of throwing
                     if (currency == null) {
                         currency = rate.getCurrency();
                     } else if (!currency.equals(rate.getCurrency())) {
                         sellable = false;
                         break;
                     }
-
                     nightlyRates.add(new NightlyRateResponse(date, rate.getAmount(), rate.getCurrency()));
                     totalAmount = totalAmount.add(rate.getAmount());
                 }
@@ -194,33 +224,69 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                 if (sellable) {
                     totalAmount = totalAmount.multiply(BigDecimal.valueOf(rooms));
                     offers.add(new AvailableOfferResponse(
-                            roomType.getId(),
-                            roomType.getCode(),
-                            roomType.getName(),
-                            roomType.getMaxAdults(),
-                            roomType.getMaxChildren(),
-                            roomType.getMaxOccupancy(),
-                            ratePlan.getId(),
-                            ratePlan.getCode(),
-                            ratePlan.getName(),
-                            ratePlan.getMealPlan(),
-                            ratePlan.getCancellationPolicy(),
+                            roomType.getId(), roomType.getCode(), roomType.getName(),
+                            roomType.getMaxAdults(), roomType.getMaxChildren(), roomType.getMaxOccupancy(),
+                            ratePlan.getId(), ratePlan.getCode(), ratePlan.getName(),
+                            ratePlan.getMealPlan(), ratePlan.getCancellationPolicy(),
                             ratePlan.getFreeCancellationDaysBefore(),
-                            (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut),
-                            rooms,
-                            occupancy,
-                            currency,
-                            totalAmount,
-                            nightlyRates
-                    ));
+                            nights, rooms, occupancy, currency, totalAmount, nightlyRates));
                 }
             }
         }
+        return offers;
+    }
 
-        return new AvailabilityResponse(
-                hotelId, checkIn, checkOut,
-                (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut),
-                rooms, adults, ages, occupancy, offers);
+    private EmptyReason explainEmpty(List<HotelRoomType> fitting, List<RatePlan> ratePlans, Index index,
+                                     LocalDate checkIn, LocalDate checkOut, int rooms, int occupancy) {
+        if (fitting.isEmpty()) {
+            return new EmptyReason(EmptyReason.NO_ROOM_TYPE_FOR_GROUP, null);
+        }
+        LocalDate lastNight = checkOut.minusDays(1);
+        for (LocalDate date = checkIn; !date.isAfter(lastNight); date = date.plusDays(1)) {
+            boolean stocked = false;
+            for (HotelRoomType rt : fitting) {
+                if (index.hasStock(rt.getId(), date, rooms)) {
+                    stocked = true;
+                    break;
+                }
+            }
+            if (!stocked) {
+                return new EmptyReason(EmptyReason.NO_STOCK, date);
+            }
+        }
+        for (LocalDate date = checkIn; !date.isAfter(lastNight); date = date.plusDays(1)) {
+            if (!anyPricedAndStocked(fitting, ratePlans, index, date, rooms, occupancy)) {
+                return new EmptyReason(EmptyReason.NO_PRICE_FOR_OCCUPANCY, date);
+            }
+        }
+        // Every night is stocked and priced somewhere, but no single offer spans the stay (e.g. mixed currency)
+        return new EmptyReason(EmptyReason.NO_PRICE_FOR_OCCUPANCY, checkIn);
+    }
+
+    private boolean anyPricedAndStocked(List<HotelRoomType> fitting, List<RatePlan> ratePlans, Index index,
+                                        LocalDate date, int rooms, int occupancy) {
+        for (HotelRoomType rt : fitting) {
+            if (!index.hasStock(rt.getId(), date, rooms)) {
+                continue;
+            }
+            for (RatePlan rp : ratePlans) {
+                if (index.rate(rt.getId(), rp.getId(), date, occupancy) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private LocalDate findNextCheckIn(List<HotelRoomType> fitting, List<RatePlan> ratePlans, Index index,
+                                      LocalDate checkIn, int nights, int rooms, int occupancy) {
+        for (int offset = 1; offset <= NEXT_AVAILABLE_WINDOW_DAYS; offset++) {
+            LocalDate candidate = checkIn.plusDays(offset);
+            if (!buildOffers(fitting, ratePlans, index, candidate, candidate.plusDays(nights), rooms, occupancy).isEmpty()) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void validateStayRange(LocalDate checkIn, LocalDate checkOut) {
