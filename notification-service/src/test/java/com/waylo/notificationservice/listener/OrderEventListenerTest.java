@@ -32,7 +32,7 @@ class OrderEventListenerTest {
     private final UUID customerId = UUID.randomUUID();
     private final UUID orderId = UUID.randomUUID();
 
-    private OrderEventListener listener() { return new OrderEventListener(processed, crm, notifications); }
+    private OrderEventListener listener() { return new OrderEventListener(processed, crm, notifications, "https://waylo.test/"); }
 
     private static ConsumerRecord<String, Object> rec(Object v) { return new ConsumerRecord<>("order-events", 0, 0L, "k", v); }
 
@@ -69,9 +69,35 @@ class OrderEventListenerTest {
         assertThat(r.bookingId()).isEqualTo(orderId);
         assertThat(r.recipient()).isEqualTo("c@example.test");
         assertThat(r.subject()).isEqualTo("Siparişiniz onaylandı");
-        assertThat(r.body()).contains("Otel Test", "2026-12-01", "2026-12-03", "1500.00 TL", "QR kodunuz Siparişlerim sayfasında");
+        assertThat(r.body()).contains("Otel Test", "01.12.2026", "03.12.2026", "1.500,00 TL", "QR kodunuz Siparişlerim sayfasında",
+                "Siparişinizi görmek için: https://waylo.test/orders");
         verify(processed).save(any());
         verify(ack).acknowledge();
+    }
+
+    @Test
+    void confirmation_formatsTimesInIstanbul_moneyTurkish_oneItemPerLine() {
+        OrderEvent e = event("ORDER_PAID");
+        e.setTotalAmount(new BigDecimal("5280"));
+        e.setItems(List.of(
+                new OrderEvent.Item("FLIGHT", "TK100 IST-ESB <script>alert(1)</script>", "2026-11-27T08:45:00Z", null, new BigDecimal("2640")),
+                new OrderEvent.Item("CAR", "Fiat Egea", "2026-11-27T09:00:00", "2026-11-29T09:00:00", new BigDecimal("2640"))));
+        String body = OrderEventListener.confirmationBody(e, "https://waylo.test");
+
+        String[] lines = body.split("\n");
+        assertThat(lines[1]).startsWith("- TK100 IST-ESB").contains("(27.11.2026 11:45)", "2.640,00 TL");
+        assertThat(lines[2]).contains("(27.11.2026 09:00 - 29.11.2026 09:00)");
+        assertThat(body).contains("Toplam: 5.280,00 TL").endsWith("Siparişinizi görmek için: https://waylo.test/orders");
+        // HTML escaping happens at delivery (NotificationServiceImpl.escape), the text body stays raw
+        assertThat(body).contains("<script>");
+    }
+
+    @Test
+    void when_handlesDateInstantAndGarbage() {
+        assertThat(OrderEventListener.when("2026-11-27")).isEqualTo("27.11.2026");
+        assertThat(OrderEventListener.when("2026-11-27T21:30:00+00:00")).isEqualTo("28.11.2026 00:30");
+        assertThat(OrderEventListener.when("2026-11-27T13:30")).isEqualTo("27.11.2026 13:30");
+        assertThat(OrderEventListener.when("later")).isEqualTo("later");
     }
 
     @Test
@@ -85,7 +111,7 @@ class OrderEventListenerTest {
 
         ArgumentCaptor<NotificationRequest> c = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notifications, times(2)).send(c.capture());
-        assertThat(c.getAllValues().get(0).body()).contains("İade tutarı: 1234.50 TL");
+        assertThat(c.getAllValues().get(0).body()).contains("İade tutarı: 1.234,50 TL");
     }
 
     @Test

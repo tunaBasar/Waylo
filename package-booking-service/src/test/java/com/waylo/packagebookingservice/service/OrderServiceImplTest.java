@@ -445,7 +445,7 @@ class OrderServiceImplTest {
     private HotelHoldClient.HoldDto hold() {
         return new HotelHoldClient.HoldDto(UUID.randomUUID(), quoteId, UUID.randomUUID(), orgId, UUID.randomUUID(),
                 UUID.randomUUID(), LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 3), 2, 1, "HELD",
-                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"), "FREE_CANCELLATION", 2);
+                "EUR", new BigDecimal("321.50"), Instant.parse("2026-12-01T10:00:00Z"), "FREE_CANCELLATION", 2, "Waylo Boutique Antalya", "Standart oda");
     }
 
     private void stubSaves() {
@@ -490,7 +490,7 @@ class OrderServiceImplTest {
         assertThat(item.freeCancellationUntil()).isEqualTo(Instant.parse("2026-11-28T21:00:00Z"));
         assertThat(item.unitAmount()).isEqualByComparingTo("321.50");
         assertThat(item.quantity()).isEqualTo(1);
-        assertThat(item.description()).isEqualTo("2026-12-01-2026-12-03, 2 gece, 1 oda");
+        assertThat(item.description()).isEqualTo("Waylo Boutique Antalya · Standart oda · 01.12.2026-03.12.2026, 2 gece, 1 oda");
         verify(eventPublisher).publishOrderCreated(any());
     }
 
@@ -499,13 +499,14 @@ class OrderServiceImplTest {
         HotelHoldClient.HoldDto h = hold();
         HotelHoldClient.HoldDto noDays = new HotelHoldClient.HoldDto(h.holdId(), h.quoteId(), h.hotelId(), h.organizationId(),
                 h.roomTypeId(), h.ratePlanId(), h.checkIn(), h.checkOut(), h.nights(), h.rooms(), h.status(), h.currency(),
-                h.totalAmount(), h.expiresAt(), "FREE_CANCELLATION", null);
+                h.totalAmount(), h.expiresAt(), "FREE_CANCELLATION", null, null, null);
         when(orderRepository.findByCustomerIdAndQuoteId(customerId, quoteId)).thenReturn(List.of());
         when(hotelHoldClient.hold(any())).thenReturn(new HotelHoldClient.Envelope<>(true, noDays, null));
         stubSaves();
 
         var item = service.createHotelOrder(customerId, new HotelOrderCreateRequest(quoteId, null, null)).items().get(0);
 
+        assertThat(item.description()).isEqualTo("01.12.2026-03.12.2026, 2 gece, 1 oda");
         assertThat(item.cancellationPolicy()).isEqualTo("FREE_CANCELLATION");
         assertThat(item.freeCancellationUntil()).isEqualTo(Instant.parse("2026-11-30T21:00:00Z"));
     }

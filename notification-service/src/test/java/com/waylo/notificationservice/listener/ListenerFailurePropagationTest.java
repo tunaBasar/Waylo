@@ -127,7 +127,7 @@ class ListenerFailurePropagationTest {
     void order_sendFailure_propagates_notAcked_notMarked() {
         when(crm.getById(any())).thenReturn(lookup());
         doThrow(new IllegalStateException("smtp down")).when(notifications).send(any());
-        var l = new OrderEventListener(processed, crm, notifications);
+        var l = new OrderEventListener(processed, crm, notifications, "http://localhost:3000");
 
         assertThrows(IllegalStateException.class, () -> l.handleOrderEvent(rec("order-events", paidOrder()), ack));
 
@@ -138,7 +138,7 @@ class ListenerFailurePropagationTest {
     @Test
     void order_duplicate_ackedWithoutProcessing() {
         when(processed.existsByEventIdAndConsumerGroup(any(), any())).thenReturn(true);
-        new OrderEventListener(processed, crm, notifications).handleOrderEvent(rec("order-events", paidOrder()), ack);
+        new OrderEventListener(processed, crm, notifications, "http://localhost:3000").handleOrderEvent(rec("order-events", paidOrder()), ack);
         verifyNoInteractions(crm, notifications);
         verify(ack).acknowledge();
     }
@@ -146,7 +146,7 @@ class ListenerFailurePropagationTest {
     @Test
     void order_crmLookupFailure_isBestEffort_stillSendsPushMarksAndAcks() {
         when(crm.getById(any())).thenThrow(new RuntimeException("crm down"));
-        new OrderEventListener(processed, crm, notifications).handleOrderEvent(rec("order-events", paidOrder()), ack);
+        new OrderEventListener(processed, crm, notifications, "http://localhost:3000").handleOrderEvent(rec("order-events", paidOrder()), ack);
         verify(processed).save(any());
         verify(ack).acknowledge();
     }

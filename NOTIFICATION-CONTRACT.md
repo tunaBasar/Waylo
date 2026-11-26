@@ -1,6 +1,6 @@
 # Notification contract (queue row 13)
 
-notification-service consumes Kafka events and stores one `notifications` row per e-mail (`status` SENT in dev: the service marks rows SENT without real SMTP delivery for order mails, `retry` is admin only). Idempotent per `eventId` through `processed_events` (group `notification-service`). Texts are Turkish. A mail carries only what the customer needs: no phone, no address, no card data, **never a voucher code or QR payload** (bearer credentials). Order mails end with "QR kodunuz Siparişlerim sayfasında."
+notification-service consumes Kafka events and stores one `notifications` row per e-mail (`status` SENT in dev: the service marks rows SENT without real SMTP delivery for order mails, `retry` is admin only). Idempotent per `eventId` through `processed_events` (group `notification-service`). Texts are Turkish. A mail carries only what the customer needs: no phone, no address, no card data, **never a voucher code or QR payload** (bearer credentials). Order mails end with "QR kodunuz Siparişlerim sayfasında." and a line "Siparişinizi görmek için: {waylo.mail.app-base-url}/orders". The body is plain text, one item per line, HTML-escaped with newlines turned into `<br>` at delivery (`NotificationServiceImpl`), so passenger names cannot inject markup. Instants are shown in Europe/Istanbul as `dd.MM.yyyy HH:mm`, date-only values as `dd.MM.yyyy`, money in Turkish format (`5.280,00 TL`). The PUSH text is the first line of the body
 
 ## 1. Event -> template -> recipient
 

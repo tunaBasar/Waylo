@@ -44,6 +44,8 @@ public interface HotelHoldClient {
             BigDecimal totalAmount,
             Instant expiresAt,
             String cancellationPolicy,
-            Integer freeCancellationDaysBefore
+            Integer freeCancellationDaysBefore,
+            String hotelName,
+            String roomTypeName
     ) {}
 }

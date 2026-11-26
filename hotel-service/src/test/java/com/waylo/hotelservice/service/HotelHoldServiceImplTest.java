@@ -96,6 +96,8 @@ class HotelHoldServiceImplTest {
         quote.setTotalAmount(TOTAL_AMOUNT);
         quote.setPrincipalUserId(principalUserId);
         quote.setExpiresAt(FIXED_CLOCK.instant().plusSeconds(HOLD_TTL_MINUTES * 60L + 300L));
+        // hotel_quotes.cancellation_policy is NOT NULL (V7): real quotes always carry a policy
+        quote.setCancellationPolicy(com.waylo.hotelservice.domain.CancellationPolicy.FREE_CANCELLATION);
         return quote;
     }
 
@@ -249,9 +251,26 @@ class HotelHoldServiceImplTest {
     }
 
     @Test
+    void hold_response_carriesHotelAndRoomTypeNames() {
+        HotelQuote quote = createQuote(QUOTE_ID);
+        quote.setRoomTypeName("Standart oda");
+        when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));
+        HotelHold existing = createHeldHold(UUID.randomUUID(), QUOTE_ID);
+        when(holdRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
+        com.waylo.hotelservice.domain.Hotel hotel = new com.waylo.hotelservice.domain.Hotel();
+        hotel.setName("Waylo Boutique Antalya");
+        when(hotelRepository.findById(existing.getHotelId())).thenReturn(Optional.of(hotel));
+
+        HotelHoldResponse r = service.hold(createHoldRequest());
+
+        assertThat(r.hotelName()).isEqualTo("Waylo Boutique Antalya");
+        assertThat(r.roomTypeName()).isEqualTo("Standart oda");
+    }
+
+    @Test
     void hold_response_carriesFreeCancellationDaysBefore() {
         HotelQuote quote = createQuote(QUOTE_ID);
-        quote.setCancellationPolicy(com.waylo.hotelservice.domain.CancellationPolicy.FREE_CANCELLATION);
         quote.setFreeCancellationDaysBefore(2);
         when(quoteRepository.findByIdWithNights(QUOTE_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.findById(QUOTE_ID)).thenReturn(Optional.of(quote));

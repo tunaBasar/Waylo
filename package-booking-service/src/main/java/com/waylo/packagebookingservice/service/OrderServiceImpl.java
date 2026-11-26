@@ -138,8 +138,7 @@ public class OrderServiceImpl implements OrderService {
             item.setSupplierOrganizationId(hold.organizationId());
             item.setProductRef(hold.roomTypeId());
             item.setFulfillmentRef(hold.holdId());
-            item.setDescription(hold.checkIn() + "-" + hold.checkOut() + ", " + hold.nights() + " gece, "
-                    + hold.rooms() + " oda");
+            item.setDescription(hotelDescription(hold));
             item.setCheckIn(hold.checkIn());
             item.setCheckOut(hold.checkOut());
             policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
@@ -412,8 +411,7 @@ public class OrderServiceImpl implements OrderService {
                 return new Held(OrderItemVertical.HOTEL, "OTEL", hold.organizationId(), hold.totalAmount(), hold.currency(),
                         hold.expiresAt(), hold.holdId(), item -> {
                             item.setProductRef(hold.roomTypeId());
-                            item.setDescription(hold.checkIn() + "-" + hold.checkOut() + ", " + hold.nights() + " gece, "
-                                    + hold.rooms() + " oda");
+                            item.setDescription(hotelDescription(hold));
                             item.setCheckIn(hold.checkIn());
                             item.setCheckOut(hold.checkOut());
                             policyResolver.applyHotel(item, hold.cancellationPolicy(), hold.freeCancellationDaysBefore());
@@ -860,6 +858,17 @@ public class OrderServiceImpl implements OrderService {
                 order.getUpdatedAt(),
                 order.getHoldExpiresAt()
         );
+    }
+
+    private static final java.time.format.DateTimeFormatter DMY = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+    /** "Hotel · Room type · 27.11.2026-29.11.2026, 2 gece, 1 oda"; missing names are left out. */
+    static String hotelDescription(HotelHoldClient.HoldDto hold) {
+        StringBuilder sb = new StringBuilder();
+        if (hold.hotelName() != null && !hold.hotelName().isBlank()) sb.append(hold.hotelName().trim()).append(" · ");
+        if (hold.roomTypeName() != null && !hold.roomTypeName().isBlank()) sb.append(hold.roomTypeName().trim()).append(" · ");
+        return sb.append(hold.checkIn().format(DMY)).append("-").append(hold.checkOut().format(DMY)).append(", ")
+                .append(hold.nights()).append(" gece, ").append(hold.rooms()).append(" oda").toString();
     }
 
     private static java.time.Instant freeCancellationUntil(OrderItem item) {

@@ -404,11 +404,12 @@ public class HotelHoldServiceImpl implements HotelHoldService {
 
     private HotelHoldResponse toResponse(HotelHold hold) {
         var quote = quoteRepository.findById(hold.getQuoteId());
+        var hotel = hotelRepository.findById(hold.getHotelId());
         return new HotelHoldResponse(
                 hold.getId(),
                 hold.getQuoteId(),
                 hold.getHotelId(),
-                hotelRepository.findById(hold.getHotelId()).map(h -> h.getOrganizationId()).orElse(null),
+                hotel.map(h -> h.getOrganizationId()).orElse(null),
                 hold.getRoomTypeId(),
                 hold.getRatePlanId(),
                 hold.getCheckIn(),
@@ -423,7 +424,9 @@ public class HotelHoldServiceImpl implements HotelHoldService {
                 hold.getReleasedAt(),
                 hold.getCreatedAt(),
                 quote.map(q -> q.getCancellationPolicy().name()).orElse(null),
-                quote.map(q -> q.getFreeCancellationDaysBefore()).orElse(null)
+                quote.map(q -> q.getFreeCancellationDaysBefore()).orElse(null),
+                hotel.map(h -> h.getName()).orElse(null),
+                quote.map(q -> q.getRoomTypeName()).orElse(null)
         );
     }
 }
