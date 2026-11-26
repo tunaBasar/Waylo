@@ -167,3 +167,41 @@ test('422 COMMISSION_RATE_MISSING never shows commission wording to the customer
     });
   });
 });
+
+test('postForm sends the FormData itself with no JSON Content-Type (car/bus document upload, 415 before)', async () => {
+  await withBrowser(async ({ api }) => {
+    const form = new FormData();
+    form.append('type', 'TRANSPORT_AUTHORIZATION');
+    form.append('file', new Blob(['%PDF-1.4'], { type: 'application/pdf' }), 'belge.pdf');
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.method, 'POST');
+      assert.equal(options.body, form, 'the FormData object must reach fetch, not a JSON string');
+      assert.equal(options.headers['Content-Type'], undefined, 'the browser must set multipart/form-data with the boundary');
+      assert.equal(options.headers.Authorization, 'Bearer old-access');
+      return json({ success: true, data: { id: 'd1' } }, 201);
+    };
+    assert.equal((await api.postForm('/api/bus-partner/organizations/o1/documents', form)).data.id, 'd1');
+  });
+});
+
+test('JSON requests keep the JSON Content-Type', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.headers['Content-Type'], 'application/json');
+      return json({ success: true, data: null });
+    };
+    await api.post('/api/example', { a: 1 });
+  });
+});
+
+test('getBlob returns the bytes of a PDF download instead of JSON-parsing them', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.headers['Content-Type'], undefined);
+      assert.equal(options.headers.Authorization, 'Bearer old-access');
+      return new Response(new Blob(['%PDF-1.4 demo'], { type: 'application/pdf' }), { status: 200 });
+    };
+    const blob = await api.getBlob('/api/partner/organizations/o1/documents/d1/file');
+    assert.equal(await blob.text(), '%PDF-1.4 demo');
+  });
+});

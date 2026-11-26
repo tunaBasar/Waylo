@@ -362,3 +362,10 @@ test('validateRateItem allows boundary minDriverAge 18 and 99', () => {
   };
   assert.deepStrictEqual(m.validateRateItem(valid99), {});
 });
+
+test('carDocumentNeedsValidUntil mirrors the backend rule (F74)', () => {
+  for (const t of ['RENTAL_AUTHORIZATION', 'IDENTITY_DOCUMENT', 'VEHICLE_REGISTRATION', 'RENTAL_INSURANCE', 'TRAFFIC_INSURANCE']) {
+    assert.strictEqual(m.carDocumentNeedsValidUntil(t), true, t);
+  }
+  assert.strictEqual(m.carDocumentNeedsValidUntil('TAX_CERTIFICATE'), false);
+});

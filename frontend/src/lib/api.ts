@@ -50,10 +50,8 @@ export async function refreshAccessToken(): Promise<boolean> {
   return refreshPromise;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+function getAuthHeaders(json = true): Record<string, string> {
+  const headers: Record<string, string> = json ? { 'Content-Type': 'application/json' } : {};
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('waylo_token');
     if (token) {
@@ -64,10 +62,12 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  // Multipart bodies must not carry the JSON Content-Type: the browser sets multipart/form-data with the boundary.
+  const json = !(typeof FormData !== 'undefined' && options?.body instanceof FormData);
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      ...getAuthHeaders(),
+      ...getAuthHeaders(json),
       ...options?.headers,
     },
   });
@@ -81,7 +81,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       const retryRes = await fetch(`${API_BASE}${path}`, {
         ...options,
         headers: {
-          ...getAuthHeaders(),
+          ...getAuthHeaders(json),
           ...options?.headers,
         },
       });
@@ -153,6 +153,18 @@ export const api = {
   get: <T>(path: string) => request<ApiResponse<T>>(path),
   post: <T>(path: string, body: unknown, headers?: Record<string, string>) =>
     request<ApiResponse<T>>(path, { method: 'POST', body: JSON.stringify(body), ...(headers ? { headers } : {}) }),
+  /**
+   * Multipart upload (documents). Never pass FormData to post(): JSON.stringify turns it into "{}" and the JSON
+   * Content-Type makes the service answer 415 (car and bus partners could not upload any document, 2026-11-26).
+   */
+  postForm: <T>(path: string, form: FormData) =>
+    request<ApiResponse<T>>(path, { method: 'POST', body: form }),
+  /** Binary download (documents, files). api.get() parses JSON and would break on PDF bytes. */
+  getBlob: async (path: string): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}${path}`, { headers: getAuthHeaders(false) });
+    if (!res.ok) throw await toApiError(res);
+    return res.blob();
+  },
   put: <T>(path: string, body: unknown) =>
     request<ApiResponse<T>>(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>

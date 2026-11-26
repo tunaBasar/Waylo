@@ -4,9 +4,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
-  partnerBusApi, formatTripTime, formatMoney, validateFares,
+  busErrorMessage, partnerBusApi, formatTripTime, formatMoney, tripBadge, validateFares,
   type BusUnit, type Terminal, type Trip, type TripFareInput,
 } from '@/lib/bus';
+import { useToast } from '@/components/Toast';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 interface StopDraft { terminalId: string; arrivalAt: string; departureAt: string }
@@ -47,7 +48,7 @@ function TripForm({ organizationId, buses, terminals, onDone }: {
       });
       onDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kaydedilemedi');
+      setError(busErrorMessage(err, 'Kaydedilemedi'));
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -110,6 +111,7 @@ function TripForm({ organizationId, buses, terminals, onDone }: {
 
 export default function TripsPage() {
   const { organizationId, loading: workspaceLoading } = usePartner();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -117,14 +119,27 @@ export default function TripsPage() {
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [version, setVersion] = useState(0);
+  // Sellability for the trip badge: company status plus every bus (inactive ones too, a trip may still point at one).
+  const [companySellable, setCompanySellable] = useState<boolean | null>(null);
+  const [busSellable, setBusSellable] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
     if (!organizationId) return;
     Promise.all([partnerBusApi.trips(organizationId), partnerBusApi.buses(organizationId), partnerBusApi.terminals(organizationId)])
-      .then(([t, b, term]) => { if (alive) { setTrips(t.data ?? []); setBuses((b.data ?? []).filter(x => x.active)); setTerminals(term.data ?? []); setError(null); } })
-      .catch(e => { if (alive) setError(e instanceof Error ? e.message : 'Yuklenemedi'); })
+      .then(([t, b, term]) => {
+        if (!alive) return;
+        setTrips(t.data ?? []);
+        setBuses((b.data ?? []).filter(x => x.active));
+        setBusSellable(Object.fromEntries((b.data ?? []).map(x => [x.id, x.sellable && x.active])));
+        setTerminals(term.data ?? []);
+        setError(null);
+      })
+      .catch(e => { if (alive) setError(busErrorMessage(e, 'Yuklenemedi')); })
       .finally(() => { if (alive) setLoading(false); });
+    partnerBusApi.status(organizationId)
+      .then(r => { if (alive) setCompanySellable(r.data?.sellable ?? null); })
+      .catch(() => { if (alive) setCompanySellable(null); });
     return () => { alive = false; };
   }, [organizationId, version]);
 
@@ -134,7 +149,7 @@ export default function TripsPage() {
       await partnerBusApi.cancelTrip(organizationId, t.id);
       setVersion(v => v + 1);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Iptal edilemedi');
+      toast.error(busErrorMessage(e, 'Iptal edilemedi'));
     }
   }
 
@@ -155,7 +170,9 @@ export default function TripsPage() {
         !showForm && <EmptyState icon="route" title="Henuz sefer yok" description="Ilk seferinizi olusturun." />
       ) : (
         <div className="space-y-3">
-          {trips.map(t => (
+          {trips.map(t => {
+            const badge = tripBadge(t.status, companySellable, busSellable[t.busId] ?? null);
+            return (
             <Card key={t.id} className="p-4 space-y-2">
               <div className="flex flex-wrap items-center gap-3">
                 <p className="font-semibold text-on-surface flex-1 min-w-0">
@@ -163,9 +180,10 @@ export default function TripsPage() {
                   <span className="text-on-surface-variant font-normal"> {formatTripTime(t.stops[0]?.departureAt)}</span>
                 </p>
                 <span className="text-xs text-outline">{t.soldSeats}/{t.seatCount} koltuk dolu</span>
-                <StatusPill tone={t.status === 'PUBLISHED' ? 'success' : 'neutral'}>{t.status === 'PUBLISHED' ? 'Yayinda' : 'Iptal'}</StatusPill>
+                <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
                 {t.status === 'PUBLISHED' && <Button variant="ghost" icon="cancel" onClick={() => cancel(t)}>Iptal et</Button>}
               </div>
+              {badge.hint && <p className="text-xs text-on-surface-variant">{badge.hint}</p>}
               <p className="text-xs text-on-surface-variant">
                 {t.stops.map(s => `${s.city} ${formatTripTime(s.departureAt).slice(11)}`).join(' > ')}
               </p>
@@ -173,7 +191,8 @@ export default function TripsPage() {
                 {t.fares.map(f => `${t.stops[f.fromSeq]?.city}-${t.stops[f.toSeq]?.city}: ${formatMoney(f.price, t.currency)}`).join(', ')}
               </p>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

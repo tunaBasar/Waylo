@@ -4,9 +4,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
-  partnerBusApi, BUS_DOC_LABEL, ORG_BUS_DOC_TYPES, BUS_BUS_DOC_TYPES, formatTripTime,
+  busErrorMessage, partnerBusApi, BUS_DOC_LABEL, ORG_BUS_DOC_TYPES, BUS_BUS_DOC_TYPES, formatTripTime,
   type BusDocType, type BusDocument, type BusUnit,
 } from '@/lib/bus';
+import { useToast } from '@/components/Toast';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const ALL_TYPES: BusDocType[] = [...ORG_BUS_DOC_TYPES, ...BUS_BUS_DOC_TYPES];
@@ -38,7 +39,7 @@ function UploadForm({ organizationId, buses, onDone }: {
       });
       onDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Yuklenemedi');
+      setError(busErrorMessage(err, 'Belge yuklenemedi'));
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -80,6 +81,7 @@ function UploadForm({ organizationId, buses, onDone }: {
 
 export default function BusDocumentsPage() {
   const { organizationId, loading: workspaceLoading } = usePartner();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<BusDocument[]>([]);
@@ -100,15 +102,15 @@ export default function BusDocumentsPage() {
   async function download(d: BusDocument) {
     if (!organizationId) return;
     try {
-      const res = await partnerBusApi.downloadDocument(organizationId, d.id);
-      const url = URL.createObjectURL(res.data);
+      const blob = await partnerBusApi.downloadDocument(organizationId, d.id);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = d.fileName;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Indirilemedi');
+      toast.error(busErrorMessage(e, 'Belge indirilemedi'));
     }
   }
 

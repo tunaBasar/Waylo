@@ -8,7 +8,7 @@ import { SurfaceShell, type NavItem } from '@/components/SurfaceShell';
 import { SurfaceGuard } from '@/components/SurfaceGuard';
 import { inputClass } from '@/components/partner/ui';
 import { missingOrgDocumentsText, partnerCarApi, type PartnerCarStatus } from '@/lib/partner-car';
-import { partnerBusApi, type BusPartnerStatus } from '@/lib/bus';
+import { missingBusDocumentsText, partnerBusApi, type BusPartnerStatus } from '@/lib/bus';
 
 const UNSAVED_LEAVE_MESSAGE =
   'Kaydedilmemis degisiklikler kaybolacak. Sayfadan ayrilmak istiyor musunuz?';
@@ -91,7 +91,7 @@ function BusStatusBanner() {
       {status.missingOrgDocuments.length > 0 && (
         <div className="flex items-start gap-2">
           <span className="material-symbols-outlined text-[20px]">description</span>
-          <span>Eksik firma belgeleri: {status.missingOrgDocuments.join(', ')}. Tamamlayin.</span>
+          <span>{missingBusDocumentsText(status.missingOrgDocuments)} <a href="/partner/bus/documents" className="font-semibold underline">Belgelere git</a></span>
         </div>
       )}
     </div>

@@ -24,6 +24,12 @@ export const BUS_DOC_LABEL: Record<BusDocType, string> = {
   SEAT_ACCIDENT_INSURANCE: 'Zorunlu koltuk ferdi kaza sigortasi',
 };
 
+/** Banner text for missing company documents (F70): Turkish labels, never the raw enum. */
+export function missingBusDocumentsText(types: string[]): string {
+  const labels = types.map(t => BUS_DOC_LABEL[t as BusDocType] ?? t);
+  return `Eksik firma belgeleri: ${labels.join(', ')}. Belgeler sayfasindan yukleyin.`;
+}
+
 export const LAYOUT_LABEL: Record<SeatLayout, string> = { TWO_PLUS_TWO: '2+2', TWO_PLUS_ONE: '2+1' };
 export const GENDER_LABEL: Record<Gender, string> = { FEMALE: 'Kadin', MALE: 'Erkek' };
 export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
@@ -53,6 +59,22 @@ export interface BusDocument {
 }
 export interface AdminBusDocument { document: BusDocument; organizationName: string | null; busLabel: string | null }
 export interface BusPartnerStatus { sellable: boolean; missingOrgDocuments: BusDocType[]; salesEnabled: boolean }
+
+/**
+ * Trip badge (D-BUS-TRIP, 2026-11-26): a PUBLISHED trip is only on sale when the company is sellable and its bus
+ * is sellable; otherwise customers do not see it, so the partner must not read "Yayinda" as "selling".
+ */
+export function tripBadge(tripStatus: string, companySellable: boolean | null, busSellable: boolean | null):
+  { label: string; tone: 'success' | 'warning' | 'neutral'; hint: string | null } {
+  if (tripStatus !== 'PUBLISHED') return { label: 'Iptal', tone: 'neutral', hint: null };
+  if (companySellable === false) {
+    return { label: 'Satista degil', tone: 'warning', hint: 'Firma onayi ve firma belgeleri tamamlanmadan sefer musterilere gosterilmez.' };
+  }
+  if (busSellable === false) {
+    return { label: 'Satista degil', tone: 'warning', hint: 'Otobusun belgeleri eksik veya onay bekliyor.' };
+  }
+  return { label: 'Satista', tone: 'success', hint: null };
+}
 export interface Ticket { id: string; seatNo: number; passengerName: string; gender: Gender; price: number; status: BookingStatus }
 export interface BusBooking {
   id: string; organizationId: string; tripId: string; fromSeq: number; toSeq: number; currency: string;
@@ -89,9 +111,9 @@ export const partnerBusApi = {
     fd.append('documentNumber', body.documentNumber);
     if (body.validUntil) fd.append('validUntil', body.validUntil);
     if (body.busId) fd.append('busId', body.busId);
-    return api.post<BusDocument>(`${P(orgId)}/documents`, fd as unknown as BusDocument);
+    return api.postForm<BusDocument>(`${P(orgId)}/documents`, fd);
   },
-  downloadDocument: (orgId: string, id: string) => api.get<Blob>(`${P(orgId)}/documents/${enc(id)}/file`),
+  downloadDocument: (orgId: string, id: string) => api.getBlob(`${P(orgId)}/documents/${enc(id)}/file`),
   bookings: (orgId: string) => api.get<BusBooking[]>(`${P(orgId)}/bookings`),
 };
 
@@ -165,9 +187,11 @@ export function formatClock(iso: string | null | undefined): string {
   return m ? `${m[1]}:${m[2]}` : '';
 }
 
-/** Turkish lira style amount, no Intl dependency so tests are locale independent. */
+/** Turkish lira style amount, no Intl dependency so tests are locale independent. "850,00 TL", not "850.00 TRY" (F72). */
 export function formatMoney(amount: number, currency = 'TRY'): string {
-  return `${amount.toFixed(2)} ${currency}`;
+  const [int, dec] = (Math.round(amount * 100) / 100).toFixed(2).split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${grouped},${dec} ${currency === 'TRY' ? 'TL' : currency}`;
 }
 
 /** Fare table sanity check mirroring backend TripRules.validateFares; returns an error text or null. */
@@ -197,7 +221,24 @@ const ERROR_TEXT: Record<string, string> = {
   COMMISSION_RATE_MISSING: SALES_CLOSED_MESSAGE,
 };
 
+/** Trip rule errors share INVALID_STOPS / INVALID_FARES; the backend text tells which rule failed (F71). */
+const TRIP_RULE_TEXT: [RegExp, string][] = [
+  [/Stop times must increase/i, 'Durak saatleri guzergah boyunca ileri gitmeli: bir durak bir onceki duraktan once olamaz. Gece seferlerinde ertesi gunun tarihini secin.'],
+  [/Departure is before arrival/i, 'Bir durakta kalkis saati varis saatinden once olamaz.'],
+  [/first departure must be in the future/i, 'Ilk kalkis gelecekte olmali.'],
+  [/at least two stops/i, 'Sefer en az iki duraktan olusmali.'],
+  [/terminal cannot appear twice/i, 'Ayni durak bir seferde iki kez kullanilamaz.'],
+  [/fare for the full route is required/i, 'Tum guzergah (ilk duraktan son duraga) icin fiyat zorunlu.'],
+  [/Duplicate fare/i, 'Ayni durak ikilisi icin birden fazla fiyat girilmis.'],
+  [/published trips/i, 'Yayinda seferi olan otobusun koltuk duzeni degistirilemez.'],
+  [/Bus is not active/i, 'Otobus pasif, once etkinlestirin.'],
+  [/Unknown or inactive terminal/i, 'Durak bulunamadi veya pasif.'],
+];
+
 export function busErrorMessage(err: unknown, fallback: string): string {
   const code = err instanceof ApiError ? err.code : null;
-  return (code && ERROR_TEXT[code]) || (err instanceof Error && err.message) || fallback;
+  if (code && ERROR_TEXT[code]) return ERROR_TEXT[code];
+  const message = err instanceof Error ? err.message : '';
+  const rule = message ? TRIP_RULE_TEXT.find(([re]) => re.test(message)) : undefined;
+  return rule?.[1] || message || fallback;
 }

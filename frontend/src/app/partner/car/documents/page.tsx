@@ -12,12 +12,15 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
+import { useToast } from '@/components/Toast';
+import { partnerErrorMessage } from '@/lib/partner';
 import {
   partnerCarApi,
   type Document,
   type DocumentType,
   type Vehicle,
   documentTypeLabel,
+  carDocumentNeedsValidUntil,
 } from '@/lib/partner-car';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
@@ -27,6 +30,7 @@ function UploadForm({ organizationId, legalType, vehicles, onDone }: {
   vehicles: { id: string; name: string }[];
   onDone: (saved: boolean) => void;
 }) {
+  const toast = useToast();
   const [type, setType] = useState<DocumentType>('RENTAL_AUTHORIZATION');
   const [documentNumber, setDocumentNumber] = useState('');
   const [validUntil, setValidUntil] = useState('');
@@ -38,6 +42,8 @@ function UploadForm({ organizationId, legalType, vehicles, onDone }: {
   const isOrgLevel = legalType === 'COMPANY'
     ? type === 'RENTAL_AUTHORIZATION' || type === 'TAX_CERTIFICATE'
     : type === 'IDENTITY_DOCUMENT';
+  // Mirrors car-rental DocumentType.validUntilRequired: only the tax certificate has no expiry (F74).
+  const needsDate = carDocumentNeedsValidUntil(type);
 
   const validTypes = legalType === 'COMPANY'
     ? ['RENTAL_AUTHORIZATION', 'TAX_CERTIFICATE', 'VEHICLE_REGISTRATION', 'RENTAL_INSURANCE', 'TRAFFIC_INSURANCE'] as DocumentType[]
@@ -58,7 +64,7 @@ function UploadForm({ organizationId, legalType, vehicles, onDone }: {
       });
       onDone(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Isletilemedi');
+      toast.error(partnerErrorMessage(err, 'Belge yuklenemedi'));
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -81,7 +87,7 @@ function UploadForm({ organizationId, legalType, vehicles, onDone }: {
             maxLength={100} autoFocus />
         </Field>
 
-        <Field label="Gecerlilik bitis">
+        <Field label="Gecerlilik bitis" hint={needsDate ? 'Gerekli' : 'Istege bagli'} error={needsDate && !validUntil ? 'Bu belge icin gecerlilik tarihi gerekli' : undefined}>
           <input className={inputClass} type="date" value={validUntil}
             onChange={e => setValidUntil(e.target.value)} />
         </Field>
@@ -105,7 +111,7 @@ function UploadForm({ organizationId, legalType, vehicles, onDone }: {
         </Field>
 
         <div className="sm:col-span-2 flex gap-2">
-          <Button type="submit" icon="upload_file" disabled={saving || !file || !documentNumber.trim()}>
+          <Button type="submit" icon="upload_file" disabled={saving || !file || !documentNumber.trim() || (needsDate && !validUntil)}>
             {saving ? 'Yukleniyor' : 'Yukle'}
           </Button>
           <Button type="button" variant="ghost" onClick={() => onDone(false)}>Vazgec</Button>
@@ -139,10 +145,10 @@ function DocumentRow({ doc, organizationId, vehicleName }: {
   organizationId: string;
   vehicleName?: string;
 }) {
+  const toast = useToast();
   const handleDownload = async () => {
     try {
-      const res = await partnerCarApi.downloadDocument(organizationId, doc.id);
-      const blob = res.data;
+      const blob = await partnerCarApi.downloadDocument(organizationId, doc.id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -150,7 +156,7 @@ function DocumentRow({ doc, organizationId, vehicleName }: {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Yuklenemedi');
+      toast.error(partnerErrorMessage(err, 'Belge indirilemedi'));
     }
   };
 

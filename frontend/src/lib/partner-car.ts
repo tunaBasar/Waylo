@@ -84,6 +84,11 @@ export function documentTypeLabel(t: DocumentType): string {
   return DOCUMENT_TYPE_LABEL[t];
 }
 
+/** car-rental DocumentType.validUntilRequired: every type except the tax certificate has an expiry (F74). */
+export function carDocumentNeedsValidUntil(t: DocumentType): boolean {
+  return t !== 'TAX_CERTIFICATE';
+}
+
 /** Banner text for missing organization documents (F63): Turkish labels, never the raw enum. */
 export function missingOrgDocumentsText(types: string[]): string {
   const labels = types.map(t => DOCUMENT_TYPE_LABEL[t as DocumentType] ?? t);
@@ -352,10 +357,10 @@ export const partnerCarApi = {
     fd.append('documentNumber', body.documentNumber);
     if (body.validUntil) fd.append('validUntil', body.validUntil);
     if (body.vehicleId) fd.append('vehicleId', body.vehicleId);
-    return api.post<Document>(`/api/partner/organizations/${enc(orgId)}/documents`, fd as unknown as Document);
+    return api.postForm<Document>(`/api/partner/organizations/${enc(orgId)}/documents`, fd);
   },
   downloadDocument: (orgId: string, documentId: string) =>
-    api.get<Blob>(`/api/partner/organizations/${enc(orgId)}/documents/${enc(documentId)}/file`),
+    api.getBlob(`/api/partner/organizations/${enc(orgId)}/documents/${enc(documentId)}/file`),
 
   // rentals
   rentals: (orgId: string) =>
