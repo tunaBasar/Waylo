@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
   ORDER_STATUS_LABEL, VOUCHER_STATUS_LABEL, partnerErrorMessage, partnerApi, checkOutOrderItem, checkOutErrorMessage,
@@ -48,9 +48,13 @@ export default function PartnerOrdersPage() {
 
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Walkthrough 2026-11-26: one click sent two POSTs in the same millisecond; the first checked out, the second hit
+  // the version check and showed "Check-out yapilamadi" for a successful check-out. Guard synchronously.
+  const checkOutInFlight = useRef(false);
 
   async function checkOut(i: PartnerOrderItem) {
-    if (!organizationId) return;
+    if (!organizationId || checkOutInFlight.current) return;
+    checkOutInFlight.current = true;
     setBusyItem(i.orderItemId);
     setActionError(null);
     try {
@@ -58,6 +62,7 @@ export default function PartnerOrdersPage() {
     } catch (e) {
       setActionError(checkOutErrorMessage(e));
     } finally {
+      checkOutInFlight.current = false;
       setBusyItem(null);
       setReloadTick(n => n + 1);
     }
