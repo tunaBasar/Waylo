@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import {
-  getCarBranches, getCarOffers, postCarOrder, errorToMessage,
+  getCarBranches, getCarOffers, postCarOrder, errorToMessage, pickupLeadError,
   generateTimeSlots, toLocalDateTime, formatLocalDateTime,
   CATEGORY_LABEL, TRANSMISSION_LABEL, FUEL_LABEL,
 } from '@/lib/car';
@@ -102,6 +102,11 @@ function VehiclesContent() {
     }
     const pickupAt = toLocalDateTime(pickupDate, pickupTime);
     const returnAt = toLocalDateTime(returnDate, returnTime);
+    const leadError = pickupLeadError(pickupAt, Date.now());
+    if (leadError) {
+      setError(leadError);
+      return;
+    }
     if (new Date(returnAt) <= new Date(pickupAt)) {
       setError('Donus tarihi giden tarihinden sonra olamali.');
       return;

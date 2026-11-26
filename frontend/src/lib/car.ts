@@ -244,6 +244,22 @@ export function toLocalDateTime(date: string, time: string): string {
   return `${date}T${time}:00`;
 }
 
+/** Backend rule (car-rental RentalRules): pickup must be at least 2 hours from now. */
+export const MIN_PICKUP_LEAD_MS = 2 * 3600 * 1000;
+
+/**
+ * Client-side check of the 2 hour lead time, so the customer sees why instead of the generic INVALID_TIME text.
+ * `pickupAt` is the offsetless local datetime of the form (browser local time); returns null when it is fine.
+ */
+export function pickupLeadError(pickupAt: string, nowMs: number): string | null {
+  const t = new Date(pickupAt).getTime();
+  if (Number.isNaN(t)) return 'Gecersiz tarih veya saat formati.';
+  if (t < nowMs + MIN_PICKUP_LEAD_MS) {
+    return 'Gidis zamani en az 2 saat sonrasi olmali. Daha ileri bir saat veya tarih secin.';
+  }
+  return null;
+}
+
 /**
  * Format an offsetless local datetime string (e.g. "2026-11-05T10:00:00")
  * as a Turkish locale date-time, without timezone conversion.

@@ -169,3 +169,21 @@ test('RENTAL_STATUS_LABEL has 4 entries', () => {
   assert.strictEqual(m.RENTAL_STATUS_LABEL['CANCELLED'], 'Iptal edildi');
   assert.strictEqual(m.RENTAL_STATUS_LABEL['EXPIRED'], 'Suresi doldu');
 });
+
+// ── pickupLeadError (backend RentalRules: pickup at least 2 hours from now) ──
+
+test('pickupLeadError rejects a pickup earlier than now + 2h with a clear message', () => {
+  const now = new Date('2026-11-24T17:45:00').getTime();
+  assert.match(m.pickupLeadError('2026-11-24T09:00:00', now), /en az 2 saat/);
+  assert.match(m.pickupLeadError('2026-11-24T19:30:00', now), /en az 2 saat/);
+});
+
+test('pickupLeadError accepts a pickup 2h or more ahead', () => {
+  const now = new Date('2026-11-24T17:45:00').getTime();
+  assert.strictEqual(m.pickupLeadError('2026-11-24T20:00:00', now), null);
+  assert.strictEqual(m.pickupLeadError('2026-11-25T09:00:00', now), null);
+});
+
+test('pickupLeadError flags an unparsable value', () => {
+  assert.strictEqual(m.pickupLeadError('not-a-dateT09:00:00', Date.now()), 'Gecersiz tarih veya saat formati.');
+});
