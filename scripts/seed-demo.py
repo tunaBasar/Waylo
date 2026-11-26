@@ -36,6 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOTEL_DAYS = min(int(os.environ.get('SEED_HOTEL_DAYS', '60')), 366)
 FLIGHT_DAYS = int(os.environ.get('SEED_FLIGHT_DAYS', '30'))
 FLIGHT_COMMISSION = float(os.environ.get('SEED_FLIGHT_COMMISSION', '0.0800'))
+HOTEL_COMMISSION = float(os.environ.get('SEED_HOTEL_COMMISSION', '0.1000'))
 HOTEL_ORG = 'Waylo Demo Hotels'
 FLIGHT_ORG = 'Waylo Ucus Satis'
 TZ = zoneinfo.ZoneInfo('Europe/Istanbul')
@@ -212,6 +213,16 @@ def publish(hotel_id, partner, admin):
     return s == 200
 
 
+def ensure_commission(vertical, org, rate, admin):
+    """Without a commission rate the order can be created but payment fails (COMMISSION_RATE_MISSING)."""
+    rates = call('GET', '/api/admin/commission-rates', token=admin)[1].get('data') or []
+    if any(r.get('vertical') == vertical and str(r.get('supplierOrganizationId')) == str(org) for r in rates):
+        return
+    print(f'  {vertical} komisyon orani {rate} {"eklenecek" if DRY else "eklendi"}')
+    if not DRY:
+        must('POST', '/api/admin/commission-rates', {'vertical': vertical, 'supplierOrganizationId': org, 'rate': rate}, admin)
+
+
 def seed_hotels(admin):
     partner = ensure_partner()
     today = datetime.datetime.now(TZ).date()
@@ -223,6 +234,7 @@ def seed_hotels(admin):
         print(f'hotels : [dry] org "{HOTEL_ORG}" olusturulacak, {len(DEMO_HOTELS)} otel, {HOTEL_DAYS} gun stok/fiyat')
         return
     org = find_org(HOTEL_ORG, partner)['organizationId'] if DRY else ensure_org(HOTEL_ORG, partner, admin)
+    ensure_commission('HOTEL', org, HOTEL_COMMISSION, admin)
     if not DRY:
         partner = login(*partner_creds())  # fresh token after org creation
     existing = {h['name']: h for h in (call('GET', f'/api/hotels?organizationId={org}', token=partner)[1].get('data') or [])}
@@ -291,13 +303,16 @@ def seed_hotels(admin):
     print(f'hotels : {"[dry] " if DRY else ""}+{new_h} otel, +{new_stock} stok gunu, +{new_rates} fiyat satiri ({HOTEL_DAYS} gun, {today} baslangic)')
 
 
-def hide_other_hotels(admin):
+def hide_other_hotels(admin, demo_org=None):
+    """Hide every public hotel that is not one of OUR demo hotels (same name in another org = old seed copy)."""
     demo = {h[0] for h in DEMO_HOTELS}
     now = datetime.datetime.now(datetime.timezone.utc)
     hidden = legacy = protected = 0
     for h in call('GET', '/api/hotels', token=admin)[1].get('data') or []:
         name = h.get('name') or ''
-        if name in demo or h.get('publicationStatus') != 'PUBLISHED':
+        if name in demo and str(h.get('organizationId') or '') == str(demo_org or ''):
+            continue
+        if h.get('publicationStatus') != 'PUBLISHED':
             continue
         created = None
         if h.get('createdAt'):
@@ -409,7 +424,8 @@ def main():
         seed_hotels(admin)
         admin = must('POST', '/api/auth/login', {'email': email, 'password': pw})['token']
     if args.hide_others:
-        hide_other_hotels(admin)
+        demo_org = psql('auth_db', f"SELECT id FROM organizations WHERE name = '{HOTEL_ORG}' LIMIT 1") or None
+        hide_other_hotels(admin, demo_org)
     if 'cars' in todo:
         seed_cars()
     if 'flights' in todo:
