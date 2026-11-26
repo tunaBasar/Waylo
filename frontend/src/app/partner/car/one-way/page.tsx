@@ -10,10 +10,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import { partnerCarApi, type OneWayRoute } from '@/lib/partner-car';
+import { partnerErrorMessage } from '@/lib/partner';
+import { useToast } from '@/components/Toast';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, inputClass } from '@/components/partner/ui';
 
 export default function OneWayPage() {
   const { organizationId, loading: workspaceLoading } = usePartner();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [routes, setRoutes] = useState<OneWayRoute[]>([]);
@@ -48,7 +51,7 @@ export default function OneWayPage() {
       setRoutes(res.data);
       setUncommitted([]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Isletilemedi');
+      toast.error(partnerErrorMessage(err, 'Tek yon rotalar kaydedilemedi'));
     } finally {
       inFlight.current = false;
       setSaving(false);

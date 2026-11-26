@@ -3,7 +3,8 @@
 /** Buses of a BUS partner org: create, activate/deactivate, see missing documents. */
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
-import { partnerBusApi, BUS_DOC_LABEL, LAYOUT_LABEL, type BusUnit, type SeatLayout } from '@/lib/bus';
+import { partnerBusApi, busErrorMessage, BUS_DOC_LABEL, LAYOUT_LABEL, type BusUnit, type SeatLayout } from '@/lib/bus';
+import { useToast } from '@/components/Toast';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 function BusForm({ organizationId, onDone }: { organizationId: string; onDone: (saved: boolean) => void }) {
@@ -62,6 +63,7 @@ function BusForm({ organizationId, onDone }: { organizationId: string; onDone: (
 
 export default function BusesPage() {
   const { organizationId, loading: workspaceLoading } = usePartner();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [buses, setBuses] = useState<BusUnit[]>([]);
@@ -84,7 +86,7 @@ export default function BusesPage() {
       await partnerBusApi.setBusActive(organizationId, b.id, !b.active);
       setVersion(v => v + 1);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Islem basarisiz');
+      toast.error(busErrorMessage(e, 'Islem basarisiz'));
     }
   }
 

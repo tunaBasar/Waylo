@@ -24,6 +24,7 @@ import {
   TRANSMISSION_LABEL,
   FUEL_LABEL,
 } from '@/lib/partner-car';
+import { partnerErrorMessage } from '@/lib/partner';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 // Options come from the shared label maps, so every backend enum value is selectable.
@@ -40,6 +41,7 @@ function VehicleForm({ vehicle, organizationId, branches, onDone }: {
   onDone: (saved: boolean) => void;
 }) {
   const isEdit = !!vehicle;
+  const toast = useToast();
   const [brand, setBrand] = useState(vehicle?.brand ?? '');
   const [model, setModel] = useState(vehicle?.model ?? '');
   const [plateNumber, setPlateNumber] = useState(vehicle?.plateNumber ?? '');
@@ -88,7 +90,7 @@ function VehicleForm({ vehicle, organizationId, branches, onDone }: {
       }
       onDone(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Isletilemedi');
+      toast.error(partnerErrorMessage(err, 'Arac kaydedilemedi'));
     } finally {
       inFlight.current = false;
       setSaving(false);
