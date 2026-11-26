@@ -9,7 +9,7 @@ import { useOnline } from '@/features/network/NetworkContext';
 import { orderLinkOpened } from '@/features/deeplinks';
 import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
-import { fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText } from '@/features/format';
+import { fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText, voucherStatusText } from '@/features/format';
 
 function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: OrderCheckin | undefined; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,7 @@ function Vouchers({ orderId, checkedInItemIds }: { orderId: string; checkedInIte
       {(list) => list.map((v) => (
         <Card key={v.voucherId}>
           <Text style={{ fontWeight: '700' }}>{v.description}</Text>
-          <Muted>{`${v.status} · ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Muted>
+          <Muted>{`${voucherStatusText(v.status)} · Gecerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Muted>
           {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={{ fontWeight: '700' }}>Binis karti (QR)</Text> : null}
           {v.payload ? <QRCode value={v.payload} size={200} /> : null}
           {v.payload ? <Text selectable style={{ fontSize: 11 }}>{v.payload}</Text> : null}

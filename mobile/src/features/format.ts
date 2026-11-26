@@ -1,14 +1,34 @@
+export const VERTICAL_TR: Record<string, string> = { HOTEL: 'Otel', CAR: 'Arac', FLIGHT: 'Ucus', BUS: 'Otobus' };
+export const verticalText = (v: string) => VERTICAL_TR[v] ?? v;
+
 export const money = (v: number, currency: string) => {
   try { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(v); }
   catch { return `${v.toFixed(2)} ${currency}`; }
 };
 
-/** Offsetless local datetime "2026-11-06T09:00:00" -> "06.11.2026 09:00" (no tz conversion). */
+/**
+ * Date-time for display in Europe/Istanbul as "dd.MM.yyyy HH:mm".
+ * - Instants with "Z" or an offset (flights, vouchers) are converted to Istanbul time (UTC+3, no DST since 2016).
+ * - Offsetless local date-times ("2026-11-06T09:00:00", car/bus local times) are shown as is.
+ * Walkthrough 2026-11-26: slicing an instant showed an 11:45 departure as 08:45.
+ */
 export function fmtLocal(iso: string | null | undefined): string {
   if (!iso) return '';
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-  return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}` : iso;
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/);
+  if (!m) return iso;
+  if (!m[6]) return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}`;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  const d = new Date(t + 3 * 3_600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 }
+
+/** Same labels as the web order page. */
+export const VOUCHER_STATUS_TR: Record<string, string> = {
+  ACTIVE: 'Gecerli', REDEEMED: 'Kullanildi', VOID: 'Iptal edildi', NO_SHOW: 'Gelinmedi',
+};
+export const voucherStatusText = (s: string) => VOUCHER_STATUS_TR[s] ?? s;
 
 export const ORDER_STATUS_TR: Record<string, string> = {
   PENDING: 'Odeme bekleniyor', CONFIRMED: 'Onaylandi', CANCELLED: 'Iptal edildi', EXPIRED: 'Süresi doldu',
