@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { api, ApiError } from '@/lib/api';
 import { usePartner } from '@/lib/partner-context';
 import { parseVoucherPayload, redeemErrorMessage } from '@/lib/voucher';
+import { displayItemText } from '@/lib/order-text';
 
 interface RedeemResult {
   voucherId: string;
@@ -146,7 +147,7 @@ export default function RedeemPage() {
       {result && (
         <div role="status" className="rounded-xl bg-tertiary-container p-4 text-on-tertiary-container space-y-1">
           <p className="font-semibold">Kupon kullanildi</p>
-          <p className="text-sm">{result.description}</p>
+          <p className="text-sm">{displayItemText(result.description)}</p>
           {result.amountReleased != null && (
             <p className="text-lg font-bold">
               {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: result.currency }).format(result.amountReleased)} isletmeye aktarildi

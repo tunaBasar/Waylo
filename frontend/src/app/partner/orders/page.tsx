@@ -9,6 +9,7 @@ import {
 import { formatMoney } from '@/lib/partner-car';
 import { formatDate } from '@/lib/utils';
 import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader, StatusPill } from '@/components/partner/ui';
+import { displayItemText } from '@/lib/order-text';
 
 const PAGE_SIZE = 20;
 const VERTICAL_LABEL: Record<string, string> = { HOTEL: 'Otel', CAR: 'Arac', FLIGHT: 'Ucus', BUS: 'Otobus' };
@@ -113,7 +114,7 @@ export default function PartnerOrdersPage() {
               <Card key={i.orderItemId} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-on-surface">{i.description}</p>
+                    <p className="font-semibold text-on-surface">{displayItemText(i.description)}</p>
                     <p className="text-sm text-on-surface-variant mt-0.5">
                       {VERTICAL_LABEL[i.vertical] ?? i.vertical} · Siparis tarihi {formatDate(i.orderCreatedAt)}
                     </p>

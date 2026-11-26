@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, type AdminOrder, type AdminOrderPage } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
+import { displayItemText } from '@/lib/order-text';
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   CONFIRMED: { label: 'Onaylandi', class: 'bg-secondary-container text-on-secondary-container' },
@@ -100,7 +101,7 @@ export default function BookingsPage() {
                 <ul className="mb-2 space-y-1">
                   {o.items.map(i => (
                     <li key={i.id} className="flex items-center justify-between text-xs text-on-surface-variant">
-                      <span><span className="font-medium text-on-surface">{verticalLabel[i.vertical] ?? i.vertical}</span> · {i.description}{i.promoCode ? ` · ${i.promoCode}` : ''}{i.cancelOutcome === 'REFUND' ? ' · iade' : ''}</span>
+                      <span><span className="font-medium text-on-surface">{verticalLabel[i.vertical] ?? i.vertical}</span> · {displayItemText(i.description)}{i.promoCode ? ` · ${i.promoCode}` : ''}{i.cancelOutcome === 'REFUND' ? ' · iade' : ''}</span>
                       <span>{i.netAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                     </li>
                   ))}

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 import { displayItemText } from '@/lib/order-text';
+import { canOfferCancel } from '@/lib/order-actions';
 import { showCreatedBanner } from '@/lib/order-banner';
 import { orderPolicyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
@@ -128,14 +129,15 @@ function QrImage({ payload }: { payload: string }) {
   return src ? <img src={src} alt="Kupon QR kodu" width={220} height={220} className="rounded-lg bg-white" /> : null;
 }
 
-function VoucherList({ orderId, testMode }: { orderId: string; testMode: boolean }) {
+function VoucherList({ orderId, testMode, onLoaded }: { orderId: string; testMode: boolean; onLoaded?: (v: Voucher[]) => void }) {
   const [vouchers, setVouchers] = useState<Voucher[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Voucher[]>(`/api/orders/${encodeURIComponent(orderId)}/vouchers`)
-      .then(r => setVouchers(r.data))
+      .then(r => { setVouchers(r.data); onLoaded?.(r.data); })
       .catch((err: unknown) => setError(err instanceof ApiError ? err.message : 'Kuponlar yuklenemedi'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   if (error) return <p className="text-xs text-error">{error}</p>;
@@ -371,6 +373,8 @@ function SupportCasePanel({ order }: { order: Order }) {
 
 function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order; onChanged: () => void; reviewable: ReviewableItem[]; onReviewed: () => void }) {
   const [testMode, setTestMode] = useState(false);
+  const [vouchers, setVouchers] = useState<Voucher[] | null>(null);
+  const [reviewedScores, setReviewedScores] = useState<Record<string, number>>({});
   const [checkins, setCheckins] = useState<FlightCheckin[]>([]);
   const loadCheckins = useCallback(() => {
     api.get<FlightCheckin[]>('/api/checkins/me').then(r => setCheckins(r.data)).catch(() => setCheckins([]));
@@ -419,8 +423,11 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
               )}
             </>
           )}
+          {item.vertical === 'HOTEL' && reviewedScores[item.id] != null && (
+            <p className="font-semibold text-on-surface" data-testid="review-done">Degerlendirmeniz alindi: {reviewedScores[item.id]}/5</p>
+          )}
           {item.vertical === 'HOTEL' && reviewable.filter(r => r.orderItemId === item.id).map(r => (
-            <ReviewForm key={r.orderItemId} item={r} onDone={onReviewed} />
+            <ReviewForm key={r.orderItemId} item={r} onDone={score => { setReviewedScores(m => ({ ...m, [r.orderItemId]: score })); onReviewed(); }} />
           ))}
           {item.vertical === 'CAR' && item.pickupAt && item.returnAt && (
             <p>Alis: {formatOffsetDateTime(item.pickupAt)} - Teslim: {formatOffsetDateTime(item.returnAt)}</p>
@@ -439,9 +446,9 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
       )}
       <p className="text-xs text-on-surface-variant">{new Date(order.createdAt).toLocaleDateString('tr-TR')}</p>
       {order.status === 'PENDING' && <PayPanel order={order} onPaid={onChanged} />}
-      {(order.status === 'PENDING' || order.status === 'CONFIRMED') && <CancelPanel order={order} onChanged={onChanged} />}
+      {(order.status === 'PENDING' || order.status === 'CONFIRMED') && canOfferCancel(order, vouchers) && <CancelPanel order={order} onChanged={onChanged} />}
       <SupportCasePanel order={order} />
-      {order.status === 'CONFIRMED' && <VoucherList orderId={order.id} testMode={testMode} />}
+      {order.status === 'CONFIRMED' && <VoucherList orderId={order.id} testMode={testMode} onLoaded={setVouchers} />}
     </div>
   );
 }

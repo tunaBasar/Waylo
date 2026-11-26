@@ -1,4 +1,4 @@
-import { fmtLocal, voucherStatusText } from '@/features/format';
+import { displayItemText, fmtLocal, voucherStatusText } from '@/features/format';
 
 // Walkthrough 2026-11-26 (F37): the app showed voucher windows and flight times in UTC
 // (an 11:45 departure as 08:45, a 00:00 hotel check-in as 21:00 the day before).
@@ -31,5 +31,16 @@ describe('voucherStatusText', () => {
     expect(voucherStatusText('ACTIVE')).toBe('Gecerli');
     expect(voucherStatusText('REDEEMED')).toBe('Kullanildi');
     expect(voucherStatusText('SOMETHING_NEW')).toBe('SOMETHING_NEW');
+  });
+});
+
+describe('displayItemText', () => {
+  it('rewrites the old ISO hotel range', () => {
+    expect(displayItemText('2026-11-27-2026-11-29, 2 gece, 1 oda')).toBe('27.11.2026-29.11.2026, 2 gece, 1 oda');
+  });
+  it('leaves other text unchanged', () => {
+    expect(displayItemText('Otel · 27.11.2026-29.11.2026, 2 gece')).toBe('Otel · 27.11.2026-29.11.2026, 2 gece');
+    expect(displayItemText('2026-11-27')).toBe('2026-11-27');
+    expect(displayItemText(null)).toBe('');
   });
 });

@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api';
 import { reviewApi, reviewErrorMessage, type ReviewableItem } from '@/lib/reviews';
 
 /** "Degerlendir" button and 1-5 + text form for one eligible hotel order item. */
-export function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void }) {
+export function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: (score: number) => void }) {
   const [open, setOpen] = useState(false);
   const [score, setScore] = useState(0);
   const [text, setText] = useState('');
@@ -18,7 +18,7 @@ export function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () 
     setMsg(null);
     try {
       await reviewApi.create(item.orderItemId, score, text);
-      onDone();
+      onDone(score);
     } catch (err) {
       setMsg(err instanceof ApiError ? reviewErrorMessage(err.code, err.message) : 'Degerlendirme gonderilemedi');
     } finally {
