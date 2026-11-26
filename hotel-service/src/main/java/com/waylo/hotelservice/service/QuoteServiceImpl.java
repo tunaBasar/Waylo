@@ -50,6 +50,7 @@ public class QuoteServiceImpl implements QuoteService {
     private final HotelQuoteRepository hotelQuoteRepository;
     private final AuthAccessClient authAccessClient;
     private final Clock clock;
+    private final OccupancyRateResolver rateResolver;
 
     public QuoteServiceImpl(HotelRepository hotelRepository,
                             HotelRoomTypeRepository roomTypeRepository,
@@ -58,7 +59,8 @@ public class QuoteServiceImpl implements QuoteService {
                             DailyInventoryRepository dailyInventoryRepository,
                             HotelQuoteRepository hotelQuoteRepository,
                             AuthAccessClient authAccessClient,
-                            Clock clock) {
+                            Clock clock,
+                            OccupancyRateResolver rateResolver) {
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.ratePlanRepository = ratePlanRepository;
@@ -67,6 +69,7 @@ public class QuoteServiceImpl implements QuoteService {
         this.hotelQuoteRepository = hotelQuoteRepository;
         this.authAccessClient = authAccessClient;
         this.clock = clock;
+        this.rateResolver = rateResolver;
     }
 
     @Override
@@ -185,12 +188,11 @@ public class QuoteServiceImpl implements QuoteService {
                         request.roomTypeId(), request.ratePlanId());
 
         // Index by date
-        Map<LocalDate, DailyRate> rateByDate = new HashMap<>();
+        Map<LocalDate, List<DailyRate>> rateByDate = new HashMap<>();
         for (DailyRate dr : allRates) {
             if (dr.getRoomTypeId().equals(request.roomTypeId())
-                    && dr.getRatePlanId().equals(request.ratePlanId())
-                    && dr.getOccupancy() == occupancy) {
-                rateByDate.put(dr.getStayDate(), dr);
+                    && dr.getRatePlanId().equals(request.ratePlanId())) {
+                rateByDate.computeIfAbsent(dr.getStayDate(), k -> new ArrayList<>()).add(dr);
             }
         }
 
@@ -200,7 +202,7 @@ public class QuoteServiceImpl implements QuoteService {
         String currency = null;
 
         for (LocalDate date = request.checkIn(); !date.isAfter(lastNight); date = date.plusDays(1)) {
-            DailyRate dr = rateByDate.get(date);
+            DailyRate dr = rateResolver.resolve(rateByDate.get(date), occupancy, roomType.getMaxOccupancy());
             if (dr == null) {
                 throw new BusinessRuleException("RATE_NOT_FOUND",
                         "No rate found for room " + request.roomTypeId()

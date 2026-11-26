@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -68,6 +69,9 @@ class AvailabilityServiceImplTest {
 
     @Captor
     private ArgumentCaptor<LocalDate> dateCaptor;
+
+    @Spy
+    private OccupancyRateResolver rateResolver = new OccupancyRateResolver();
 
     @InjectMocks
     private AvailabilityServiceImpl availabilityService;
@@ -741,6 +745,26 @@ class AvailabilityServiceImplTest {
         assertThat(r.emptyReason().code()).isEqualTo("NO_PRICE_FOR_OCCUPANCY");
         assertThat(r.emptyReason().date()).isEqualTo(checkIn);
         assertThat(r.nextAvailableCheckIn()).isNull();
+    }
+
+    @Test
+    void oneAdult_findsOfferWhenOnlyOccupancyTwoIsPriced() {
+        stubCatalog(buildRoomType(roomTypeId, 2, 2, 0), buildRatePlan(ratePlanId));
+        LocalDate lastNight = checkOut.minusDays(1);
+        when(dailyInventoryRepository.findByHotelIdAndStayDateBetween(eq(hotelId), any(), any()))
+                .thenReturn(List.of(
+                        buildDailyInventory(hotelId, roomTypeId, checkIn, 5, false),
+                        buildDailyInventory(hotelId, roomTypeId, lastNight, 5, false)));
+        when(dailyRateRepository.findByHotelIdAndDateRange(eq(hotelId), any(), any(), any(), any()))
+                .thenReturn(List.of(
+                        buildDailyRate(hotelId, roomTypeId, ratePlanId, checkIn, 2, BigDecimal.valueOf(100)),
+                        buildDailyRate(hotelId, roomTypeId, ratePlanId, lastNight, 2, BigDecimal.valueOf(100))));
+
+        AvailabilityResponse r = availabilityService.getAvailability(hotelId, checkIn, checkOut, 1, 1, List.of());
+
+        assertThat(r.offers()).hasSize(1);
+        assertThat(r.offers().get(0).totalAmount()).isEqualByComparingTo("200");
+        assertThat(r.offers().get(0).occupancy()).isEqualTo(1);
     }
 
     @Test

@@ -468,6 +468,12 @@ stopSell (Boolean), expectedVersion (Long)}`. Response: updated list of daily in
 Body `items` (required, 1..500) of `{roomTypeId (required), ratePlanId (required), stayDate (required), occupancy (required, 1..30),
 amount (required, >= 0.01, 10 integer and 2 fraction digits), currency (required, 3 uppercase letters), expectedVersion (Long)}`. Response: updated rate rows.
 
+**Occupancy pricing rule (availability and quotes).** A search for N guests is priced by the exact rate row for occupancy N when one exists.
+Otherwise the row with the smallest occupancy M > N on the same (roomType, ratePlan, night) is used, provided M <= the room type's `maxOccupancy`
+(the room price applies to fewer guests). There is no downward fallback: a price for 2 never covers 3. Availability and quote share this rule, so
+the quote's nightly amounts and total equal the offer's; the quote's `occupancy` stays the requested one. The partner calendar writes only the
+`maxOccupancy` price, which therefore covers every occupancy from 1 up to max. No response fields were added.
+
 #### `GET /api/hotels/{hotelId}/rates/currency` - Hotel currency (partner + ROOM_MANAGE)
 
 Response `data`: `{currency}`.

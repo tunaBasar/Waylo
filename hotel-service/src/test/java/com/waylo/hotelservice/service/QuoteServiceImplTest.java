@@ -84,7 +84,7 @@ class QuoteServiceImplTest {
         service = new QuoteServiceImpl(
                 hotelRepository, roomTypeRepository, ratePlanRepository,
                 dailyRateRepository, dailyInventoryRepository, hotelQuoteRepository,
-                authAccessClient, clock);
+                authAccessClient, clock, new OccupancyRateResolver());
     }
 
     // ===== Helper builders =====
@@ -406,6 +406,39 @@ class QuoteServiceImplTest {
         verify(hotelQuoteRepository).save(quoteCaptor.capture());
         com.waylo.hotelservice.domain.HotelQuote savedQuote = quoteCaptor.getValue();
         assertThat(savedQuote.getPrincipalUserId()).isEqualTo(principalUserId);
+    }
+
+    @Test
+    void oneAdultQuoteOnTwoPricedRoom_usesFallbackAmountAndKeepsRequestedOccupancy() {
+        Hotel hotel = buildHotel(true);
+        HotelRoomType rt = buildRoomType(2, 2, 0);
+        RatePlan rp = buildRatePlan();
+        LocalDate lastNight = checkOut.minusDays(1);
+
+        when(hotelRepository.findById(hotelId)).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findById(roomTypeId)).thenReturn(Optional.of(rt));
+        when(ratePlanRepository.findById(ratePlanId)).thenReturn(Optional.of(rp));
+        when(dailyInventoryRepository.findByHotelIdAndRoomTypeIdAndStayDateBetween(
+                eq(hotelId), eq(roomTypeId), eq(checkIn), eq(lastNight)))
+                .thenReturn(List.of(buildInventory(checkIn, 5), buildInventory(lastNight, 5)));
+        when(dailyRateRepository.findByHotelIdAndDateRange(
+                eq(hotelId), eq(checkIn), eq(lastNight), eq(roomTypeId), eq(ratePlanId)))
+                .thenReturn(List.of(
+                        buildRate(checkIn, 2, BigDecimal.valueOf(100)),
+                        buildRate(lastNight, 2, BigDecimal.valueOf(100))));
+        when(authAccessClient.activeOrganizationIds()).thenReturn(List.of(orgId));
+        when(hotelQuoteRepository.save(any())).thenAnswer(invocation -> {
+            com.waylo.hotelservice.domain.HotelQuote q = invocation.getArgument(0);
+            q.setId(UUID.randomUUID());
+            return q;
+        });
+
+        QuoteResponse response = service.createQuote(buildRequest(1, 1, List.of()), principalUserId);
+
+        // Same total the availability offer shows for the same search: 2 nights * 100
+        assertThat(response.totalAmount()).isEqualByComparingTo(BigDecimal.valueOf(200));
+        verify(hotelQuoteRepository).save(quoteCaptor.capture());
+        assertThat(quoteCaptor.getValue().getOccupancy()).isEqualTo(1);
     }
 
     @Test

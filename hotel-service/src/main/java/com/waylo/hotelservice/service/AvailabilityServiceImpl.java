@@ -47,6 +47,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
     private final DailyRateRepository dailyRateRepository;
     private final AuthAccessClient authAccessClient;
     private final Clock clock;
+    private final OccupancyRateResolver rateResolver;
 
     public AvailabilityServiceImpl(HotelRepository hotelRepository,
                                    HotelRoomTypeRepository roomTypeRepository,
@@ -54,7 +55,8 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                                    DailyInventoryRepository dailyInventoryRepository,
                                    DailyRateRepository dailyRateRepository,
                                    AuthAccessClient authAccessClient,
-                                   Clock clock) {
+                                   Clock clock,
+                                   OccupancyRateResolver rateResolver) {
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.ratePlanRepository = ratePlanRepository;
@@ -62,6 +64,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
         this.dailyRateRepository = dailyRateRepository;
         this.authAccessClient = authAccessClient;
         this.clock = clock;
+        this.rateResolver = rateResolver;
     }
 
     @Override
@@ -165,14 +168,15 @@ public class AvailabilityServiceImpl implements AvailabilityService {
     /** Inventory and rate lookups keyed for quick per-night access. */
     private static final class Index {
         private final Map<String, DailyInventory> inventory = new HashMap<>();
-        private final Map<String, DailyRate> rates = new HashMap<>();
+        private final Map<String, List<DailyRate>> rates = new HashMap<>();
 
         Index(List<DailyInventory> inv, List<DailyRate> rt) {
             for (DailyInventory di : inv) {
                 inventory.put(di.getRoomTypeId() + "|" + di.getStayDate(), di);
             }
             for (DailyRate dr : rt) {
-                rates.put(dr.getRoomTypeId() + "|" + dr.getRatePlanId() + "|" + dr.getStayDate() + "|" + dr.getOccupancy(), dr);
+                rates.computeIfAbsent(dr.getRoomTypeId() + "|" + dr.getRatePlanId() + "|" + dr.getStayDate(),
+                        k -> new ArrayList<>()).add(dr);
             }
         }
 
@@ -181,8 +185,8 @@ public class AvailabilityServiceImpl implements AvailabilityService {
             return inv != null && !inv.isStopSell() && inv.getAvailable() >= rooms;
         }
 
-        DailyRate rate(UUID roomTypeId, UUID ratePlanId, LocalDate date, int occupancy) {
-            return rates.get(roomTypeId + "|" + ratePlanId + "|" + date + "|" + occupancy);
+        List<DailyRate> rates(UUID roomTypeId, UUID ratePlanId, LocalDate date) {
+            return rates.get(roomTypeId + "|" + ratePlanId + "|" + date);
         }
     }
 
@@ -205,7 +209,8 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                         sellable = false;
                         break;
                     }
-                    DailyRate rate = index.rate(roomType.getId(), ratePlan.getId(), date, occupancy);
+                    DailyRate rate = rateResolver.resolve(
+                            index.rates(roomType.getId(), ratePlan.getId(), date), occupancy, roomType.getMaxOccupancy());
                     if (rate == null) {
                         sellable = false;
                         break;
@@ -270,7 +275,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                 continue;
             }
             for (RatePlan rp : ratePlans) {
-                if (index.rate(rt.getId(), rp.getId(), date, occupancy) != null) {
+                if (rateResolver.resolve(index.rates(rt.getId(), rp.getId(), date), occupancy, rt.getMaxOccupancy()) != null) {
                     return true;
                 }
             }

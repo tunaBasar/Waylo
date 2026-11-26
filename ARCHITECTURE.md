@@ -180,6 +180,12 @@ confirm/release'i yayın durumuna bakmaz. Kuruluş durumu auth-service'ten 30 sn
 kuruluş otelleri gizlenir (fail-closed). V10 öncesindeki bütün oteller PUBLISHED olarak devralındı. Kuruluşu olmayan
 22 legacy otel salt-okunur görünür (sahiplik kararı kullanıcıda). Bus satışları hukuki maddeler kapanana kadar kapalıdır.
 
+**Kişi sayısına göre fiyat kuralı:** tam eşleşen `daily_rates` satırı varsa o kullanılır. Yoksa aynı (oda tipi, rate plan, gece)
+için, oda tipinin `maxOccupancy` değerini aşmayan en küçük daha yüksek kişi sayısının fiyatı kullanılır (oda fiyatı daha az
+misafire de geçerlidir). Aşağı yönde fallback yoktur: 2 kişilik fiyat 3 kişiyi kapsamaz. Kural tek bileşende
+(`OccupancyRateResolver`) durur ve müsaitlik (açıklama ve sonraki tarih dahil) ile quote aynı çözümü kullanır, böylece toplamlar
+aynıdır. Partner takvimi yalnız `maxOccupancy` fiyatı yazar; bu fiyat 1..max aramaları kapsar.
+
 **Konaklama tamamlama (RM-29):** QR okutma check-in sayılır ve escrow'u serbest bırakır. Partner check-out'u ayrıca kaydeder
 (`.../order-items/{id}/check-out`). Yorum hakkı yalnız kayıtlı check-out'tan sonra doğar; tarih geçmesi yetmez, NO_SHOW ve
 iptal hak vermez.

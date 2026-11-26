@@ -176,20 +176,20 @@ export default function CalendarPage() {
     return map;
   }, [rates, roomType]);
 
-  // Nights that have stock but lack a price for some occupancy (1..maxOccupancy) on an active plan.
+  // Nights that have stock but where no occupancy (1..maxOccupancy) is priced on any active plan.
+  // A single max-occupancy price covers 1..max through the backend fallback, so those nights are fine.
   const missingPrices = useMemo(() => {
-    const result = new Map<IsoDate, number[]>();
+    const result: IsoDate[] = [];
     if (!roomType) return result;
-    const priced = new Set(rates.map(r => `${r.ratePlanId}|${r.stayDate}|${r.occupancy}`));
+    const activeIds = new Set(activePlans.map(p => p.id));
+    const priced = new Set(
+      rates
+        .filter(r => activeIds.has(r.ratePlanId) && r.occupancy >= 1 && r.occupancy <= roomType.maxOccupancy)
+        .map(r => r.stayDate),
+    );
     for (const row of inventory) {
       if (row.stopSell || row.allotment - row.held - row.confirmed <= 0) continue;
-      const missing = new Set<number>();
-      for (const plan of activePlans) {
-        for (let occ = 1; occ <= roomType.maxOccupancy; occ++) {
-          if (!priced.has(`${plan.id}|${row.stayDate}|${occ}`)) missing.add(occ);
-        }
-      }
-      if (missing.size > 0) result.set(row.stayDate, [...missing].sort((a, b) => a - b));
+      if (!priced.has(row.stayDate)) result.push(row.stayDate);
     }
     return result;
   }, [inventory, rates, roomType, activePlans]);
@@ -400,12 +400,12 @@ export default function CalendarPage() {
           <Button variant="ghost" onClick={() => { if (hotelId && roomTypeId) void loadGrid(hotelId, roomTypeId, from); }}>Tekrar dene</Button>
         </Card>
       )}
-      {missingPrices.size > 0 && (
+      {missingPrices.length > 0 && (
         <Card className="p-3 text-sm text-on-surface">
           <div role="status" data-testid="calendar-missing-prices">
-            <span className="font-medium">Fiyatsiz kisi sayisi var: </span>
-            {[...missingPrices.entries()].map(([d, occ]) => `${d} (${occ.join(', ')} kisi)`).join('; ')}.
-            {' '}Bu gecelerde oda var ama bazi kisi sayilari icin fiyat yok, bu yuzden musteriler bu tarihleri goremeyebilir.
+            <span className="font-medium">Bu gecelerde oda var ama fiyat yok: </span>
+            {missingPrices.join(', ')}.
+            {' '}Fiyat girilmedigi icin musteriler bu tarihleri goremeyebilir.
           </div>
         </Card>
       )}
