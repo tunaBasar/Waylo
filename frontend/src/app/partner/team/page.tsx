@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
-import { ROLE_LABEL, partnerErrorMessage, partnerApi, teamInviteErrorMessage, type PartnerRole, type TeamMember } from '@/lib/partner';
+import { ROLE_LABEL, partnerErrorMessage, sectionErrorMessage, partnerApi, teamInviteErrorMessage, type PartnerRole, type TeamMember } from '@/lib/partner';
 import { formatDate } from '@/lib/utils';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader } from '@/components/partner/ui';
@@ -10,7 +10,7 @@ import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader } 
 const GRANTABLE: PartnerRole[] = ['HOTEL_MANAGER', 'HOTEL_STAFF', 'HOTEL_OWNER'];
 
 export default function PartnerTeamPage() {
-  const { organizationId, hotels, hotelId, isCarRentalOrg, isBusOrg, loading: workspaceLoading } = usePartner();
+  const { membership, organizationId, hotels, hotelId, isCarRentalOrg, isBusOrg, loading: workspaceLoading } = usePartner();
   const flight = useSingleFlight();
   const [reloads, setReloads] = useState(0);
   const key = `${organizationId}|${reloads}`;
@@ -26,9 +26,9 @@ export default function PartnerTeamPage() {
     let alive = true;
     partnerApi.members(organizationId)
       .then(res => { if (alive) setResult({ key, members: res.data ?? [], error: null }); })
-      .catch(e => { if (alive) setResult({ key, members: [], error: partnerErrorMessage(e, 'Ekip yuklenemedi') }); });
+      .catch(e => { if (alive) setResult({ key, members: [], error: sectionErrorMessage(e, membership?.roles, 'Ekip yuklenemedi') }); });
     return () => { alive = false; };
-  }, [organizationId, key]);
+  }, [organizationId, key, membership?.roles]);
 
   const load = async () => setReloads(n => n + 1);
   const loading = result?.key !== key && !result;

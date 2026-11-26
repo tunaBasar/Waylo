@@ -8,6 +8,7 @@ import {
   isVersionConflict,
   partnerApi,
   partnerErrorMessage,
+  sectionErrorMessage,
   type RatePlan,
   type MealPlan,
   type CancellationPolicy,
@@ -196,10 +197,10 @@ function RatePlanForm({
 }
 
 export default function RatePlansPage() {
-  const { hotelId, loading: workspaceLoading } = usePartner();
+  const { membership, hotelId, loading: workspaceLoading } = usePartner();
   const [plans, setPlans] = useState<RatePlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ err: unknown } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<RatePlan | null>(null);
 
@@ -209,7 +210,7 @@ export default function RatePlansPage() {
       setPlans(res.data ?? []);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Yuklenemedi');
+      setError({ err: e });
     } finally {
       setLoading(false);
     }
@@ -257,7 +258,7 @@ export default function RatePlansPage() {
   if (workspaceLoading) return <LoadingRows />;
   if (!hotelId) return <NeedsHotel />;
   if (loading) return <LoadingRows />;
-  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={error} />;
+  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={sectionErrorMessage(error.err, membership?.roles, 'Yuklenemedi')} />;
 
   return (
     <div className="space-y-space-lg">

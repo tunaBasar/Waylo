@@ -532,6 +532,12 @@ export function teamInviteErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.status === 404) {
     return 'Bu e-posta ile kayitli bir Waylo hesabi yok. Kisiden once Waylo\'ya kayit olmasini ve e-postasini dogrulamasini isteyin.';
   }
+  // auth-service RoleGrantService texts are English; the known 409s get Turkish text, anything else passes through.
+  if (err instanceof ApiError && err.status === 409) {
+    if (/already exists/i.test(err.message)) return 'Bu kisi bu otelde zaten bu role sahip.';
+    if (/membership is not active/i.test(err.message)) return 'Bu kisinin isletme uyeligi pasif. Once uyeligi yeniden etkinlestirin.';
+    if (/organization is not active/i.test(err.message)) return 'Isletme aktif degil, rol verilemez.';
+  }
   return partnerErrorMessage(err, 'Rol verilemedi');
 }
 
@@ -544,7 +550,20 @@ export function partnerErrorMessage(err: unknown, fallback: string): string {
   if (isVersionConflict(err)) {
     return 'Bu kayit siz duzenlerken baska biri tarafindan degistirildi. Guncel bilgiler yuklendi, tekrar deneyin.';
   }
+  if (err instanceof ApiError && err.status === 403) return 'Bu islem icin yetkiniz yok.';
   return (err instanceof Error && err.message) || fallback;
+}
+
+/** Page-level load error: a 403 names the user's role ("Bu bolum icin yetkiniz yok ..."), other errors pass through. */
+export function sectionErrorMessage(err: unknown, roles: RoleGrant[] | undefined, fallback: string): string {
+  if (err instanceof ApiError && err.status === 403) {
+    const order: PartnerRole[] = ['ORGANIZATION_OWNER', 'HOTEL_OWNER', 'HOTEL_MANAGER', 'HOTEL_STAFF'];
+    const top = order.find(r => roles?.some(g => g.role === r));
+    return top
+      ? `Bu bolum icin yetkiniz yok (rolunuz: ${ROLE_LABEL[top]}). Isletme sahibinden yetki isteyin.`
+      : 'Bu bolum icin yetkiniz yok. Isletme sahibinden yetki isteyin.';
+  }
+  return partnerErrorMessage(err, fallback);
 }
 
 export const PUBLICATION_STATUS_LABEL: Record<PublicationStatus, string> = {

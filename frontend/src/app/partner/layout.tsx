@@ -1,5 +1,6 @@
 'use client';
 
+import { hotelNavFor } from '@/lib/partner-permissions';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { PartnerProvider, usePartner } from '@/lib/partner-context';
@@ -252,12 +253,12 @@ function PartnerChrome({ children }: { children: React.ReactNode }) {
 // ── Frame (selects nav based on businessType) ─────────────────────────────────
 
 function PartnerFrame({ children }: { children: React.ReactNode }) {
-  const { memberships, loading, error, membership, isCarRentalOrg, isBusOrg } = usePartner();
+  const { memberships, loading, error, membership, hotelId, isCarRentalOrg, isBusOrg } = usePartner();
   const hasMembership = loading || error ? null : memberships.length > 0;
 
   // Determine nav and subtitle
   const noOrg = !loading && !error && memberships.length === 0;
-  const nav = noOrg ? onboardingNav : isCarRentalOrg ? carNav : isBusOrg ? busNav : hotelNav;
+  const nav = noOrg ? onboardingNav : isCarRentalOrg ? carNav : isBusOrg ? busNav : hotelNavFor(membership, hotelId, hotelNav);
   const subtitle = membership?.organizationName ?? 'Isletme Paneli';
 
   return (

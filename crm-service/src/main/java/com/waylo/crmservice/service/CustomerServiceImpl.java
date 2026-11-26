@@ -46,7 +46,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override @Transactional(readOnly = true)
     public List<CustomerResponse> getAll() {
-        return repository.findAll().stream().map(mapper::toResponse).toList();
+        return repository.findAllByOrderByCreatedAtDesc().stream().map(mapper::toResponse).toList();
     }
 
     @Override @Transactional(readOnly = true)

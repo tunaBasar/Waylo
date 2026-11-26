@@ -143,7 +143,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional(readOnly = true)
     public List<NotificationResponse> getAll() {
-        return repository.findAll().stream().map(mapper::toResponse).toList();
+        return repository.findTop500ByOrderByCreatedAtDesc().stream().map(mapper::toResponse).toList();
     }
 
     @Override @Transactional(readOnly = true)
@@ -187,7 +187,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override @Transactional(readOnly = true)
     public List<NotificationResponse> getByStatus(NotificationStatus status) {
-        return repository.findByStatus(status).stream().map(mapper::toResponse).toList();
+        return repository.findTop500ByStatusOrderByCreatedAtDesc(status).stream().map(mapper::toResponse).toList();
     }
 
     private Notification findOrThrow(UUID id) {

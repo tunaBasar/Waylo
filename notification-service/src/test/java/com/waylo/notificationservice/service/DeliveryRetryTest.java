@@ -249,7 +249,7 @@ class DeliveryRetryTest {
     @Test
     void getByStatus_delegatesToRepository() {
         Notification g = n(NotificationStatus.GAVE_UP, 5);
-        when(repository.findByStatus(NotificationStatus.GAVE_UP)).thenReturn(List.of(g));
+        when(repository.findTop500ByStatusOrderByCreatedAtDesc(NotificationStatus.GAVE_UP)).thenReturn(List.of(g));
         NotificationResponse r = mock(NotificationResponse.class);
         when(mapper.toResponse(g)).thenReturn(r);
 

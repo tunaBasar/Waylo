@@ -4,7 +4,7 @@ import { codeHint, normalizeCode } from '@/lib/code';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
-import { isVersionConflict, partnerApi, partnerErrorMessage, type RoomType } from '@/lib/partner';
+import { isVersionConflict, partnerApi, partnerErrorMessage, sectionErrorMessage, type RoomType } from '@/lib/partner';
 import { Button, Card, EmptyState, Field, LoadingRows, NeedsHotel, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 function RoomTypeForm({
@@ -215,10 +215,10 @@ function StatusToggle({ roomType, hotelId, onUpdated }: {
 }
 
 export default function RoomTypesPage() {
-  const { hotelId, loading: workspaceLoading } = usePartner();
+  const { membership, hotelId, loading: workspaceLoading } = usePartner();
   const [items, setItems] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ err: unknown } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<RoomType | null>(null);
 
@@ -228,7 +228,7 @@ export default function RoomTypesPage() {
       setItems(res.data ?? []);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Yuklenemedi');
+      setError({ err: e });
     } finally {
       setLoading(false);
     }
@@ -244,7 +244,7 @@ export default function RoomTypesPage() {
   if (workspaceLoading) return <LoadingRows />;
   if (!hotelId) return <NeedsHotel />;
   if (loading) return <LoadingRows />;
-  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={error} />;
+  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={sectionErrorMessage(error.err, membership?.roles, 'Yuklenemedi')} />;
 
   return (
     <div className="space-y-space-lg">

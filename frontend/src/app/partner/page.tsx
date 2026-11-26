@@ -274,8 +274,11 @@ function PublicationPanel({ hotel, organizationStatus, canManage, photosVersion 
 
   const refresh = useCallback(async () => {
     try {
-      const reqs = await partnerApi.publicationRequests(hotel.id);
-      setRequests(reqs.data ?? []);
+      // staff cannot read publication requests (403): skip the call instead of showing an error
+      if (canManage) {
+        const reqs = await partnerApi.publicationRequests(hotel.id);
+        setRequests(reqs.data ?? []);
+      }
       if (canManage) {
         // photos are optional for a request: a failed list only hides the checklist (photos stay in the per-photo queue)
         setPhotos(await hotelMediaApi.list(hotel.id).then(r => r.data ?? [], () => []));
@@ -371,6 +374,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage, photosVersion 
         {!hotel.active && <StatusPill tone="neutral">Satis duraklatildi</StatusPill>}
       </div>
       {loadError && <p className="text-xs text-error">{loadError}</p>}
+      {!canManage && <p className="text-xs text-on-surface-variant">Yayin islemleri otel yoneticisi veya isletme sahibi tarafindan yapilir.</p>}
 
       {rejection?.decision?.reason && (
         <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">Red gerekcesi: {rejection.decision.reason}</p>

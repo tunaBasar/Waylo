@@ -123,17 +123,19 @@ class NotificationServiceImplTest {
     // --- getAll ---
 
     @Test
-    void getAll_returnsMappedList() {
+    void getAll_returnsMappedList_newestFirstFromTheCappedQuery() {
+        // F58: the admin list must come from the sorted, capped query, never the unsorted findAll().
         service = newService();
         Notification notification = buildNotification(notificationId, NotificationStatus.SENT);
         NotificationResponse response = mock(NotificationResponse.class);
 
-        when(repository.findAll()).thenReturn(List.of(notification));
+        when(repository.findTop500ByOrderByCreatedAtDesc()).thenReturn(List.of(notification));
         when(mapper.toResponse(notification)).thenReturn(response);
 
         List<NotificationResponse> result = service.getAll();
 
         assertThat(result).containsExactly(response);
+        verify(repository, never()).findAll();
     }
 
     // --- getByCustomerId ---

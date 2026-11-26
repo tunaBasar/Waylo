@@ -19,6 +19,8 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     List<Customer> findByActiveTrue();
     boolean existsByEmail(String email);
     List<Customer> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(String firstName, String lastName);
+    /** Admin list (F60): newest customers first. The page searches client-side, so no cap. */
+    List<Customer> findAllByOrderByCreatedAtDesc();
 
     /**
      * Creates the CRM record for an auth user with the SAME id as the auth userId, so that

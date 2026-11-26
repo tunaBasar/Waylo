@@ -17,6 +17,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findByCustomerId(UUID customerId);
     List<Notification> findByBookingId(UUID bookingId);
     List<Notification> findByStatus(NotificationStatus status);
+    /** Admin list (F58): newest first, capped. The unsorted findAll() put October seed rows above today's mails. */
+    List<Notification> findTop500ByOrderByCreatedAtDesc();
+    List<Notification> findTop500ByStatusOrderByCreatedAtDesc(NotificationStatus status);
     /** Claims due FAILED rows. Rows locked by other instances are skipped. Must run inside the transaction that sends them. */
     @Query(value = "SELECT * FROM notifications WHERE status = 'FAILED' AND retry_count < :max AND next_attempt_at <= :now "
             + "ORDER BY next_attempt_at LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)

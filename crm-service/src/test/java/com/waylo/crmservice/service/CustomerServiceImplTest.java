@@ -124,16 +124,18 @@ class CustomerServiceImplTest {
     // --- getAll ---
 
     @Test
-    void getAll_mapsAllCustomers() {
+    void getAll_mapsAllCustomers_newestFirst() {
+        // F60: the admin list comes from the createdAt-desc query, never the unsorted findAll().
         service = newService();
         Customer c1 = buildCustomer(UUID.randomUUID(), CustomerTier.BRONZE, 0);
         Customer c2 = buildCustomer(UUID.randomUUID(), CustomerTier.GOLD, 100);
-        when(repository.findAll()).thenReturn(List.of(c1, c2));
+        when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(c1, c2));
         when(mapper.toResponse(any(Customer.class))).thenReturn(mock(CustomerResponse.class));
 
         List<CustomerResponse> result = service.getAll();
 
         assertThat(result).hasSize(2);
+        verify(repository, never()).findAll();
     }
 
     // --- getByTier ---

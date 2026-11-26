@@ -15,6 +15,7 @@ import { usePartner } from '@/lib/partner-context';
 import {
   partnerApi,
   partnerErrorMessage,
+  sectionErrorMessage,
   isVersionConflict,
   MEAL_PLAN_LABEL,
   type DailyInventory,
@@ -69,7 +70,7 @@ const NO_EDITS: Edits = { allotment: {}, stopSell: {}, amount: {} };
 
 export default function CalendarPage() {
   const toast = useToast();
-  const { hotelId, loading: workspaceLoading, setHasUnsavedChanges } = usePartner();
+  const { membership, hotelId, loading: workspaceLoading, setHasUnsavedChanges } = usePartner();
   const today = useMemo(() => toIso(new Date()), []);
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -83,7 +84,7 @@ export default function CalendarPage() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [gridLoading, setGridLoading] = useState(false);
   const [gridError, setGridError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ err: unknown } | null>(null);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const gridRequest = useRef(0);
@@ -112,7 +113,7 @@ export default function CalendarPage() {
       setHotelCurrency(cur.data?.currency ?? null);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Katalog yuklenemedi');
+      setError({ err: e });
     } finally {
       setCatalogLoading(false);
     }
@@ -328,7 +329,7 @@ export default function CalendarPage() {
   if (workspaceLoading) return <LoadingRows />;
   if (!hotelId) return <NeedsHotel />;
   if (catalogLoading) return <LoadingRows />;
-  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={error} />;
+  if (error) return <EmptyState icon="error" title="Yuklenemedi" description={sectionErrorMessage(error.err, membership?.roles, 'Katalog yuklenemedi')} />;
   if (roomTypes.length === 0) {
     return <EmptyState icon="bed" title="Aktif oda tipi yok"
       description="Takvimi kullanmak icin Oda tipleri sayfasindan en az bir aktif oda tipi tanimlayin." />;

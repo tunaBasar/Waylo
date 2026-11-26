@@ -51,10 +51,13 @@ test('F52 formatTrAmountInput is Turkish and round-trips', () => {
   }
 });
 
-test('F56 teamInviteErrorMessage explains an unknown invitee, other errors keep their text', () => {
+test('F56 teamInviteErrorMessage explains an unknown invitee and the known conflicts', () => {
   const E = partner.__ApiError;
   assert.match(partner.teamInviteErrorMessage(new E('kullanici bulunamadi', 404, null)), /kayitli bir Waylo hesabi yok/);
-  assert.equal(partner.teamInviteErrorMessage(new E('Role assignment already exists', 409, null)), 'Role assignment already exists');
+  assert.equal(partner.teamInviteErrorMessage(new E('Role assignment already exists', 409, null)), 'Bu kisi bu otelde zaten bu role sahip.');
+  assert.match(partner.teamInviteErrorMessage(new E('Target user membership is not active', 409, null)), /uyeligi pasif/);
+  assert.match(partner.teamInviteErrorMessage(new E('Organization is not active', 409, null)), /Isletme aktif degil/);
+  assert.equal(partner.teamInviteErrorMessage(new E('Something else', 409, null)), 'Something else');
   assert.equal(partner.teamInviteErrorMessage(new Error('')), 'Rol verilemedi');
 });
 
