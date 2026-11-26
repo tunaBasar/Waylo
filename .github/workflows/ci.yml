@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 scripts/check-bean-constructors.py
           python3 scripts/check-yaml-duplicates.py
+          python3 scripts/check-service-keys.py
       - name: Gradle test (all modules)
         run: ./gradlew test --no-daemon
 
