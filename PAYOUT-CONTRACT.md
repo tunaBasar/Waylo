@@ -98,7 +98,7 @@ Timing rules:
 | P1 | (new) | REQUESTED | partner (org OWNER role, sec. 3.2) | amount, currency, `Idempotency-Key` | `RESERVE` (`payable_delta = -amount`) |
 | P2 | REQUESTED | APPROVED | admin | none | none (decision row in `payout_events`) |
 | P3 | APPROVED | PROCESSING | admin | none ("bank transfer started") | none |
-| P4 | PROCESSING | PAID | admin | `reference` (bank transfer ref, 3..100 chars, unique), optional `paidAt` (default now, not in the future) | `PAID` legs: `DR SUPPLIER_PAYABLE amount`, `CR SUPPLIER_PAID amount`, `payable_delta = 0` |
+| P4 | PROCESSING | PAID | admin | `reference` (bank transfer ref, 3..100 chars, unique), optional `paidAt` (default now, not in the future, not before the minute of `requestedAt`: 400 `PAID_AT_BEFORE_REQUEST`) | `PAID` legs: `DR SUPPLIER_PAYABLE amount`, `CR SUPPLIER_PAID amount`, `payable_delta = 0` |
 | P5 | PROCESSING | FAILED | admin | `reason` (5..500) | `RESERVE_RELEASE` (`payable_delta = +amount`) |
 | P6 | REQUESTED | CANCELLED | partner (own org, owner role) or admin | partner: none. admin: `reason` | `RESERVE_RELEASE` |
 | P7 | APPROVED | CANCELLED | admin only | `reason` (5..500) | `RESERVE_RELEASE` |
@@ -162,6 +162,7 @@ Masking (every response, log line and event):
 - Binding format: responses carry `ibanLast4` (4 chars) and `maskedIban` = `"TR** **** **** **** **** **" + last4.substring(2)`, e.g. `TR** **** **** **** **** **26`. Check digits and the middle are never shown. One helper `IbanMask.mask(last4)` is the only code that formats an IBAN. Tests assert the full IBAN and its middle digits never appear in any response body, log, event payload or email.
 - The ciphertext and hash never leave the service (no field in any DTO, `@JsonIgnore` is not enough: DTOs are separate records without them).
 - The only place the full IBAN is returned: `GET /api/admin/payouts/{id}/bank-details` (ADMIN, status APPROVED or PROCESSING only, otherwise 409 `INVALID_STATE_TRANSITION`). It returns the snapshot IBAN and holder name so the admin can send the transfer, and writes a `REVEALED` row in `partner_bank_account_changes` (actor, payout id in `reason`). Response header `Cache-Control: no-store`. This is the one deliberate exception to "masked everywhere" and is open decision 4 (alternative: show masked and require the admin to read it from the bank portal, unworkable).
+- Also: `GET /api/admin/bank-accounts/{id}/iban` (ADMIN only, any account status, 404 if unknown) returns `{bankAccountId, accountHolderName, iban}` so the admin can check a PENDING_VERIFICATION account against the organization's documents. It writes a `REVEALED` row with `reason` = `bank-account:{id}` and returns `Cache-Control: no-store`. The UI keeps the IBAN in component state only.
 - Request logging must not log request bodies of the bank-account endpoints (implementation verifies there is no body logging filter).
 
 No real money movement: provider integration is out of scope. `PROCESSING` means the admin has started a manual bank transfer. `PAID` records `reference` and `paid_by`. A later task may replace P3-P4 with a provider call behind a new port, without changing the lifecycle.
@@ -377,6 +378,7 @@ The existing `GET .../earnings` is fixed in the same slice to group by currency:
 | `GET /api/admin/payouts?status=&organizationId=&currency=&page=&size=` | queue, default status filter REQUESTED,APPROVED,PROCESSING, oldest first |
 | `GET /api/admin/payouts/{id}` | detail with `events[]`, masked IBAN, org balance snapshot |
 | `GET /api/admin/payouts/{id}/bank-details` | full IBAN reveal (sec. 4), audited, `no-store` |
+| `GET /api/admin/bank-accounts/{id}/iban` | full IBAN reveal for a bank account (sec. 4), audited `bank-account:{id}`, `no-store` |
 | `POST /api/admin/payouts/{id}/approve` | P2 |
 | `POST /api/admin/payouts/{id}/processing` | P3 |
 | `POST /api/admin/payouts/{id}/paid` | P4, body `{ "reference": "TRF-2026-11-24-001", "paidAt": "optional instant" }` |

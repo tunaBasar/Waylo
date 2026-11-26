@@ -58,6 +58,7 @@ class ControllerAuthTest {
             assertThatThrownBy(() -> controller.queue(user, role, null, null, null, 0, 20)).isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> controller.detail(user, role, id)).isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> controller.bankDetails(user, role, id)).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(() -> controller.bankAccountIban(user, role, id)).isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> controller.approve(user, role, id, null)).isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> controller.processing(user, role, id, null)).isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> controller.paid(user, role, id, paid)).isInstanceOf(AccessDeniedException.class);

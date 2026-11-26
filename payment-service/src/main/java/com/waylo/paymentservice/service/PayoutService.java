@@ -231,6 +231,12 @@ public class PayoutService {
         PartnerPayout p = lock(payoutId, null);
         if (p.getStatus() == PayoutStatus.PAID) return toResponse(p);
         guard(p, PayoutStatus.PAID, PayoutActorType.ADMIN, expectedVersion);
+        // A bank transfer cannot happen before the partner asked for it (F53, a typo here would misdate the books).
+        // Minute precision, like the admin's date-time input: the request minute itself is accepted.
+        if (paidAt != null && p.getRequestedAt() != null
+                && paidAt.isBefore(p.getRequestedAt().truncatedTo(java.time.temporal.ChronoUnit.MINUTES))) {
+            throw new BadRequestException("PAID_AT_BEFORE_REQUEST", "paidAt cannot be earlier than the payout request");
+        }
         requireBankAccountUnchanged(p);
         if (settings.isRequireDifferentAdmins() && adminId.equals(p.getApprovedBy())) {
             throw new AccessDeniedException("SAME_ADMIN_NOT_ALLOWED", "A different administrator must mark this payout as paid");

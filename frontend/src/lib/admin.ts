@@ -117,6 +117,7 @@ export interface AdminPayout extends PartnerPayout {
 export interface AdminPayoutDetail extends AdminPayout { events?: PayoutEventRow[]; organizationBalance?: AdminPayoutBalance | null }
 export interface AdminPayoutPage { items: AdminPayout[]; page: number; size: number; total: number }
 export interface AdminBankDetails { iban: string; accountHolderName: string }
+export interface AdminBankAccountIban { bankAccountId: string; accountHolderName: string; iban: string }
 export interface AdminBankAccount {
   id: string; organizationId: string; accountHolderName: string; ibanLast4: string; maskedIban: string;
   status: BankAccountStatus; verifiedAt: string | null; rejectReason: string | null; updatedAt: string; version: number;
@@ -127,7 +128,28 @@ export interface PayoutAdjustmentRequest {
 }
 export type AdminPayoutAction = 'approve' | 'processing' | 'paid' | 'failed' | 'cancel';
 
+export type AdminPayoutActionKey = 'approve' | 'processing' | 'paid' | 'failed' | 'cancel';
+export interface PayoutActionSpec { action: AdminPayoutActionKey; label: string; variant: 'primary' | 'secondary' | 'danger' | 'ghost' }
+
+/** Mirrors PayoutStateMachine: only the actions valid for a status, plus a short hint. Terminal states have none. */
+export function payoutActionsFor(status: PayoutStatus): { actions: PayoutActionSpec[]; hint: string | null } {
+  switch (status) {
+    case 'REQUESTED':
+      return { hint: 'Bakiyeyi kontrol edip onaylayin.', actions: [
+        { action: 'approve', label: 'Onayla', variant: 'primary' }, { action: 'cancel', label: 'Iptal', variant: 'ghost' }] };
+    case 'APPROVED':
+      return { hint: "Havaleyi baslatirken Isleme al'a basin.", actions: [
+        { action: 'processing', label: 'Isleme al', variant: 'secondary' }, { action: 'cancel', label: 'Iptal', variant: 'ghost' }] };
+    case 'PROCESSING':
+      return { hint: 'Havale yapildiysa Odendi olarak isaretleyin.', actions: [
+        { action: 'paid', label: 'Odendi', variant: 'primary' }, { action: 'failed', label: 'Basarisiz', variant: 'danger' }] };
+    default:
+      return { hint: null, actions: [] };
+  }
+}
+
 export const adminApi = {
+  bankAccountIban: (id: string) => api.get<AdminBankAccountIban>(`/api/admin/bank-accounts/${enc(id)}/iban`),
   payouts: (f: { status?: string; organizationId?: string; currency?: string; page?: number; size?: number } = {}) => {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== '') q.set(k, String(v));

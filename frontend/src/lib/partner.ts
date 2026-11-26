@@ -527,6 +527,14 @@ export function isVersionConflict(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409 && err.code === 'CONCURRENT_MODIFICATION';
 }
 
+/** Turkish text for a failed team invite: an unknown e-mail (404) gets guidance instead of the raw backend text (F56). */
+export function teamInviteErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 404) {
+    return 'Bu e-posta ile kayitli bir Waylo hesabi yok. Kisiden once Waylo\'ya kayit olmasini ve e-postasini dogrulamasini isteyin.';
+  }
+  return partnerErrorMessage(err, 'Rol verilemedi');
+}
+
 /**
  * Turns a failed partnerApi call into a Turkish message for the user. Optimistic-lock conflicts
  * (someone else saved the same record first) get an actionable explanation instead of the raw
@@ -760,6 +768,7 @@ export const PAYOUT_ERROR_LABEL: Record<string, string> = {
   BANK_ACCOUNT_CHANGED: 'Banka hesabi talepten sonra degisti. Talebi iptal edip yeniden olusturun.',
   ORGANIZATION_NOT_ACTIVE: 'Isletme aktif degil.',
   PAYMENT_REFERENCE_IN_USE: 'Bu banka referansi baska bir odemede kullanilmis.',
+  PAID_AT_BEFORE_REQUEST: 'Odeme tarihi talep tarihinden once olamaz.',
   INSUFFICIENT_PAYABLE_BALANCE: 'Tutar cekilebilir bakiyeyi asiyor.',
   PAYOUT_BELOW_MINIMUM: 'Tutar asgari odeme tutarinin altinda.',
   PAYOUT_CURRENCY_NOT_SUPPORTED: 'Bu para birimi icin odeme yapilmiyor.',
@@ -771,6 +780,22 @@ export const PAYOUT_ERROR_LABEL: Record<string, string> = {
 
 export function isPayoutVersionConflict(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409 && err.code === 'VERSION_CONFLICT';
+}
+
+/**
+ * Checks an optional admin "paid at" value (F53): it may not be in the future and not before the partner's request,
+ * because a transfer cannot happen before it was asked for. Null when acceptable or empty.
+ */
+export function paidAtProblem(paidAt: Date | null, requestedAt: string | null, now: Date = new Date()): string | null {
+  if (!paidAt) return null;
+  if (Number.isNaN(paidAt.getTime())) return 'Gecersiz tarih.';
+  if (paidAt.getTime() > now.getTime()) return 'Odeme tarihi gelecekte olamaz.';
+  const req = requestedAt ? new Date(requestedAt) : null;
+  // datetime-local has minute precision: the request minute itself is allowed.
+  if (req && !Number.isNaN(req.getTime()) && paidAt.getTime() < Math.floor(req.getTime() / 60000) * 60000) {
+    return 'Odeme tarihi talep tarihinden once olamaz.';
+  }
+  return null;
 }
 
 /** Turkish message for a failed payout call: by error code first, then backend text, then fallback. */
@@ -803,6 +828,17 @@ export function isValidTrIban(raw: string): boolean {
     for (const d of digits) remainder = (remainder * 10 + (d.charCodeAt(0) - 48)) % 97;
   }
   return remainder === 1;
+}
+
+export const IBAN_SHAPE_ERROR = 'IBAN TR ile baslamali ve 24 rakam icermeli (toplam 26 karakter).';
+export const IBAN_CHECKSUM_ERROR = "IBAN kontrol hanesi tutmuyor. Lutfen IBAN'i kontrol edin.";
+
+/** Null when the IBAN is valid (or empty), otherwise a Turkish message that says whether shape or checksum is wrong. */
+export function ibanProblem(raw: string): string | null {
+  const iban = normalizeIban(raw);
+  if (!iban) return null;
+  if (!/^TR[0-9]{24}$/.test(iban)) return IBAN_SHAPE_ERROR;
+  return isValidTrIban(raw) ? null : IBAN_CHECKSUM_ERROR;
 }
 
 /** Same format as the backend IbanMask: check digits and middle never shown, last 2 digits only. */

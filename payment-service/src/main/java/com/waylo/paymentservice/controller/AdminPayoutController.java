@@ -107,6 +107,13 @@ public class AdminPayoutController {
         return ResponseEntity.ok(ApiResponse.of(bankAccounts.adminList(userId, role, status, size)));
     }
 
+    @GetMapping("/bank-accounts/{id}/iban")
+    public ResponseEntity<ApiResponse<PayoutDtos.BankAccountIbanResponse>> bankAccountIban(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role, @PathVariable UUID id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.of(bankAccounts.revealAccount(userId, role, id)));
+    }
+
     @PostMapping("/bank-accounts/{id}/verify")
     public ResponseEntity<ApiResponse<PayoutDtos.AdminBankAccountResponse>> verify(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,

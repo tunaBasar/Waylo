@@ -187,6 +187,17 @@ public class BankAccountService {
         return new PayoutDtos.BankDetailsResponse(p.getId(), p.getAccountHolderName(), iban);
     }
 
+    /** Audited admin reveal of a bank account IBAN so it can be checked against the organization's documents. Any status. */
+    @Transactional
+    public PayoutDtos.BankAccountIbanResponse revealAccount(UUID adminId, String role, UUID accountId) {
+        PayoutAccess.requireAdmin(adminId, role);
+        PartnerBankAccount a = accounts.findById(accountId).orElseThrow(() -> new ResourceNotFoundException("BankAccount", "id", accountId));
+        String iban = crypto.decrypt(a.getIbanCiphertext());
+        changes.save(new BankAccountChange(a.getId(), a.getOrganizationId(), BankAccountChangeType.REVEALED, a.getIbanLast4(), null,
+                null, null, adminId, PayoutActorType.ADMIN, "bank-account:" + a.getId(), Instant.now()));
+        return new PayoutDtos.BankAccountIbanResponse(a.getId(), a.getAccountHolderName(), iban);
+    }
+
     private PartnerBankAccount lockPending(UUID accountId) {
         PartnerBankAccount a = accounts.findByIdForUpdate(accountId).orElseThrow(() -> new ResourceNotFoundException("BankAccount", "id", accountId));
         if (a.getStatus() != BankAccountStatus.PENDING_VERIFICATION) {

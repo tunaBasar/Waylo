@@ -144,7 +144,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(orgOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
         when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
         when(membershipRepository.save(any(OrganizationMembership.class))).thenAnswer(inv -> {
             OrganizationMembership saved = inv.getArgument(0);
@@ -177,7 +177,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(hotelOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
         when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
         when(membershipRepository.save(any(OrganizationMembership.class))).thenAnswer(inv -> {
             OrganizationMembership saved = inv.getArgument(0);
@@ -337,7 +337,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(orgOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.empty());
 
         RoleGrantRequest req = new RoleGrantRequest(TARGET_EMAIL, Role.HOTEL_MANAGER, HOTEL_ID);
 
@@ -349,6 +349,35 @@ class RoleGrantServiceTest {
     }
 
     @Test
+    void grantRole_pastedMixedCaseEmailWithSpaces_findsTheLowercaseAccount() throws Exception {
+        // F55: the owner pasted " Zeynep.Arslan@... " and got 404 although the account exists.
+        RoleAssignment orgOwnerAssign = createActorOrgOwnerAssignment(actorMembership);
+        when(organizationRepository.findById(ORGANIZATION_ID)).thenReturn(Optional.of(organization));
+        when(membershipRepository.findByUserIdAndOrganizationId(ACTOR_ID, ORGANIZATION_ID))
+                .thenReturn(Optional.of(actorMembership));
+        when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(orgOwnerAssign));
+        mockSuccessfulHotelLookup();
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
+        when(membershipRepository.save(any(OrganizationMembership.class))).thenAnswer(inv -> {
+            OrganizationMembership saved = inv.getArgument(0);
+            setMembershipId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(roleAssignmentRepository.existsByMembershipIdAndRoleAndScopeTypeAndScopeId(any(), any(), any(), any()))
+                .thenReturn(false);
+        when(roleAssignmentRepository.save(any(RoleAssignment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RoleGrantRequest req = new RoleGrantRequest("  Target@Example.COM ", Role.HOTEL_STAFF, HOTEL_ID);
+
+        RoleGrantResult result = roleGrantService.grantRole(ACTOR_ID, ORGANIZATION_ID, req);
+
+        assertEquals(Role.HOTEL_STAFF, result.role());
+        assertEquals(USER_ID, result.userId());
+        verify(userRepository).findByEmailIgnoreCase(TARGET_EMAIL);
+    }
+
+    @Test
     void grantRole_duplicate_returns409() throws Exception {
         // Arrange
         RoleAssignment orgOwnerAssign = createActorOrgOwnerAssignment(actorMembership);
@@ -357,7 +386,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(orgOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
         when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID))
                 .thenReturn(Optional.of(targetMembership));
         when(roleAssignmentRepository.existsByMembershipIdAndRoleAndScopeTypeAndScopeId(any(), any(), any(), any()))
@@ -380,7 +409,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(orgOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
         when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
         ArgumentCaptor<OrganizationMembership> memberCaptor = ArgumentCaptor.forClass(OrganizationMembership.class);
         when(membershipRepository.save(memberCaptor.capture())).thenReturn(targetMembership);
@@ -444,7 +473,7 @@ class RoleGrantServiceTest {
                 .thenReturn(Optional.of(actorMembership));
         when(roleAssignmentRepository.findByMembershipId(MEMBERSHIP_ID)).thenReturn(List.of(hotelOwnerAssign));
         mockSuccessfulHotelLookup();
-        when(userRepository.findByEmail(TARGET_EMAIL)).thenReturn(Optional.of(target));
+        when(userRepository.findByEmailIgnoreCase(TARGET_EMAIL)).thenReturn(Optional.of(target));
         when(membershipRepository.findByUserIdAndOrganizationId(USER_ID, ORGANIZATION_ID)).thenReturn(Optional.empty());
         when(membershipRepository.save(any(OrganizationMembership.class))).thenAnswer(inv -> {
             OrganizationMembership saved = inv.getArgument(0);

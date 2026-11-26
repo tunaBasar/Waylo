@@ -109,8 +109,10 @@ public class RoleGrantService {
                     "Hotel does not belong to this organization");
         }
 
-        // Rule 5: target user
-        User target = userRepository.findByEmail(req.email())
+        // Rule 5: target user. E-mails are stored lowercase (register/login normalise), so a pasted
+        // " Zeynep.Arslan@... " must still find the account (F55).
+        String targetEmail = req.email() == null ? "" : req.email().trim().toLowerCase(java.util.Locale.ROOT);
+        User target = userRepository.findByEmailIgnoreCase(targetEmail)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "kullanici bulunamadi"));
 
         // Find or create membership for target

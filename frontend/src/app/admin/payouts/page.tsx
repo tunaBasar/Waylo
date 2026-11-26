@@ -5,11 +5,11 @@ import { useToast } from '@/components/Toast';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { ApiError } from '@/lib/api';
 import {
-  adminApi, type AdminBankAccount, type AdminPayout, type AdminPayoutAction, type AdminPayoutBalance,
+  adminApi, payoutActionsFor, type AdminBankAccount, type AdminPayout, type AdminPayoutAction, type AdminPayoutBalance,
 } from '@/lib/admin';
 import {
   BANK_STATUS_LABEL, BANK_STATUS_TONE, PAYOUT_STATUS_LABEL, PAYOUT_STATUS_TONE, formatIbanGroups,
-  isPayoutVersionConflict, parseAmountInput, payoutErrorMessage, toAmount,
+  isPayoutVersionConflict, paidAtProblem, parseAmountInput, payoutErrorMessage, toAmount,
 } from '@/lib/partner';
 import { formatMoney } from '@/lib/partner-car';
 import { formatDate } from '@/lib/utils';
@@ -119,6 +119,11 @@ export default function AdminPayoutsPage() {
     try { setBalance({ orgId, data: (await adminApi.payoutBalance(orgId)).data }); } catch (e) { handleError(e, 'Bakiye yuklenemedi'); }
   }
 
+  function runPayoutAction(p: AdminPayout, action: AdminPayoutAction) {
+    if (action === 'approve' || action === 'processing') { void act(p, action).catch(() => undefined); return; }
+    setDialog({ kind: action, payout: p });
+  }
+
   const orgName = (id: string) => orgNames[id] ?? id;
 
   return (
@@ -146,7 +151,7 @@ export default function AdminPayoutsPage() {
               <Card key={a.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
                 <div>
                   <p className="font-semibold text-on-surface">{orgName(a.organizationId)}</p>
-                  <p className="font-mono text-xs text-on-surface-variant">{a.maskedIban}</p>
+                  <BankIban account={a} />
                   <p className="text-xs text-on-surface-variant">{a.accountHolderName} · {formatDate(a.updatedAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -175,13 +180,13 @@ export default function AdminPayoutsPage() {
                 <StatusPill tone={PAYOUT_STATUS_TONE[p.status]}>{PAYOUT_STATUS_LABEL[p.status]}</StatusPill>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button disabled={p.status !== 'REQUESTED' || busy === p.id} onClick={() => { void act(p, 'approve').catch(() => undefined); }}>Onayla</Button>
-                <Button variant="secondary" disabled={p.status !== 'APPROVED' || busy === p.id} onClick={() => { void act(p, 'processing').catch(() => undefined); }}>Isleme al</Button>
-                <Button disabled={p.status !== 'PROCESSING'} onClick={() => setDialog({ kind: 'paid', payout: p })}>Odendi</Button>
-                <Button variant="danger" disabled={p.status !== 'PROCESSING'} onClick={() => setDialog({ kind: 'failed', payout: p })}>Basarisiz</Button>
-                <Button variant="ghost" disabled={p.status !== 'REQUESTED' && p.status !== 'APPROVED'} onClick={() => setDialog({ kind: 'cancel', payout: p })}>Iptal</Button>
+                {payoutActionsFor(p.status).actions.map(spec => (
+                  <Button key={spec.action} variant={spec.variant === 'primary' ? undefined : spec.variant} disabled={busy === p.id}
+                    onClick={() => runPayoutAction(p, spec.action)}>{spec.label}</Button>
+                ))}
                 <Button variant="ghost" onClick={() => { void showBalance(p.organizationId); }}>Bakiye</Button>
               </div>
+              {payoutActionsFor(p.status).hint && <p className="mt-2 text-xs text-on-surface-variant">{payoutActionsFor(p.status).hint}</p>}
             </Card>
           ))}
         </div>
@@ -227,6 +232,23 @@ export default function AdminPayoutsPage() {
           onError={e => handleError(e, 'Duzeltme kaydedilemedi')} />
       )}
     </div>
+  );
+}
+
+// The revealed IBAN lives only in this component's state and is gone when it unmounts.
+function BankIban({ account }: { account: AdminBankAccount }) {
+  const [iban, setIban] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  async function reveal() {
+    setErr(null);
+    try { setIban((await adminApi.bankAccountIban(account.id)).data.iban); } catch (e) { setErr(payoutErrorMessage(e, 'IBAN alinamadi')); }
+  }
+  return (
+    <>
+      <p className="font-mono text-xs text-on-surface-variant">{iban ? formatIbanGroups(iban) : account.maskedIban}</p>
+      {!iban && <Button variant="ghost" icon="visibility" onClick={() => { void reveal(); }}>IBAN&apos;i goster</Button>}
+      {err && <p className="text-xs text-error">{err}</p>}
+    </>
   );
 }
 
@@ -278,6 +300,7 @@ function PayoutDialog({ kind, payout, busy, onClose, onSubmit }: {
   const refOk = reference.trim().length >= 3 && reference.trim().length <= 100;
   const paidIso = paidAt ? new Date(paidAt) : null;
   const dateOk = !paidIso || !Number.isNaN(paidIso.getTime());
+  const dateProblem = paidAtProblem(paidIso, payout.requestedAt);
   return (
     <Modal title={`Odendi: ${formatMoney(toAmount(payout.amount), payout.currency)}`} onClose={onClose}>
       <p className="text-xs text-on-surface-variant">Havaleyi banka uzerinden yaptiktan sonra referansi girin.</p>
@@ -291,10 +314,10 @@ function PayoutDialog({ kind, payout, busy, onClose, onSubmit }: {
       )}
       {revealError && <p className="text-xs text-error">{revealError}</p>}
       <Field label="Banka referansi" hint="3 ile 100 karakter"><input className={inputClass} value={reference} onChange={e => setReference(e.target.value)} /></Field>
-      <Field label="Odeme tarihi (istege bagli, gelecekte olamaz)" error={dateOk ? null : 'Gecersiz tarih'}>
+      <Field label="Odeme tarihi (istege bagli, talep ile simdi arasinda)" error={dateOk ? null : 'Gecersiz tarih'}>
         <input type="datetime-local" className={inputClass} value={paidAt} onChange={e => setPaidAt(e.target.value)} /></Field>
       <Button disabled={!refOk || !dateOk || busy}
-        onClick={() => { if (paidIso && paidIso.getTime() > Date.now()) { setRevealError('Odeme tarihi gelecekte olamaz.'); return; } void onSubmit({ reference: reference.trim(), ...(paidIso ? { paidAt: paidIso.toISOString() } : {}) }).catch(() => undefined); }}>Odendi olarak isaretle</Button>
+        onClick={() => { if (dateProblem) { setRevealError(dateProblem); return; } void onSubmit({ reference: reference.trim(), ...(paidIso ? { paidAt: paidIso.toISOString() } : {}) }).catch(() => undefined); }}>Odendi olarak isaretle</Button>
     </Modal>
   );
 }

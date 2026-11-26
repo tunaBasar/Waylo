@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
   BANK_STATUS_LABEL, BANK_STATUS_TONE, ESCROW_STATE_LABEL, PAYOUT_BLOCKED_LABEL, PAYOUT_STATUS_LABEL, PAYOUT_STATUS_TONE,
-  isValidTrIban, parseAmountInput, partnerApi, partnerErrorMessage, payoutErrorMessage, toAmount, validatePayoutAmount,
+  ibanProblem, isValidTrIban, parseAmountInput, partnerApi, partnerErrorMessage, payoutErrorMessage, toAmount, validatePayoutAmount,
   type PartnerBankAccount, type PartnerEarnings, type PartnerPayout, type PartnerPayoutBalance, type PayoutCurrencyBalance,
 } from '@/lib/partner';
 import { ApiError } from '@/lib/api';
+import { formatTrAmountInput } from '@/lib/amount';
 import { formatMoney } from '@/lib/partner-car';
 import { formatDate } from '@/lib/utils';
 import { useSingleFlight } from '@/lib/use-single-flight';
@@ -198,7 +199,7 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
 
   function openForm() {
     setIdemKey(crypto.randomUUID());
-    setAmount(toAmount(b.payable).toFixed(2));
+    setAmount(formatTrAmountInput(toAmount(b.payable)));
     setFieldError(null);
     setOpen(true);
   }
@@ -243,7 +244,7 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
               <input className={inputClass} inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); setFieldError(null); }} />
             </Field>
             <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" type="button" onClick={() => setAmount(toAmount(b.payable).toFixed(2))}>Tumunu cek</Button>
+              <Button variant="ghost" type="button" onClick={() => setAmount(formatTrAmountInput(toAmount(b.payable)))}>Tumunu cek</Button>
               <Button type="button" disabled={busy} onClick={submit}>Talep gonder</Button>
               <Button variant="ghost" type="button" onClick={() => setOpen(false)}>Vazgec</Button>
             </div>
@@ -275,6 +276,7 @@ function PayoutRow({ p, orgId, owner, onDone, onError }: { p: PartnerPayout } & 
       <div>
         <p className="font-semibold text-on-surface">{money(p.amount, p.currency)}</p>
         <p className="text-xs text-on-surface-variant">{formatDate(p.requestedAt)} · {p.maskedIban}</p>
+        {p.status === 'PAID' && p.paidAt && <p className="text-xs text-on-surface-variant">Odeme tarihi: {formatDate(p.paidAt)}</p>}
         {p.status === 'PAID' && p.paymentReference && <p className="text-xs text-on-surface-variant">Banka referansi: {p.paymentReference}</p>}
         {p.status === 'FAILED' && p.failureReason && <p className="text-xs text-error">Neden: {p.failureReason}</p>}
         {p.status === 'CANCELLED' && p.cancelReason && <p className="text-xs text-on-surface-variant">Neden: {p.cancelReason}</p>}
@@ -293,7 +295,7 @@ function BankSection({ bank, orgId, owner, onDone, onError }: { bank: PartnerBan
   const [iban, setIban] = useState('');
   const flight = useSingleFlight();
   const [busy, setBusy] = useState(false);
-  const ibanError = iban && !isValidTrIban(iban) ? 'Gecerli bir TR IBAN girin (TR + 24 hane).' : null;
+  const ibanError = ibanProblem(iban);
   const formOpen = editing || (!bank && owner);
 
   async function save() {

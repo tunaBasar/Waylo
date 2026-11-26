@@ -320,6 +320,25 @@ class PayoutServiceTest extends PayoutDbSupport {
     }
 
     @Test
+    void paidAtBeforeTheRequestMinuteIsRejected_theRequestMinuteIsKept() {
+        // F53: the admin typed 12:45 for a payout requested at 12:50 and it was accepted.
+        Org o = fundedOrg("1000.00");
+        UUID id = toProcessing(o, "early", "200.00");
+        java.time.Instant requested = payouts.get(o.owner, o.id, id).requestedAt();
+
+        BadRequestException ex = org.junit.jupiter.api.Assertions.assertThrows(BadRequestException.class,
+                () -> payouts.markPaid(ADMIN, "ADMIN", id, ref(), requested.minusSeconds(300), null));
+        assertThat(ex.getCode()).isEqualTo("PAID_AT_BEFORE_REQUEST");
+        assertThat(payouts.get(o.owner, o.id, id).status().name()).isEqualTo("PROCESSING");
+        assertThat(outbox(id)).isEmpty();
+
+        java.time.Instant at = requested.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);   // the request minute is fine
+        var paid = payouts.markPaid(ADMIN, "ADMIN", id, ref(), at, null);
+        assertThat(paid.status().name()).isEqualTo("PAID");
+        assertThat(paid.paidAt()).isEqualTo(at);
+    }
+
+    @Test
     void expectedVersionMismatch_is409_VERSION_CONFLICT() {
         Org o = fundedOrg("1000.00");
         var p = request(o, "ver", "200.00").payout();

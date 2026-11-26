@@ -6,8 +6,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.waylo.paymentservice.dto.PayoutDtos;
 import com.waylo.paymentservice.exception.AccessDeniedException;
+import com.waylo.paymentservice.exception.AuthenticationRequiredException;
 import com.waylo.paymentservice.exception.BadRequestException;
 import com.waylo.paymentservice.exception.ConflictException;
+import com.waylo.paymentservice.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
@@ -186,6 +188,31 @@ class BankAccountServiceTest extends PayoutDbSupport {
     }
 
     @Test
+    void revealAccount_adminOnly_anyStatus_writesREVEALEDRow_andUnknownIs404() {
+        Org o = newOrg();
+        String iban = uniqueIban();
+        UUID id = bankAccounts.put(o.owner, o.id, req(iban)).id();                       // PENDING_VERIFICATION
+
+        assertThatThrownBy(() -> bankAccounts.revealAccount(UUID.randomUUID(), "PARTNER", id)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> bankAccounts.revealAccount(null, "ADMIN", id)).isInstanceOf(AuthenticationRequiredException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM partner_bank_account_changes WHERE organization_id = ? AND change_type = 'REVEALED'", Integer.class, o.id)).isZero();
+
+        var r = bankAccounts.revealAccount(ADMIN, "ADMIN", id);
+        assertThat(r.iban()).isEqualTo(IbanValidator.normalize(iban));
+        assertThat(r.accountHolderName()).isEqualTo("Acme Otel AS");
+        assertThat(r.toString()).doesNotContain(r.iban());
+        Map<String, Object> audit = jdbc.queryForList("SELECT * FROM partner_bank_account_changes WHERE organization_id = ? AND change_type = 'REVEALED'", o.id).get(0);
+        assertThat(audit.get("reason")).isEqualTo("bank-account:" + id);
+        assertThat(audit.get("actor_user_id")).isEqualTo(ADMIN);
+        assertThat(audit.toString()).doesNotContain(r.iban());
+
+        bankAccounts.verify(ADMIN, "ADMIN", id);                                           // VERIFIED also works
+        assertThat(bankAccounts.revealAccount(ADMIN, "ADMIN", id).iban()).isEqualTo(r.iban());
+
+        assertThatThrownBy(() -> bankAccounts.revealAccount(ADMIN, "ADMIN", UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void revealPath_isTheOnlyDtoWithAFullIbanAccessor_andNoOtherJsonContainsTheMiddleDigits() throws Exception {
         Org o = newOrg();
         releasedItem(o.id, "TRY", "1000.00", "0.00", 0);
@@ -218,7 +245,9 @@ class BankAccountServiceTest extends PayoutDbSupport {
         }
 
         for (Class<?> dto : PayoutDtos.class.getDeclaredClasses()) {
-            if (!dto.isRecord() || dto == PayoutDtos.BankDetailsResponse.class || dto == PayoutDtos.BankAccountRequest.class) continue;
+            // The two audited admin reveal DTOs and the partner's input are the only records allowed to carry a full IBAN.
+            if (!dto.isRecord() || dto == PayoutDtos.BankDetailsResponse.class || dto == PayoutDtos.BankAccountIbanResponse.class
+                    || dto == PayoutDtos.BankAccountRequest.class) continue;
             for (RecordComponent c : dto.getRecordComponents()) {
                 String n = c.getName().toLowerCase();
                 assertThat(n).as("%s.%s", dto.getSimpleName(), c.getName()).isNotIn("iban", "ibanciphertext", "ibanhash", "ciphertext", "hash");

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
-import { ROLE_LABEL, partnerErrorMessage, partnerApi, type PartnerRole, type TeamMember } from '@/lib/partner';
+import { ROLE_LABEL, partnerErrorMessage, partnerApi, teamInviteErrorMessage, type PartnerRole, type TeamMember } from '@/lib/partner';
 import { formatDate } from '@/lib/utils';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { Button, Card, EmptyState, Field, inputClass, LoadingRows, PageHeader } from '@/components/partner/ui';
@@ -50,7 +50,7 @@ export default function PartnerTeamPage() {
         setNotice('Rol verildi');
         await load();
       } catch (err) {
-        setNotice(partnerErrorMessage(err, 'Rol verilemedi'));
+        setNotice(teamInviteErrorMessage(err));
       } finally {
         setBusy(false);
       }

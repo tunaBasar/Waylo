@@ -95,6 +95,11 @@ public final class PayoutDtos {
         @Override public String toString() { return "BankDetailsResponse[payoutId=" + payoutId + ", iban=***]"; }
     }
 
+    /** Admin reveal of a bank account IBAN (verification against documents). toString never prints it. */
+    public record BankAccountIbanResponse(UUID bankAccountId, String accountHolderName, String iban) {
+        @Override public String toString() { return "BankAccountIbanResponse[bankAccountId=" + bankAccountId + ", iban=***]"; }
+    }
+
     public record AdjustmentResponse(UUID id, UUID organizationId, String currency, BigDecimal amount,
                                      AdjustmentRequest.Direction direction, String reason, Instant createdAt) {}
 }

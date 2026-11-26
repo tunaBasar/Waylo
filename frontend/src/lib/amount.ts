@@ -27,3 +27,9 @@ export function parseTrAmount(raw: string | null | undefined): number | null {
   const n = Number(norm);
   return Number.isFinite(n) && n > 0 && n < 1e10 ? n : null;
 }
+
+/** Formats a number for an amount input the Turkish way: thousands dots, comma decimals, always 2 decimals. */
+export function formatTrAmountInput(n: number): string {
+  const [int, dec] = (Math.round(n * 100) / 100).toFixed(2).split('.');
+  return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`;
+}
