@@ -31,7 +31,7 @@ export default function TabsLayout() {
     return () => clearTimeout(t);
   }, [user, router]);
 
-  const goLogin = (back: string) => { setReturnTo(back); router.push('/(auth)/login'); };
+  const goLogin = (back: string) => { setReturnTo(back); router.navigate('/(auth)/login'); };
   const cartButton = () => (
     <Pressable accessibilityRole="button" accessibilityLabel="Sepet" onPress={() => (user ? router.push('/cart') : goLogin('/cart'))} style={{ paddingHorizontal: 14 }}>
       <Text>{`Sepet${items.length ? ` (${items.length})` : ''}`}</Text>

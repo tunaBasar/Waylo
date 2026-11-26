@@ -68,7 +68,7 @@ export default function Cars() {
               <Muted>{`${o.category} · ${o.transmission} · ${o.seatCount} koltuk · ${o.chargeableDays} gun`}</Muted>
               <Text style={{ fontWeight: '700' }}>{money(o.totalAmount, o.currency)}</Text>
               <Button kind="secondary" title="Sepete ekle" onPress={() => {
-                if (!user) { setReturnTo('/cars'); router.push('/(auth)/login'); return; }
+                if (!user) { setReturnTo('/cars'); router.navigate('/(auth)/login'); return; }
                 const ok = cart.add({
                   vertical: 'CAR', label: `${o.exampleModel}, ${q.pickupAt.slice(0, 16)}`, amount: o.totalAmount, currency: o.currency,
                   request: { pickupBranchId: o.pickupBranchId, returnBranchId: o.returnBranchId, category: o.category, transmission: o.transmission, pickupAt: q.pickupAt, returnAt: q.returnAt, driverAge: q.driverAge },

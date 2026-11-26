@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
+import { displayItemText } from '@/lib/order-text';
 import { showCreatedBanner } from '@/lib/order-banner';
 import { orderPolicyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
@@ -144,7 +145,7 @@ function VoucherList({ orderId, testMode }: { orderId: string; testMode: boolean
       {testMode && <p className="rounded-lg bg-tertiary-container p-2 text-xs font-semibold text-on-tertiary-container">TEST ODEME: gercek para cekilmedi.</p>}
       {vouchers.map(v => (
         <div key={v.voucherId} className="rounded-xl bg-surface-container p-3 space-y-2">
-          <p className="text-sm font-medium text-on-surface">{v.description}</p>
+          <p className="text-sm font-medium text-on-surface">{displayItemText(v.description)}</p>
           <p className="text-xs text-on-surface-variant">
             {VOUCHER_STATUS_TR[v.status]} · Gecerlilik: {fmt(v.validFrom)} - {fmt(v.validUntil)}
             {v.redeemedAt && ` · Kullanim: ${fmt(v.redeemedAt)}`}
@@ -345,7 +346,7 @@ function SupportCasePanel({ order }: { order: Order }) {
             <Field label="Kalem (istege bagli)">
               <select className={inputClass} value={itemId} onChange={e => setItemId(e.target.value)} data-testid="support-case-item">
                 <option value="">Tum siparis</option>
-                {order.items?.map(i => <option key={i.id} value={i.id}>{i.description}</option>)}
+                {order.items?.map(i => <option key={i.id} value={i.id}>{displayItemText(i.description)}</option>)}
               </select>
             </Field>
           )}
@@ -396,7 +397,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
       <p className="mt-2 text-lg font-bold text-primary">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: order.currency }).format(order.totalAmount)}</p>
       {order.items && order.items.map(item => (
         <div key={item.id} className="mt-1 text-xs text-on-surface-variant">
-          <p>{item.description}</p>
+          <p>{displayItemText(item.description)}</p>
           {item.discountAmount != null && item.discountAmount > 0 && item.grossAmount != null && item.netAmount != null && (
             <p data-testid="item-breakdown">
               Fiyat: {money(item.grossAmount, item.currency)} · Indirim{item.promoCode ? ` (${item.promoCode})` : ''}: -{money(item.discountAmount, item.currency)} · Odenen: {money(item.netAmount, item.currency)}

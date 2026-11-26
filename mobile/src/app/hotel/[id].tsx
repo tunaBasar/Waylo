@@ -45,7 +45,7 @@ export default function HotelDetail() {
       const qs = new URLSearchParams({ checkIn: p.checkIn ?? '', checkOut: p.checkOut ?? '', rooms: String(stay.rooms), adults: String(stay.adults) });
       ages.forEach((a) => qs.append('childrenAges', String(a)));
       setReturnTo(`/hotel/${p.id}?${qs}`);
-      router.push('/(auth)/login');
+      router.navigate('/(auth)/login');
       return;
     }
     setBusy(key); setError(null);

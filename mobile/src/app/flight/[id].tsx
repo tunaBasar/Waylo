@@ -33,7 +33,7 @@ export default function FlightOfferScreen() {
             <Field label="Yolcu adi" value={first} onChangeText={setFirst} autoCapitalize="words" />
             <Field label="Yolcu soyadi" value={last} onChangeText={setLast} autoCapitalize="words" />
             <Button title="Sepete ekle" disabled={!first.trim() || !last.trim()} onPress={() => {
-              if (!user) { setReturnTo(`/flight/${id}`); router.push('/(auth)/login'); return; }
+              if (!user) { setReturnTo(`/flight/${id}`); router.navigate('/(auth)/login'); return; }
               const ok = cart.add({
                 vertical: 'FLIGHT', label: `${o.flightNumber} ${first.trim()} ${last.trim()}`, amount: o.totalAmount, currency: o.currency,
                 request: { offerId: o.offerId, passengerFirstName: first.trim(), passengerLastName: last.trim() },
