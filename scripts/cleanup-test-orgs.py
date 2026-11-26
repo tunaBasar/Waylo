@@ -30,7 +30,7 @@ import org_cleanup  # noqa: E402
 # test scripts register '<prefix>-<hex>@example.test'; @waylo.test is used by the seed accounts (seed-*), which stay protected
 TEST_DOMAINS = ('@example.test', '@waylo.test')
 SEED_PREFIXES = ('seed-',)
-PROTECTED_NAMES = {'Waylo Demo Hotels', 'Waylo Ucus Satis', 'Kaya Otelcilik Ltd. Sti.'}
+PROTECTED_NAMES = {'Waylo Demo Hotels', 'Waylo Ucus Satis'}
 
 # label -> regex on the organization name
 PATTERNS = {
@@ -49,6 +49,9 @@ PATTERNS = {
     'SC Other': r'^SC Other\b',
     'Bus Test / Bus Ind': r'^Bus (Test|Ind)\b',
     'Car Order Test Co': r'^Car Order Test Co\b',
+    # e2e spec 13 (partner onboarding) creates this name with an @example.test user; the walkthrough partner of the same
+    # name stays protected by its non-test (@walkthrough.dev) member.
+    'Kaya Otelcilik (e2e onboarding)': r'^Kaya Otelcilik Ltd\. Sti\.$',
 }
 COMPILED = {label: re.compile(rx) for label, rx in PATTERNS.items()}
 SEP = '\x1f'
