@@ -47,3 +47,24 @@ test('publication request carries a photo, admin approves request and photo in t
   const mine = await api<{ id: string; reviewStatus: string }[]>('GET', `/api/hotels/${hotel.id}/media/mine`, undefined, hp);
   expect(mine.data.find(m => m.id === mediaId)?.reviewStatus).toBe('APPROVED');
 });
+
+// F28: a photo uploaded in the UI shows up in the publication checklist without a reload.
+test('photo uploaded on the partner page appears in the publication checklist without reload', async ({ page, context }) => {
+  const s = loadState();
+  const hp = (await login(s.hotelPartner)).token;
+  const name = `E2E Foto Canli ${Date.now().toString(36)}`;
+  await must('POST', '/api/hotels', { name, city: s.hotelCity, country: 'TR', address: 'E2E only', starRating: 3, organizationId: s.hotelOrgId }, hp);
+
+  await signIn(context, s.hotelPartner);
+  await page.addInitScript((orgId) => { localStorage.setItem('waylo_partner_org', orgId); }, s.hotelOrgId);
+  await page.goto('/partner');
+  await page.getByRole('button', { name: new RegExp(name) }).first().click();
+  await expect(page.getByTestId('publication-media-checklist')).toHaveCount(0);
+
+  await page.locator('input[type=file]').setInputFiles({ name: 'e2e-canli.png', mimeType: 'image/png', buffer: pngBuffer(800, 600) });
+  await expect(page.getByText('Fotograf yuklendi, incelemeye alindi')).toBeVisible();
+
+  const list = page.getByTestId('publication-media-checklist');
+  await expect(list.getByTestId('publication-media-check')).toHaveCount(1);
+  await expect(page.getByTestId('publication-readiness')).toContainText('Fotograf: 1 (incelemede 1)');
+});

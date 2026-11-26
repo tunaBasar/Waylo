@@ -26,7 +26,7 @@ function Thumb({ hotelId, item }: { hotelId: string; item: HotelMediaItem }) {
   return <img src={src} alt={item.caption ?? 'Otel fotografi'} className="h-32 w-full rounded-lg object-cover" />;
 }
 
-export function HotelPhotosPanel({ hotel, canManage }: { hotel: PartnerHotel; canManage: boolean }) {
+export function HotelPhotosPanel({ hotel, canManage, onChanged }: { hotel: PartnerHotel; canManage: boolean; onChanged?: () => void }) {
   const toast = useToast();
   const [items, setItems] = useState<HotelMediaItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -59,6 +59,7 @@ export function HotelPhotosPanel({ hotel, canManage }: { hotel: PartnerHotel; ca
       await fn();
       if (done) toast.success(done);
       await refresh();
+      onChanged?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Islem basarisiz');
     } finally {

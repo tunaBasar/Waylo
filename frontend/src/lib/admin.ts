@@ -1,12 +1,17 @@
 /** Typed wrappers for the platform-admin endpoints (all ADMIN-only on the backend). */
 import { api } from './api';
-import type { Airport, Flight, Vehicle } from './types';
+import type { Airport, Flight } from './types';
 import type { Amount, BankAccountStatus, PartnerPayout, PartnerPayoutBalance, PayoutStatus, HotelContent, PublicationRequestKind, PublicationRequestStatus, PublicationStatus } from './partner';
 
 const enc = encodeURIComponent;
 
 export type OrgStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
-export interface AdminOrganization { id: string; name: string; status: OrgStatus }
+/** createdAt and owner are not in the auth-service OrganizationResponse yet: shown only when the API sends them. */
+export interface AdminOrganization {
+  id: string; name: string; status: OrgStatus;
+  businessType?: 'HOTEL' | 'CAR_RENTAL' | 'BUS' | null; legalType?: 'COMPANY' | 'INDIVIDUAL' | null;
+  createdAt?: string | null; ownerName?: string | null; ownerEmail?: string | null;
+}
 export interface AdminUser { id: string; email: string; fullName: string; role: 'USER' | 'ADMIN'; verified: boolean }
 
 export interface AirportRequest {
@@ -17,16 +22,11 @@ export interface FlightRequest {
   flightNumber: string; departureAirportCode: string; arrivalAirportCode: string;
   airline: string; departureTime: string; arrivalTime: string;
 }
-export interface VehicleRequest {
-  plateNumber: string; brand: string; model: string; year: number; vehicleType: Vehicle['vehicleType'];
-  color: string | null; seatCount: number; dailyRate: number; currency: string; location: string; mileage: number | null;
-}
 export interface BulkSeatRequest {
   flightNumber: string; seatType: SeatType; price: number; fromRow: number; toRow: number; letters: string;
 }
 export type SeatType = 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST';
 export const SEAT_TYPES: SeatType[] = ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST'];
-export type VehicleStatusTarget = 'AVAILABLE' | 'MAINTENANCE';
 
 export interface AdminOrderItem {
   id: string; vertical: 'HOTEL' | 'CAR' | 'FLIGHT' | 'BUS'; description: string; netAmount: number;
@@ -178,13 +178,6 @@ export const adminApi = {
   cancelFlight: (id: string) => api.post<Flight>(`/api/flights/${enc(id)}/cancel`, {}),
   deleteFlight: (id: string) => api.del(`/api/flights/${enc(id)}`),
 
-  vehicles: () => api.get<Vehicle[]>('/api/vehicles'),
-  createVehicle: (b: VehicleRequest) => api.post<Vehicle>('/api/vehicles', b),
-  updateVehicle: (id: string, b: VehicleRequest) => api.put<Vehicle>(`/api/vehicles/${enc(id)}`, b),
-  setVehicleStatus: (id: string, status: VehicleStatusTarget) => api.post<Vehicle>(`/api/vehicles/${enc(id)}/status?status=${status}`, {}),
-  activateVehicle: (id: string) => api.post<Vehicle>(`/api/vehicles/${enc(id)}/activate`, {}),
-  deactivateVehicle: (id: string) => api.post<Vehicle>(`/api/vehicles/${enc(id)}/deactivate`, {}),
-  deleteVehicle: (id: string) => api.del(`/api/vehicles/${enc(id)}`),
 
   createSeatsBulk: (b: BulkSeatRequest) => api.post<{ flightNumber: string; created: number }>('/api/seat-inventory/seats/bulk', b),
   availableSeatCount: (flightNumber: string) => api.get<number>(`/api/seat-inventory/seats/${enc(flightNumber)}/count`),

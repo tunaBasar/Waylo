@@ -13,6 +13,26 @@ const STATUSES: Array<{ key: OrgStatus; label: string }> = [
 ];
 const TONE: Record<OrgStatus, 'success' | 'warning' | 'error' | 'neutral'> = { ACTIVE: 'success', PENDING: 'warning', SUSPENDED: 'error', ARCHIVED: 'neutral' };
 
+const BUSINESS_LABEL: Record<string, string> = { HOTEL: 'Otel', CAR_RENTAL: 'Arac kiralama', BUS: 'Otobus firmasi' };
+const LEGAL_LABEL: Record<string, string> = { COMPANY: 'Sirket', INDIVIDUAL: 'Sahis' };
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Only what the API returns: business type, legal type, created date, owner. */
+function orgDetails(o: AdminOrganization): string {
+  const parts: string[] = [];
+  if (o.businessType) parts.push(BUSINESS_LABEL[o.businessType] ?? o.businessType);
+  if (o.legalType) parts.push(LEGAL_LABEL[o.legalType] ?? o.legalType);
+  if (o.createdAt) parts.push(`Basvuru: ${fmtDateTime(o.createdAt)}`);
+  if (o.ownerName || o.ownerEmail) parts.push(`Sahip: ${[o.ownerName, o.ownerEmail].filter(Boolean).join(' · ')}`);
+  return parts.join(' · ');
+}
+
 export default function AdminOrganizationsPage() {
   const toast = useToast();
   const [status, setStatus] = useState<OrgStatus>('PENDING');
@@ -78,7 +98,8 @@ export default function AdminOrganizationsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-on-surface truncate">{o.name}</p>
-                    <p className="text-xs text-outline">{o.id}</p>
+                    <p className="text-xs text-on-surface-variant" data-testid="org-details">{orgDetails(o)}</p>
+                    <p className="text-[10px] text-outline" title={o.id}>{o.id}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusPill tone={TONE[o.status]}>{STATUSES.find(s => s.key === o.status)?.label ?? o.status}</StatusPill>

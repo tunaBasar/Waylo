@@ -20,6 +20,7 @@ import {
   type PublicationRequestSummary, type HotelContentView, type HotelContent, type HotelMediaItem,
 } from '@/lib/partner';
 import { HotelPhotosPanel } from './HotelPhotosPanel';
+import { readinessLines } from '@/lib/publication-readiness';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 const STATUS_TONE: Record<OrganizationStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -252,8 +253,8 @@ function ContentForm({ hotel, view, onSaved, onCancel }: {
   );
 }
 
-function PublicationPanel({ hotel, organizationStatus, canManage }: {
-  hotel: PartnerHotel; organizationStatus: OrganizationStatus | undefined; canManage: boolean;
+function PublicationPanel({ hotel, organizationStatus, canManage, photosVersion }: {
+  hotel: PartnerHotel; organizationStatus: OrganizationStatus | undefined; canManage: boolean; photosVersion: number;
 }) {
   const toast = useToast();
   const { reload } = usePartner();
@@ -266,6 +267,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<HotelMediaItem[]>([]);
+  const [counts, setCounts] = useState<{ rooms: number | null; plans: number | null }>({ rooms: null, plans: null });
   const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
   const inFlight = useRef(false);
   const revisionMode = status === 'PUBLISHED' || status === 'SUSPENDED';
@@ -277,6 +279,11 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
       if (canManage) {
         // photos are optional for a request: a failed list only hides the checklist (photos stay in the per-photo queue)
         setPhotos(await hotelMediaApi.list(hotel.id).then(r => r.data ?? [], () => []));
+        const [rooms, plans] = await Promise.all([
+          partnerApi.roomTypes(hotel.id).then(r => (r.data ?? []).length, () => null),
+          partnerApi.ratePlans(hotel.id).then(r => (r.data ?? []).length, () => null),
+        ]);
+        setCounts({ rooms, plans });
       }
       if (revisionMode && canManage) setView((await partnerApi.getContent(hotel.id)).data);
       else setView(null);
@@ -290,7 +297,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
     let cancelled = false;
     void Promise.resolve().then(() => { if (!cancelled) return refresh(); });
     return () => { cancelled = true; };
-  }, [refresh, status]);
+  }, [refresh, status, photosVersion]);
 
   const reloadAll = useCallback(async () => {
     await reload({ organizationId: hotel.organizationId ?? undefined, hotelId: hotel.id });
@@ -323,6 +330,11 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
   const mediaIds = pendingIds.filter(id => !unchecked.has(id));
   const withMedia = <T extends object>(body: T): T & { mediaIds?: string[] } => (pendingIds.length > 0 ? { ...body, mediaIds } : body);
   const photoByStatus = new Map(photos.map(p => [p.id, p]));
+  const readiness = canManage && (
+    <p className="text-xs text-on-surface-variant" data-testid="publication-readiness">
+      {readinessLines(counts.rooms, counts.plans, photos).join(' · ')}
+    </p>
+  );
   const checklist = pendingIds.length > 0 && (
     <div className="space-y-1" data-testid="publication-media-checklist">
       <p className="text-xs font-semibold text-on-surface-variant">Bu talebe eklenecek fotograflar</p>
@@ -374,6 +386,7 @@ function PublicationPanel({ hotel, organizationStatus, canManage }: {
           <Field label="Not" hint="Istege bagli, incelemeyi yapan yoneticiye iletilir">
             <input className={inputClass} value={note} maxLength={1000} onChange={e => setNote(e.target.value)} disabled={!!blocked} />
           </Field>
+          {readiness}
           {checklist}
           <div className="flex flex-wrap items-center gap-2">
             <Button icon="send" disabled={busy || !!blocked}
@@ -453,6 +466,7 @@ export default function PartnerOrganizationsPage() {
   const { loading, error, memberships, membership, organizationId, hotels, hotelId, hotel, selectHotel, isBusOrg } = usePartner();
   const [showOrgForm, setShowOrgForm] = useState(false);
   const [showHotelForm, setShowHotelForm] = useState(false);
+  const [photosVersion, setPhotosVersion] = useState(0);
 
   const isOwner = membership?.roles.some(r => r.role === 'ORGANIZATION_OWNER') ?? false;
 
@@ -531,11 +545,11 @@ export default function PartnerOrganizationsPage() {
             </div>
           )}
           {hotel && (
-            <PublicationPanel key={hotel.id} hotel={hotel} organizationStatus={membership?.organizationStatus}
+            <PublicationPanel key={hotel.id} hotel={hotel} organizationStatus={membership?.organizationStatus} photosVersion={photosVersion}
               canManage={membership ? canManageHotel(membership.roles, hotel.id) : false} />
           )}
           {hotel && (
-            <HotelPhotosPanel key={`photos-${hotel.id}`} hotel={hotel}
+            <HotelPhotosPanel key={`photos-${hotel.id}`} hotel={hotel} onChanged={() => setPhotosVersion(v => v + 1)}
               canManage={membership ? canManageHotel(membership.roles, hotel.id) : false} />
           )}
         </section>
