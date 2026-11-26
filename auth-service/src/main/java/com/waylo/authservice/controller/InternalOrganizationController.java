@@ -5,6 +5,7 @@ import com.waylo.authservice.domain.LegalType;
 import com.waylo.authservice.domain.Organization;
 import com.waylo.authservice.domain.OrganizationStatus;
 import com.waylo.authservice.repository.OrganizationRepository;
+import com.waylo.authservice.repository.RoleAssignmentRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,8 +28,12 @@ public class InternalOrganizationController {
 
     private final OrganizationRepository organizationRepository;
 
-    public InternalOrganizationController(OrganizationRepository organizationRepository) {
+    private final RoleAssignmentRepository roleAssignmentRepository;
+
+    public InternalOrganizationController(OrganizationRepository organizationRepository,
+                                          RoleAssignmentRepository roleAssignmentRepository) {
         this.organizationRepository = organizationRepository;
+        this.roleAssignmentRepository = roleAssignmentRepository;
     }
 
     /** IDs of organizations currently in ACTIVE status. Plain list, no ApiResponse wrapper (matches /internal/access style). */
@@ -50,6 +55,14 @@ public class InternalOrganizationController {
         return new InternalOrganizationDetail(org.getId(), org.getName(), org.getStatus(),
                 org.getBusinessType(), org.getLegalType());
     }
+
+    /** E-mails of ACTIVE ORGANIZATION_OWNER / HOTEL_OWNER members, for partner notifications. Service-token only (/internal). */
+    @GetMapping("/{id}/contacts")
+    public OrganizationContacts contacts(@PathVariable UUID id) {
+        return new OrganizationContacts(roleAssignmentRepository.findOwnerEmails(id));
+    }
+
+    record OrganizationContacts(List<String> emails) {}
 
     /** Public-facing organization detail for internal callers. */
     record InternalOrganizationDetail(

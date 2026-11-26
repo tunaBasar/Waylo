@@ -34,7 +34,8 @@ class OutboxTest {
         org.slf4j.MDC.put("requestId", "req-1");
         writer.write("SUPPORT_CASE", caseId.toString(), "support-events", caseId.toString(),
                 new SupportCaseUpdatedEvent(caseId, UUID.randomUUID(), UUID.randomUUID(), "Bag question",
-                        SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.PARTNER));
+                        SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.PARTNER,
+                        UUID.randomUUID()));
         org.slf4j.MDC.clear();
 
         ArgumentCaptor<Object> args = ArgumentCaptor.forClass(Object.class);

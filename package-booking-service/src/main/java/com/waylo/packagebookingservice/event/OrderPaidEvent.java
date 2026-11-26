@@ -24,7 +24,9 @@ public class OrderPaidEvent extends BaseEvent {
     }
 
     /** startsAt/endsAt: ISO date or date-time text of the service (hotel stay, car pickup/return, flight departure), may be null. */
-    public record Item(String vertical, String description, String startsAt, String endsAt, BigDecimal amount) {}
+    public record Item(String vertical, String description, String startsAt, String endsAt, BigDecimal amount,
+                       UUID supplierOrganizationId, BigDecimal refundAmount) {
+    }
 
     public UUID getOrderId() { return orderId; }
     public void setOrderId(UUID v) { this.orderId = v; }

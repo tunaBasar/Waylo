@@ -2,7 +2,8 @@ package com.waylo.notificationservice.event;
 
 import java.util.UUID;
 
-/** support-events (RM-36). Carries no reply text on purpose. kind: ANSWERED | CLOSED, authorRole: PARTNER | ADMIN. */
+/** support-events (RM-36). Carries no reply text on purpose. kind: ANSWERED | CLOSED (customer mail) | CREATED | CUSTOMER_MESSAGE (partner mail), authorRole: PARTNER | ADMIN | CUSTOMER. */
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class SupportCaseUpdatedEvent extends BaseEvent {
     private UUID caseId;
     private UUID customerId;
@@ -10,6 +11,7 @@ public class SupportCaseUpdatedEvent extends BaseEvent {
     private String subject;
     private String kind;
     private String authorRole;
+    private UUID supplierOrganizationId;
 
     public SupportCaseUpdatedEvent() { super("SUPPORT_CASE_UPDATED", "crm-service"); }
 
@@ -25,4 +27,6 @@ public class SupportCaseUpdatedEvent extends BaseEvent {
     public void setKind(String kind) { this.kind = kind; }
     public String getAuthorRole() { return authorRole; }
     public void setAuthorRole(String authorRole) { this.authorRole = authorRole; }
+    public UUID getSupplierOrganizationId() { return supplierOrganizationId; }
+    public void setSupplierOrganizationId(UUID v) { this.supplierOrganizationId = v; }
 }

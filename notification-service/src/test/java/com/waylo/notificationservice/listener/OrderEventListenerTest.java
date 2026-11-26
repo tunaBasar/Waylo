@@ -54,7 +54,7 @@ class OrderEventListenerTest {
     void paid_sendsConfirmationWithItemsAndTotal_noQr() {
         OrderEvent e = event("ORDER_PAID");
         e.setTotalAmount(new BigDecimal("1500"));
-        e.setItems(List.of(new OrderEvent.Item("HOTEL", "Otel Test", "2026-12-01", "2026-12-03", new BigDecimal("1500"))));
+        e.setItems(List.of(new OrderEvent.Item("HOTEL", "Otel Test", "2026-12-01", "2026-12-03", new BigDecimal("1500"), null, null)));
         emailFound();
 
         listener().handleOrderEvent(rec(e), ack);
@@ -80,8 +80,8 @@ class OrderEventListenerTest {
         OrderEvent e = event("ORDER_PAID");
         e.setTotalAmount(new BigDecimal("5280"));
         e.setItems(List.of(
-                new OrderEvent.Item("FLIGHT", "TK100 IST-ESB <script>alert(1)</script>", "2026-11-27T08:45:00Z", null, new BigDecimal("2640")),
-                new OrderEvent.Item("CAR", "Fiat Egea", "2026-11-27T09:00:00", "2026-11-29T09:00:00", new BigDecimal("2640"))));
+                new OrderEvent.Item("FLIGHT", "TK100 IST-ESB <script>alert(1)</script>", "2026-11-27T08:45:00Z", null, new BigDecimal("2640"), null, null),
+                new OrderEvent.Item("CAR", "Fiat Egea", "2026-11-27T09:00:00", "2026-11-29T09:00:00", new BigDecimal("2640"), null, null)));
         String body = OrderEventListener.confirmationBody(e, "https://waylo.test");
 
         String[] lines = body.split("\n");

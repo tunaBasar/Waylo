@@ -64,6 +64,7 @@ public class SupportCaseService {
         Instant now = Instant.now();
         SupportCase c = cases.save(new SupportCase(customerId, req.orderId(), req.orderItemId(), supplier, req.subject().trim(), now));
         SupportMessage m = messages.save(new SupportMessage(c.getId(), SupportMessage.Role.CUSTOMER, customerId, req.message().trim(), now));
+        emit(c, SupportCaseUpdatedEvent.Kind.CREATED, SupportCaseUpdatedEvent.AuthorRole.CUSTOMER);
         return CaseResponse.of(c, List.of(m));
     }
 
@@ -141,6 +142,8 @@ public class SupportCaseService {
         messages.save(new SupportMessage(c.getId(), role, authorId, body.trim(), now));
         if (role != SupportMessage.Role.CUSTOMER) {
             emit(c, SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.valueOf(role.name()));
+        } else {
+            emit(c, SupportCaseUpdatedEvent.Kind.CUSTOMER_MESSAGE, SupportCaseUpdatedEvent.AuthorRole.CUSTOMER);
         }
         return detail(c);
     }
@@ -157,7 +160,8 @@ public class SupportCaseService {
     /** Same transaction as the message/close (RM-36 e-mail via outbox). */
     private void emit(SupportCase c, SupportCaseUpdatedEvent.Kind kind, SupportCaseUpdatedEvent.AuthorRole role) {
         outbox.write("SUPPORT_CASE", c.getId().toString(), "support-events", c.getId().toString(),
-                new SupportCaseUpdatedEvent(c.getId(), c.getCustomerId(), c.getOrderId(), c.getSubject(), kind, role));
+                new SupportCaseUpdatedEvent(c.getId(), c.getCustomerId(), c.getOrderId(), c.getSubject(), kind, role,
+                        c.getSupplierOrganizationId()));
     }
 
     private CaseResponse detail(SupportCase c) {

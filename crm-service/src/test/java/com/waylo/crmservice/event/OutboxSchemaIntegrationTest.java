@@ -63,7 +63,8 @@ class OutboxSchemaIntegrationTest {
         MDC.put(RequestId.MDC_KEY, requestId);
         new OutboxWriter(jdbc).write("SUPPORT_CASE", caseId.toString(), "support-events", caseId.toString(),
                 new SupportCaseUpdatedEvent(caseId, UUID.randomUUID(), UUID.randomUUID(), "Bag question",
-                        SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.PARTNER));
+                        SupportCaseUpdatedEvent.Kind.ANSWERED, SupportCaseUpdatedEvent.AuthorRole.PARTNER,
+                        UUID.randomUUID()));
         MDC.clear();
         return caseId;
     }

@@ -1,6 +1,7 @@
 package com.waylo.packagebookingservice.event;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 public class OrderCancelledEvent extends BaseEvent {
@@ -11,6 +12,9 @@ public class OrderCancelledEvent extends BaseEvent {
     private String currency;
     /** Sum of item refund amounts decided at cancel (CANCELLATION-CONTRACT.md), zero when nothing was refunded. */
     private BigDecimal refundAmount;
+
+    /** Per-item summary (supplierOrganizationId, refundAmount per item), used for partner e-mails. Null for PENDING cancels. */
+    private List<OrderPaidEvent.Item> items;
 
     public OrderCancelledEvent() { super("ORDER_CANCELLED", "package-booking-service"); }
 
@@ -27,6 +31,14 @@ public class OrderCancelledEvent extends BaseEvent {
         this.refundAmount = refundAmount;
     }
 
+    public OrderCancelledEvent(UUID orderId, UUID customerId, boolean paid, String currency, BigDecimal refundAmount,
+                               List<OrderPaidEvent.Item> items) {
+        this(orderId, customerId, paid, currency, refundAmount);
+        this.items = items;
+    }
+
+    public List<OrderPaidEvent.Item> getItems() { return items; }
+    public void setItems(List<OrderPaidEvent.Item> items) { this.items = items; }
     public UUID getOrderId() { return orderId; }
     public void setOrderId(UUID orderId) { this.orderId = orderId; }
     public UUID getCustomerId() { return customerId; }

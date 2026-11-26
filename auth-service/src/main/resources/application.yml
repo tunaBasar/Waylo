@@ -65,4 +65,4 @@ waylo:
       - path: /internal/access
         callers: [hotel-service, bus-service, car-rental-service, package-booking-service, payment-service, crm-service]
       - path: /internal/organizations
-        callers: [hotel-service, bus-service, car-rental-service, payment-service]
+        callers: [hotel-service, bus-service, car-rental-service, payment-service, notification-service]

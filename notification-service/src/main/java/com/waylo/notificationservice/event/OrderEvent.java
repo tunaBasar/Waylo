@@ -20,7 +20,9 @@ public class OrderEvent extends BaseEvent {
     public OrderEvent() { super(); }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Item(String vertical, String description, String startsAt, String endsAt, BigDecimal amount) {}
+    public record Item(String vertical, String description, String startsAt, String endsAt, BigDecimal amount,
+                       UUID supplierOrganizationId, BigDecimal refundAmount) {
+    }
 
     public UUID getOrderId() { return orderId; }
     public void setOrderId(UUID v) { this.orderId = v; }

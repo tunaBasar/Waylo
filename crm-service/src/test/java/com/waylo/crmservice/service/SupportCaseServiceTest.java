@@ -229,10 +229,31 @@ class SupportCaseServiceTest {
     }
 
     @Test
-    void customerMessageAndCustomerCloseWriteNoOutboxRow() {
+    void customerCloseWritesNoOutboxRow() {
         SupportCase c = caseOf(customerA, orgA);
-        service.customerReply(customerA, c.getId(), "hello");
         service.closeMine(customerA, c.getId());
         verifyNoInteractions(outbox);
+    }
+
+    @Test
+    void customerMessageWritesCustomerMessageOutboxRowWithSupplier() {
+        SupportCase c = caseOf(customerA, orgA);
+        service.customerReply(customerA, c.getId(), "hello");
+        SupportCaseUpdatedEvent e = oneEvent(c);
+        assertThat(e.getKind()).isEqualTo(SupportCaseUpdatedEvent.Kind.CUSTOMER_MESSAGE);
+        assertThat(e.getAuthorRole()).isEqualTo(SupportCaseUpdatedEvent.AuthorRole.CUSTOMER);
+        assertThat(e.getSupplierOrganizationId()).isEqualTo(orgA);
+    }
+
+    @Test
+    void openWritesCreatedOutboxRowWithSupplier() {
+        CaseResponse r = service.open(customerA, new OpenCaseRequest(orderId, itemId, "Late", "Hello"));
+        ArgumentCaptor<Object> ev = ArgumentCaptor.forClass(Object.class);
+        verify(outbox, times(1)).write(eq("SUPPORT_CASE"), eq(r.id().toString()), eq("support-events"),
+                eq(r.id().toString()), ev.capture());
+        SupportCaseUpdatedEvent e = (SupportCaseUpdatedEvent) ev.getValue();
+        assertThat(e.getKind()).isEqualTo(SupportCaseUpdatedEvent.Kind.CREATED);
+        assertThat(e.getSupplierOrganizationId()).isEqualTo(orgA);
+        assertThat(e.getCustomerId()).isEqualTo(customerA);
     }
 }

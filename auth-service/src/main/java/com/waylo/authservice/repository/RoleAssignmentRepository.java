@@ -32,4 +32,11 @@ public interface RoleAssignmentRepository extends JpaRepository<RoleAssignment, 
             + "where r.organizationId = :organizationId and m.status = com.waylo.authservice.domain.MembershipStatus.ACTIVE "
             + "order by r.createdAt")
     List<RoleAssignment> findAllByOrganization(@Param("organizationId") UUID organizationId);
+
+    /** E-mails of ACTIVE members holding ORGANIZATION_OWNER or HOTEL_OWNER in the organization (partner notification recipients). */
+    @Query("select distinct m.user.email from RoleAssignment r join r.membership m "
+            + "where r.organizationId = :organizationId and m.status = com.waylo.authservice.domain.MembershipStatus.ACTIVE "
+            + "and r.role in (com.waylo.authservice.domain.Role.ORGANIZATION_OWNER, com.waylo.authservice.domain.Role.HOTEL_OWNER) "
+            + "order by m.user.email")
+    List<String> findOwnerEmails(@Param("organizationId") UUID organizationId);
 }

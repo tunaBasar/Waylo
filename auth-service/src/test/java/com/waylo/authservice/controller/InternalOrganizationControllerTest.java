@@ -3,6 +3,7 @@ package com.waylo.authservice.controller;
 import com.waylo.authservice.domain.Organization;
 import com.waylo.authservice.domain.OrganizationStatus;
 import com.waylo.authservice.repository.OrganizationRepository;
+import com.waylo.authservice.repository.RoleAssignmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,12 +22,14 @@ import static org.mockito.Mockito.when;
 class InternalOrganizationControllerTest {
 
     private OrganizationRepository organizationRepository;
+    private RoleAssignmentRepository roleAssignmentRepository;
     private InternalOrganizationController controller;
 
     @BeforeEach
     void setUp() {
         organizationRepository = mock(OrganizationRepository.class);
-        controller = new InternalOrganizationController(organizationRepository);
+        roleAssignmentRepository = mock(RoleAssignmentRepository.class);
+        controller = new InternalOrganizationController(organizationRepository, roleAssignmentRepository);
     }
 
     @Test
@@ -88,6 +91,34 @@ class InternalOrganizationControllerTest {
         org.junit.jupiter.api.Assertions.assertThrows(
                 org.springframework.web.server.ResponseStatusException.class,
                 () -> controller.getOrganization(missing));
+    }
+
+    @Test
+    void contacts_returnsOwnerEmailsFromRepository() {
+        UUID orgId = UUID.randomUUID();
+        when(roleAssignmentRepository.findOwnerEmails(orgId)).thenReturn(List.of("a@x.com", "b@x.com"));
+        assertEquals(List.of("a@x.com", "b@x.com"), controller.contacts(orgId).emails());
+    }
+
+    @Test
+    void ownerEmailsQuery_filtersActiveMembersAndOwnerRolesOnly() throws Exception {
+        String q = RoleAssignmentRepository.class.getMethod("findOwnerEmails", UUID.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value();
+        org.junit.jupiter.api.Assertions.assertTrue(q.contains("MembershipStatus.ACTIVE"));
+        org.junit.jupiter.api.Assertions.assertTrue(q.contains("Role.ORGANIZATION_OWNER"));
+        org.junit.jupiter.api.Assertions.assertTrue(q.contains("Role.HOTEL_OWNER"));
+        org.junit.jupiter.api.Assertions.assertFalse(q.contains("HOTEL_MANAGER") || q.contains("HOTEL_STAFF"));
+        org.junit.jupiter.api.Assertions.assertTrue(q.contains("r.organizationId = :organizationId"));
+    }
+
+    @Test
+    void contactsRequiresServiceAuth_notificationServiceIsAllowlistedOnInternalOrganizations() throws Exception {
+        String yml = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/application.yml"));
+        int i = yml.indexOf("path: /internal/organizations");
+        org.junit.jupiter.api.Assertions.assertTrue(i > 0);
+        String line = yml.substring(i, yml.indexOf('\n', yml.indexOf("callers:", i)));
+        org.junit.jupiter.api.Assertions.assertTrue(line.contains("notification-service"));
+        org.junit.jupiter.api.Assertions.assertTrue(line.contains("payment-service"));
     }
 
     /** Organization's constructor and ID are package-private/generated; set the id via reflection for this test double. */

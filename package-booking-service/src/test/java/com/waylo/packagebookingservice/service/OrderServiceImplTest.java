@@ -437,6 +437,27 @@ class OrderServiceImplTest {
         verify(eventPublisher).publishOrderCancelled(any());
     }
 
+    @Test
+    void paidEvent_itemsCarrySupplierOrganizationId() throws Exception {
+        UUID orgA = UUID.randomUUID();
+        UUID orgB = UUID.randomUUID();
+        OrderItem a = new OrderItem();
+        a.setVertical(OrderItemVertical.HOTEL); a.setSupplierOrganizationId(orgA);
+        a.setDescription("Otel A"); a.setUnitAmount(new BigDecimal("100")); a.setQuantity(1);
+        OrderItem b = new OrderItem();
+        b.setVertical(OrderItemVertical.CAR); b.setSupplierOrganizationId(orgB);
+        b.setDescription("Araba B"); b.setUnitAmount(new BigDecimal("50")); b.setQuantity(1);
+        Order order = persistedOrder(UUID.randomUUID(), customerId, OrderStatus.CONFIRMED, 1L);
+
+        java.lang.reflect.Method m = OrderServiceImpl.class.getDeclaredMethod("paidEvent", Order.class, List.class);
+        m.setAccessible(true);
+        com.waylo.packagebookingservice.event.OrderPaidEvent ev =
+                (com.waylo.packagebookingservice.event.OrderPaidEvent) m.invoke(service, order, List.of(a, b));
+
+        assertThat(ev.getItems()).extracting(com.waylo.packagebookingservice.event.OrderPaidEvent.Item::supplierOrganizationId)
+                .containsExactly(orgA, orgB);
+    }
+
     // --- hotel orders ---
 
     private final UUID quoteId = UUID.randomUUID();

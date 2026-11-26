@@ -676,10 +676,12 @@ public class OrderServiceImpl implements OrderService {
         if (allRefunded) pricingApplier.release(order.getId()); // promo is consumed when nothing was refunded
         voucherService.voidForOrder(order.getId());
 
+        List<OrderItem> cancelledItems = orderItemRepository.findByOrderId(order.getId());
         eventPublisher.publishOrderCancelled(new OrderCancelledEvent(order.getId(), order.getCustomerId(), wasPaid, order.getCurrency(),
-                orderItemRepository.findByOrderId(order.getId()).stream()
+                cancelledItems.stream()
                         .map(i -> i.getRefundAmount() == null || !"REFUND".equals(i.getCancelOutcome()) ? BigDecimal.ZERO : i.getRefundAmount())
-                        .reduce(BigDecimal.ZERO, BigDecimal::add)));
+                        .reduce(BigDecimal.ZERO, BigDecimal::add),
+                cancelledItems.stream().map(this::eventItem).toList()));
 
         return toResponse(order, orderItemRepository.findByOrderId(order.getId()));
     }
@@ -764,7 +766,13 @@ public class OrderServiceImpl implements OrderService {
 
     /** Customer facing summary of the confirmed items. No voucher code or QR payload is ever put on the bus. */
     private OrderPaidEvent paidEvent(Order order, List<OrderItem> confirmed) {
-        List<OrderPaidEvent.Item> list = confirmed.stream().map(i -> {
+        List<OrderPaidEvent.Item> list = confirmed.stream().map(this::eventItem).toList();
+        BigDecimal total = confirmed.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new OrderPaidEvent(order.getId(), order.getCustomerId(), order.getCurrency(), total, list);
+    }
+
+    private OrderPaidEvent.Item eventItem(OrderItem i) {
+        {
             String start = null, end = null;
             switch (i.getVertical()) {
                 case HOTEL -> { start = String.valueOf(i.getCheckIn()); end = String.valueOf(i.getCheckOut()); }
@@ -774,10 +782,10 @@ public class OrderServiceImpl implements OrderService {
             }
             if ("null".equals(start)) start = null;
             if ("null".equals(end)) end = null;
-            return new OrderPaidEvent.Item(i.getVertical().name(), i.getDescription(), start, end, i.getSubtotal());
-        }).toList();
-        BigDecimal total = confirmed.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new OrderPaidEvent(order.getId(), order.getCustomerId(), order.getCurrency(), total, list);
+            BigDecimal refund = i.getRefundAmount() == null || !"REFUND".equals(i.getCancelOutcome()) ? null : i.getRefundAmount();
+            return new OrderPaidEvent.Item(i.getVertical().name(), i.getDescription(), start, end, i.getSubtotal(),
+                    i.getSupplierOrganizationId(), refund);
+        }
     }
 
     private void confirmHold(OrderItem item) {

@@ -1925,7 +1925,7 @@ Read from `waylo.service-auth.routes` as currently on disk (uncommitted working 
 | Callee service | Route prefix | Allowed callers |
 |----------------|--------------|-----------------|
 | auth-service | `/internal/access` | hotel-service, bus-service, car-rental-service, package-booking-service, payment-service |
-| auth-service | `/internal/organizations` | hotel-service, bus-service, car-rental-service |
+| auth-service | `/internal/organizations` | hotel-service, bus-service, car-rental-service, notification-service |
 | hotel-service | `/internal/hotels` | auth-service |
 | hotel-service | `/internal/hotel-holds` | package-booking-service |
 | car-rental-service | `/internal/car-holds` | package-booking-service |
@@ -1950,6 +1950,7 @@ A caller listed for a prefix may call every endpoint under it. Routes are matche
 | `GET /internal/access` (query `userId`, `organizationId`, `permission`, optional hotel scope) | auth-service | hotel, bus, car-rental, package-booking, payment |
 | `GET /internal/organizations/active-ids` | auth-service | hotel, bus, car-rental |
 | `GET /internal/organizations/{id}` | auth-service | hotel, bus, car-rental |
+| `GET /internal/organizations/{id}/contacts` | auth-service | notification (e-mails of ACTIVE ORGANIZATION_OWNER / HOTEL_OWNER members, `{"emails":[...]}`) |
 | `GET /internal/hotels/{id}` | hotel-service | auth-service |
 | `POST /internal/hotel-holds` | hotel-service | package-booking-service |
 | `GET /internal/hotel-holds/{holdId}` | hotel-service | package-booking-service |

@@ -56,6 +56,8 @@ public class SupportEventListener {
     }
 
     private void handleUpdated(SupportCaseUpdatedEvent e) {
+        // CREATED / CUSTOMER_MESSAGE are partner-only (PartnerEventListener); the customer never mails themselves.
+        if (!"ANSWERED".equals(e.getKind()) && !"CLOSED".equals(e.getKind())) return;
         if (processedEventRepository.existsByEventIdAndConsumerGroup(e.getEventId(), GROUP)) {
             log.debug("Tekrar eden event atlanıyor: {}", e.getEventId());
             return;
