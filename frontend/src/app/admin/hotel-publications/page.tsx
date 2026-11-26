@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { orgLabel, orgNameMap } from '@/lib/org-names';
 import { useToast } from '@/components/Toast';
 import {
   adminApi, type HotelPublicationDetail, type HotelPublicationItem, type HotelStatusDecision, type PublicationReviewDecision,
@@ -195,6 +196,16 @@ export default function AdminHotelPublicationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [section, setSection] = useState<'requests' | 'media'>('requests');
+  const [orgNames, setOrgNames] = useState<Record<string, string>>({});
+
+  // One-time id -> name lookup; a failure just leaves the short id in place
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    void Promise.all((['PENDING', 'ACTIVE', 'SUSPENDED', 'ARCHIVED'] as const).map(s => adminApi.organizations(s).then(r => r.data ?? [], () => [])))
+      .then(lists => { if (!cancelled) setOrgNames(orgNameMap(lists)); });
+    return () => { cancelled = true; };
+  }, [isAdmin]);
 
   const load = useCallback(async (s: PublicationRequestStatus, p: number) => {
     setLoading(true);
@@ -250,7 +261,7 @@ export default function AdminHotelPublicationsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-on-surface truncate">{it.hotelName}</p>
-                      <p className="text-xs text-outline">Isletme: {it.organizationId}</p>
+                      <p className="text-xs text-outline">Isletme: <span title={it.organizationId}>{orgLabel(orgNames, it.organizationId)}</span></p>
                       <p className="text-xs text-on-surface-variant">{KIND_LABEL[it.kind]} &middot; {fmtDate(it.submittedAt)}{(it.mediaCount ?? 0) > 0 && <> &middot; {it.mediaCount} fotograf</>}</p>
                     </div>
                     <div className="flex items-center gap-2">

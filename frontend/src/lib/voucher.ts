@@ -31,6 +31,19 @@ const REDEEM_ERRORS: Record<string, string> = {
   PAYMENT_SERVICE_UNAVAILABLE: 'Odeme servisi su an kullanilamiyor, kupon kullanilmadi. Tekrar deneyin.',
 };
 
-export function redeemErrorMessage(code: string | null | undefined, fallback = 'Kupon okutulamadi.'): string {
+/** "2026-11-27T21:00:00Z" -> "28.11.2026 00:00" (Europe/Istanbul, fixed UTC+3). */
+export function fmtIstanbul(iso: string): string | null {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t + 3 * 3_600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
+export function redeemErrorMessage(code: string | null | undefined, fallback = 'Kupon okutulamadi.', body?: { validFrom?: unknown } | null): string {
+  if (code === 'NOT_YET_VALID' && typeof body?.validFrom === 'string') {
+    const when = fmtIstanbul(body.validFrom);
+    if (when) return `Bu kupon ${when} itibariyla gecerli olur.`;
+  }
   return (code && REDEEM_ERRORS[code]) || fallback;
 }

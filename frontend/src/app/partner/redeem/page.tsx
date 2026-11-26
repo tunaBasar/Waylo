@@ -69,7 +69,7 @@ export default function RedeemPage() {
       setResult(res.data);
       setManual('');
     } catch (err) {
-      if (err instanceof ApiError) setError(redeemErrorMessage(err.code, err.message));
+      if (err instanceof ApiError) setError(redeemErrorMessage(err.code, err.message, err.body));
       else setError(redeemErrorMessage(null));
     } finally {
       busyRef.current = false;

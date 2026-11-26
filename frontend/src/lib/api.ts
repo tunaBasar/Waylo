@@ -120,7 +120,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
  * Still an Error, so existing `err.message` callers keep working.
  */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly code: string | null) {
+  constructor(message: string, readonly status: number, readonly code: string | null, readonly body: Record<string, unknown> | null = null) {
     super(message);
     this.name = 'ApiError';
   }
@@ -140,7 +140,7 @@ async function toApiError(res: Response): Promise<ApiError> {
   if (body?.error === 'COMMISSION_RATE_MISSING') {
     return new ApiError(SALES_CLOSED_MESSAGE, res.status, 'COMMISSION_RATE_MISSING');
   }
-  return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.error ?? null);
+  return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.error ?? null, body as Record<string, unknown> | null);
 }
 
 /** 204 No Content (e.g. DELETE) has no body; res.json() would throw on it. */

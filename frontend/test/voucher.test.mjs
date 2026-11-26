@@ -33,3 +33,9 @@ test('maps error codes to Turkish messages with fallback', () => {
   assert.equal(m.redeemErrorMessage('SOMETHING_ELSE'), 'Kupon okutulamadi.');
   assert.equal(m.redeemErrorMessage(null, 'x'), 'x');
 });
+
+test('NOT_YET_VALID shows the validFrom date in Istanbul time', () => {
+  assert.equal(m.redeemErrorMessage('NOT_YET_VALID', 'x', { validFrom: '2026-11-27T21:00:00Z' }), 'Bu kupon 28.11.2026 00:00 itibariyla gecerli olur.');
+  assert.equal(m.redeemErrorMessage('NOT_YET_VALID', 'x', {}), 'Kupon henuz gecerli degil.');
+  assert.equal(m.redeemErrorMessage('NOT_YET_VALID', 'x', { validFrom: 'bad' }), 'Kupon henuz gecerli degil.');
+});

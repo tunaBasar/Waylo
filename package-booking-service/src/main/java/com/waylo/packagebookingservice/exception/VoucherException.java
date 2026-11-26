@@ -22,6 +22,18 @@ public class VoucherException extends RuntimeException {
         this.redeemedAt = redeemedAt;
     }
 
+    private Instant validFrom;
+    private Instant validUntil;
+
+    /** Adds the voucher validity window to the error body (NOT_YET_VALID / EXPIRED). */
+    public VoucherException withWindow(Instant validFrom, Instant validUntil) {
+        this.validFrom = validFrom;
+        this.validUntil = validUntil;
+        return this;
+    }
+
+    public Instant getValidFrom() { return validFrom; }
+    public Instant getValidUntil() { return validUntil; }
     public String getCode() { return code; }
     public HttpStatus getStatus() { return status; }
     public Instant getRedeemedAt() { return redeemedAt; }

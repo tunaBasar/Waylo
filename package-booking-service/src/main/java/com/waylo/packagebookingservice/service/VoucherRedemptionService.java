@@ -100,8 +100,8 @@ public class VoucherRedemptionService {
         }
         if (v.getStatus() == VoucherStatus.VOID) throw new VoucherException("VOID", HttpStatus.UNPROCESSABLE_ENTITY);
         Instant now = Instant.now();
-        if (now.isBefore(v.getValidFrom())) throw new VoucherException("NOT_YET_VALID", HttpStatus.UNPROCESSABLE_ENTITY);
-        if (now.isAfter(v.getValidUntil())) throw new VoucherException("EXPIRED", HttpStatus.UNPROCESSABLE_ENTITY);
+        if (now.isBefore(v.getValidFrom())) throw new VoucherException("NOT_YET_VALID", HttpStatus.UNPROCESSABLE_ENTITY).withWindow(v.getValidFrom(), v.getValidUntil());
+        if (now.isAfter(v.getValidUntil())) throw new VoucherException("EXPIRED", HttpStatus.UNPROCESSABLE_ENTITY).withWindow(v.getValidFrom(), v.getValidUntil());
 
         v.setStatus(VoucherStatus.REDEEMED);
         v.setRedeemedAt(now);

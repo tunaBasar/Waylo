@@ -154,6 +154,8 @@ public class GlobalExceptionHandler {
         body.put("path", request.getRequestURI());
         body.put("timestamp", java.time.Instant.now());
         if (ex.getRedeemedAt() != null) body.put("redeemedAt", ex.getRedeemedAt());
+        if (ex.getValidFrom() != null) body.put("validFrom", ex.getValidFrom());
+        if (ex.getValidUntil() != null) body.put("validUntil", ex.getValidUntil());
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 

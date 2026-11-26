@@ -216,6 +216,10 @@ class VoucherRedemptionServiceTest {
         voucher.setValidFrom(Instant.now().plusSeconds(3600));
         voucher.setValidUntil(Instant.now().plusSeconds(7200));
         assertCode("NOT_YET_VALID", HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThatThrownBy(() -> service.redeem(user, org, payload)).isInstanceOfSatisfying(VoucherException.class, e -> {
+            assertThat(e.getValidFrom()).isEqualTo(voucher.getValidFrom());
+            assertThat(e.getValidUntil()).isEqualTo(voucher.getValidUntil());
+        });
     }
 
     @Test
