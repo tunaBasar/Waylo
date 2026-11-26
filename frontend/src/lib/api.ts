@@ -129,10 +129,16 @@ export class ApiError extends Error {
 /** Same text as ADMIN_PURCHASE_MESSAGE in surface.ts (duplicated: api.ts must stay import-free for its unit test). */
 export const ADMIN_CANNOT_PURCHASE_MESSAGE = 'Platform yoneticisi hesabi ile satin alma yapilamaz, musteri hesabi kullanin.';
 
+/** Shown for COMMISSION_RATE_MISSING: customers must never see internal commission wording. */
+export const SALES_CLOSED_MESSAGE = 'Bu urun su anda satisa kapali. Lutfen daha sonra tekrar deneyin veya destek ile iletisime gecin.';
+
 async function toApiError(res: Response): Promise<ApiError> {
   const body = await res.json().catch(() => null) as { message?: string; error?: string } | null;
   if (res.status === 403 && body?.error === 'ADMIN_CANNOT_PURCHASE') {
     return new ApiError(ADMIN_CANNOT_PURCHASE_MESSAGE, 403, 'ADMIN_CANNOT_PURCHASE');
+  }
+  if (body?.error === 'COMMISSION_RATE_MISSING') {
+    return new ApiError(SALES_CLOSED_MESSAGE, res.status, 'COMMISSION_RATE_MISSING');
   }
   return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.error ?? null);
 }

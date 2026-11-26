@@ -15,7 +15,8 @@ async function mod() {
   const stripped = source
     .replace(/import \{[^}]+\} from '\.\/api';\n?/, '')
     .replace(/import type \{[^}]+\} from '\.\/partner-car';\n?/, '')
-    .replace(/ADMIN_CANNOT_PURCHASE_MESSAGE/g, "'Platform yonetıcisi hesabı ile satın alma yapılamaz.'");
+    .replace(/ADMIN_CANNOT_PURCHASE_MESSAGE/g, "'Platform yonetıcisi hesabı ile satın alma yapılamaz.'")
+    .replace(/SALES_CLOSED_MESSAGE/g, "'Bu urun su anda satisa kapali. Lutfen daha sonra tekrar deneyin veya destek ile iletisime gecin.'");
   const { outputText } = ts.transpileModule(stripped, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
   });
@@ -102,8 +103,10 @@ test('errorToMessage ROUTE_NOT_OFFERED', () => {
 });
 
 test('errorToMessage COMMISSION_RATE_MISSING', () => {
+  // walkthrough F29: the customer never sees internal commission jargon
   const msg = m.errorToMessage('COMMISSION_RATE_MISSING', 'fallback');
-  assert.ok(msg.includes('Komisyon'));
+  assert.ok(msg.includes('satisa kapali'), msg);
+  assert.ok(!/komisyon|commission/i.test(msg), msg);
 });
 
 test('errorToMessage ADMIN_CANNOT_PURCHASE', () => {

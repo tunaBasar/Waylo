@@ -8,7 +8,8 @@ async function mod() {
   const source = await readFile(new URL('../src/lib/flight.ts', import.meta.url), 'utf8');
   const stripped = source
     .replace(/import \{[^}]+\} from '\.\/api';\n?/, '')
-    .replace(/ADMIN_CANNOT_PURCHASE_MESSAGE/g, "'admin yasak'");
+    .replace(/ADMIN_CANNOT_PURCHASE_MESSAGE/g, "'admin yasak'")
+    .replace(/SALES_CLOSED_MESSAGE/g, "'satisa kapali'");
   const { outputText } = ts.transpileModule(stripped, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
   });

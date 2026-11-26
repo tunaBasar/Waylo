@@ -154,3 +154,16 @@ test('403 ADMIN_CANNOT_PURCHASE maps to the customer-account message', async () 
     });
   });
 });
+
+test('422 COMMISSION_RATE_MISSING never shows commission wording to the customer', async () => {
+  await withBrowser(async ({ api, ApiError, SALES_CLOSED_MESSAGE }) => {
+    globalThis.fetch = async () => json({ message: 'No commission rate is configured for vertical HOTEL', error: 'COMMISSION_RATE_MISSING' }, 422);
+    await assert.rejects(api.post('/api/payments/orders/x/intent', {}), err => {
+      assert.ok(err instanceof ApiError);
+      assert.equal(err.code, 'COMMISSION_RATE_MISSING');
+      assert.equal(err.message, SALES_CLOSED_MESSAGE);
+      assert.ok(!/komisyon|commission/i.test(err.message));
+      return true;
+    });
+  });
+});

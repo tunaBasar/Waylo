@@ -5,7 +5,7 @@
  * and adds customer/admin-specific types. All pure helpers live at the bottom so tests can import
  * them without the api dependency.
  */
-import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE } from './api';
+import { api, ApiError, ADMIN_CANNOT_PURCHASE_MESSAGE, SALES_CLOSED_MESSAGE } from './api';
 import type { Category, Transmission, FuelType, DocumentStatus, RentalStatus } from './partner-car';
 import type { Rental as PartnerRental } from './partner-car';
 
@@ -290,7 +290,7 @@ export function errorToMessage(code: string | null | undefined, fallback: string
     case 'ROUTE_NOT_OFFERED':
       return 'Giden-donus rotasi icin araç kiralama teklifi bulunmuyor.';
     case 'COMMISSION_RATE_MISSING':
-      return 'Komisyon oran tanimli degil. lutfen sonra tekrar deneyin.';
+      return SALES_CLOSED_MESSAGE;
     case 'ADMIN_CANNOT_PURCHASE':
       return ADMIN_CANNOT_PURCHASE_MESSAGE;
     default:

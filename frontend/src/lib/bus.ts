@@ -2,7 +2,7 @@
  * Bus vertical: types, API client (partner, admin, customer) and pure helpers.
  * Field names mirror bus-service DTOs (see BUS-CONTRACT.md). Partner paths use /api/bus-partner.
  */
-import { api, ApiError } from './api';
+import { api, ApiError, SALES_CLOSED_MESSAGE } from './api';
 
 export type SeatLayout = 'TWO_PLUS_TWO' | 'TWO_PLUS_ONE';
 export type Gender = 'FEMALE' | 'MALE';
@@ -194,7 +194,7 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_SEAT: 'Gecersiz koltuk.',
   SEGMENT_NOT_OFFERED: 'Bu guzergah icin fiyat yok.',
   ADMIN_CANNOT_PURCHASE: 'Platform yoneticisi hesabi ile satin alma yapilamaz.',
-  COMMISSION_RATE_MISSING: 'Bu satis icin komisyon orani tanimli degil.',
+  COMMISSION_RATE_MISSING: SALES_CLOSED_MESSAGE,
 };
 
 export function busErrorMessage(err: unknown, fallback: string): string {

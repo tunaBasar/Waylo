@@ -188,11 +188,7 @@ function PayPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       }
       onPaid();
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'COMMISSION_RATE_MISSING') {
-        setMsg('Bu urun icin satis henuz acik degil (komisyon orani tanimli degil). Lutfen daha sonra tekrar deneyin.');
-      } else {
-        setMsg(err instanceof ApiError ? err.message : 'Odeme basarisiz');
-      }
+      setMsg(err instanceof ApiError ? err.message : 'Odeme basarisiz');
     } finally {
       setBusy(false);
       payInFlight.current = false;

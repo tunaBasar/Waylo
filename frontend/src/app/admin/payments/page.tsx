@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { VERTICAL_TR, verticalsWithoutDefault } from '@/lib/commission';
 import { reconciliationLabel, reconciliationPath, reconciliationTone, shortId } from '@/lib/reconciliation';
 
 interface CommissionRate {
@@ -295,6 +296,13 @@ export default function PaymentsPage() {
           <span className="material-symbols-outlined text-primary">percent</span>
           Komisyon oranlari
         </h2>
+
+        {!rateLoading && !rateError && verticalsWithoutDefault(rates).length > 0 && (
+          <p className="mt-2 rounded-lg bg-warning-container px-3 py-2 text-sm text-on-warning-container" data-testid="missing-default-rates">
+            Varsayilan komisyon orani olmayan dikeyler: {verticalsWithoutDefault(rates).map(v => VERTICAL_TR[v]).join(', ')}.
+            Ozel orani olmayan isletmeler bu dikeylerde satis yapamaz. Isletmeyi onaylarken oran girilir.
+          </p>
+        )}
 
         {/* Error from load */}
         {rateError && (

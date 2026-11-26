@@ -2,7 +2,7 @@
  * Flight offers, orders and supplier balance (FLIGHT-SUPPLIER-CONTRACT.md).
  * Pure helpers live at the bottom so tests can import them without the api dependency.
  */
-import { api, ADMIN_CANNOT_PURCHASE_MESSAGE } from './api';
+import { api, ADMIN_CANNOT_PURCHASE_MESSAGE, SALES_CLOSED_MESSAGE } from './api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ export const LEDGER_TYPE_LABEL: Record<string, string> = {
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
+  COMMISSION_RATE_MISSING: SALES_CLOSED_MESSAGE,
   OFFER_EXPIRED: 'Teklifin suresi doldu, lutfen yeniden arama yapin.',
   INVALID_OFFER: 'Teklif gecersiz, lutfen yeniden arama yapin.',
   FARE_CHANGED: 'Ucret degisti, lutfen yeniden arama yapin.',

@@ -6,7 +6,7 @@ import ts from 'typescript';
 let sequence = 0;
 async function mod() {
   const source = await readFile(new URL('../src/lib/bus.ts', import.meta.url), 'utf8');
-  const stub = "class ApiError extends Error { constructor(m, s, c) { super(m); this.status = s; this.code = c; } }\nconst api = {};\n";
+  const stub = "class ApiError extends Error { constructor(m, s, c) { super(m); this.status = s; this.code = c; } }\nconst api = {};\nconst SALES_CLOSED_MESSAGE = 'Bu urun su anda satisa kapali. Lutfen daha sonra tekrar deneyin veya destek ile iletisime gecin.';\n";
   const stripped = stub + source.replace(/import \{[^}]+\} from '\.\/api';\n?/, '');
   const { outputText } = ts.transpileModule(stripped, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },

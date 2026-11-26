@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { api } from '@/lib/api';
+import {
+  VERTICAL_TR, hasIdenticalOverride, parseCommissionPercent, prefillPercent, verticalOf, type RateRow,
+} from '@/lib/commission';
 import { adminApi, type AdminOrganization, type OrgStatus } from '@/lib/admin';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
@@ -42,6 +46,10 @@ export default function AdminOrganizationsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [suspending, setSuspending] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [approving, setApproving] = useState<string | null>(null);
+  const [percent, setPercent] = useState('');
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [rateRows, setRateRows] = useState<RateRow[]>([]);
 
   const load = useCallback(async (s: OrgStatus) => {
     setLoading(true);
@@ -77,6 +85,53 @@ export default function AdminOrganizationsPage() {
     }
   }
 
+  async function openApprove(o: AdminOrganization) {
+    if (approving === o.id) { setApproving(null); return; }
+    setApproveError(null);
+    setPercent('');
+    setApproving(o.id);
+    try {
+      const rows = (await api.get<RateRow[]>('/api/admin/commission-rates')).data ?? [];
+      setRateRows(rows);
+      setPercent(prefillPercent(rows, verticalOf(o.businessType), o.id));
+    } catch {
+      setRateRows([]);
+    }
+  }
+
+  async function confirmApprove(o: AdminOrganization) {
+    if (busy) return;
+    const vertical = verticalOf(o.businessType);
+    const fraction = parseCommissionPercent(percent);
+    if (!vertical) { setApproveError('Isletme tipi bilinmiyor, komisyon orani belirlenemiyor.'); return; }
+    if (fraction == null) { setApproveError('Komisyon orani 0 ile 50 arasinda olmali. Ornek: 10 veya 12,5'); return; }
+    setBusy(o.id);
+    setApproveError(null);
+    try {
+      if (!hasIdenticalOverride(rateRows, vertical, o.id, fraction)) {
+        try {
+          await api.post('/api/admin/commission-rates', { vertical, supplierOrganizationId: o.id, rate: fraction });
+        } catch (e) {
+          setApproveError(`Komisyon orani kaydedilemedi, isletme onaylanmadi: ${e instanceof Error ? e.message : 'hata'}`);
+          return;
+        }
+      }
+      try {
+        await adminApi.approveOrganization(o.id);
+      } catch (e) {
+        setApproveError(`Komisyon orani kaydedildi ancak onay basarisiz: ${e instanceof Error ? e.message : 'hata'}. Tekrar Onayla deneyebilirsiniz.`);
+        const rows = (await api.get<RateRow[]>('/api/admin/commission-rates').catch(() => null))?.data;
+        if (rows) setRateRows(rows);
+        return;
+      }
+      toast.success('Isletme onaylandi');
+      setApproving(null);
+      await load(status);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-space-md">
       <PageHeader title="Isletmeler" subtitle="Partner isletme basvurularini onaylayin veya askiya alin." />
@@ -105,7 +160,7 @@ export default function AdminOrganizationsPage() {
                     <StatusPill tone={TONE[o.status]}>{STATUSES.find(s => s.key === o.status)?.label ?? o.status}</StatusPill>
                     {o.status === 'PENDING' && (
                       <Button icon="check" disabled={busy === o.id}
-                        onClick={() => void run(o.id, () => adminApi.approveOrganization(o.id), 'Isletme onaylandi')}>Onayla</Button>
+                        onClick={() => void openApprove(o)}>Onayla</Button>
                     )}
                     {(o.status === 'PENDING' || o.status === 'ACTIVE') && (
                       <Button variant="danger" icon="block" disabled={busy === o.id}
@@ -113,6 +168,20 @@ export default function AdminOrganizationsPage() {
                     )}
                   </div>
                 </div>
+                {approving === o.id && (
+                  <form className="flex flex-wrap items-end gap-3" data-testid="approve-form" onSubmit={e => { e.preventDefault(); void confirmApprove(o); }}>
+                    <div className="min-w-[220px]">
+                      <Field label={`Komisyon orani (%) - ${verticalOf(o.businessType) ? VERTICAL_TR[verticalOf(o.businessType)!] : 'tip bilinmiyor'}`}
+                        hint="Bu isletmeye ozel oran kaydedilir, sonra isletme onaylanir.">
+                        <input className={inputClass} inputMode="decimal" value={percent} autoFocus placeholder="Ornek: 10"
+                          onChange={e => setPercent(e.target.value)} />
+                      </Field>
+                    </div>
+                    <Button type="submit" icon="check" disabled={busy === o.id || !percent.trim()}>Kaydet ve onayla</Button>
+                    <Button type="button" variant="ghost" onClick={() => setApproving(null)}>Vazgec</Button>
+                    {approveError && <p className="basis-full text-xs text-error">{approveError}</p>}
+                  </form>
+                )}
                 {suspending === o.id && (
                   <form className="flex flex-wrap items-end gap-3" onSubmit={e => {
                     e.preventDefault();
