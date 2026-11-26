@@ -25,6 +25,15 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  # F77: fail fast when auth-service is down or restarting (default connect timeout is 10 s). Same values as
+  # hotel-service -> auth-service.
+  cloud:
+    openfeign:
+      client:
+        config:
+          auth-service:
+            connect-timeout: 2000
+            read-timeout: 2000
 
 eureka:
   client:
