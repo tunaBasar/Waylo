@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
 """Rolling, idempotent demo data. Run it as often as you like (daily is fine): every run only adds what is missing,
-so the window always starts TODAY.
+so the hotel window always starts TODAY (Europe/Istanbul) and flights start tomorrow.
 
-  hotels   : DEMO_HOTELS in several cities, published through the normal publication flow. Per hotel two room types,
-             one rate plan, daily stock and a nightly price for EVERY occupancy (1..maxOccupancy) for the next 60 days.
-  cars     : delegates to seed-car-partner.py (only when SEED_CAR_PARTNER_PASSWORD is set, it is idempotent).
-  flights  : airports + one flight per route per day for the next 30 days (WD<route><day-of-year>), seats per flight.
-             Also ensures the flight seller organization and a FLIGHT commission rate exist and prints the env value
-             package-booking-service needs (FLIGHT_SELLER_ORGANIZATION_ID).
-  cleanup  : PUBLISHED hotels that are not demo hotels are SUSPENDED via the admin status API (hidden, nothing deleted).
-             Set SEED_KEEP_OTHER_HOTELS=1 to skip this.
+  python3 scripts/seed-demo.py [--dry-run] [--only hotels|flights|cars] [--hide-others]
 
-Credentials come from the environment or .env (WAYLO_BOOTSTRAP_ADMIN_* or SEED_ADMIN_*), never printed.
+  hotels   : a dedicated demo PARTNER user (SEED_HOTEL_PARTNER_EMAIL, default seed-otel@waylo.test) owns the org
+             "Waylo Demo Hotels" and does every hotel write. The admin only approves the org and decides the publication
+             (an admin cannot review an organization they belong to: 409 SELF_REVIEW_NOT_ALLOWED).
+             Per hotel: two room types, one rate plan, daily stock and a nightly price for EVERY occupancy for SEED_HOTEL_DAYS.
+  cars     : runs seed-car-partner.py (generates SEED_CAR_PARTNER_PASSWORD into .env when missing).
+  flights  : airports, one flight per route per day from tomorrow 00:00 for SEED_FLIGHT_DAYS plus today's remaining
+             departures that are >= 3 h away (WD<route><day-of-year>), seats per flight. Reuses the existing flight seller
+             org ('Waylo Ucus Satis' / FLIGHT_SELLER_ORGANIZATION_ID) and ensures its FLIGHT commission rate.
+  --hide-others (opt-in): SUSPENDs other PUBLISHED hotels, never E2E/PubProj/Media/Cancel test fixtures, hotels
+             created in the last 2 hours or legacy hotels without an organization.
+
+Credentials come from the environment or .env, never printed. Generated passwords are appended to .env (mode kept).
 SEED_BASE (default http://localhost:8080), SEED_HOTEL_DAYS (60), SEED_FLIGHT_DAYS (30), SEED_FLIGHT_COMMISSION (0.0800).
 """
+import argparse
 import datetime
 import json
 import os
 import pathlib
+import secrets
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
+import zoneinfo
 
 BASE = os.environ.get('SEED_BASE', 'http://localhost:8080')
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-HOTEL_DAYS = int(os.environ.get('SEED_HOTEL_DAYS', '60'))
+HOTEL_DAYS = min(int(os.environ.get('SEED_HOTEL_DAYS', '60')), 366)
 FLIGHT_DAYS = int(os.environ.get('SEED_FLIGHT_DAYS', '30'))
 FLIGHT_COMMISSION = float(os.environ.get('SEED_FLIGHT_COMMISSION', '0.0800'))
 HOTEL_ORG = 'Waylo Demo Hotels'
-FLIGHT_ORG = 'Waylo Flights'
-TZ = datetime.timezone(datetime.timedelta(hours=3))
+FLIGHT_ORG = 'Waylo Ucus Satis'
+TZ = zoneinfo.ZoneInfo('Europe/Istanbul')
+PROTECTED_PREFIXES = ('E2E', 'PubProj', 'Media', 'Cancel test')
+DRY = False
 
 # name, city, country, address, stars, description, base price per night for 2 guests (TRY)
 DEMO_HOTELS = [
@@ -79,6 +89,31 @@ def env(key):
     return ''
 
 
+def ensure_secret(key):
+    """Env/.env value, else generate one and append it to .env (append keeps the mode). Never prints the value."""
+    v = env(key)
+    if v or DRY:
+        return v
+    v = secrets.token_urlsafe(18) + 'a1'
+    f = ROOT / '.env'
+    text = f.read_text() if f.exists() else ''
+    with f.open('a') as fh:
+        fh.write(('' if not text or text.endswith('\n') else '\n') + f'{key}={v}\n')
+    os.environ[key] = v
+    print(f'  (new password written to .env)')
+    return v
+
+
+def psql(db, sql):
+    r = subprocess.run(['docker', 'exec', 'waylo-postgres', 'psql', '-U', 'waylo', '-d', db, '-tAc', sql],
+                       capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ''
+
+
+def q(v):
+    return str(v).replace("'", "''")
+
+
 def call(method, path, body=None, token=None):
     h = {'Content-Type': 'application/json'}
     if token:
@@ -102,14 +137,55 @@ def must(method, path, body=None, token=None, ok=(200, 201)):
     return b.get('data')
 
 
-def ensure_org(name, admin):
-    mine = call('GET', '/api/me/memberships', token=admin)[1].get('data') or []
-    for m in mine:
+def login(email, pw):
+    s, b = call('POST', '/api/auth/login', {'email': email, 'password': pw})
+    return b['data']['token'] if s == 200 else None
+
+
+def partner_creds():
+    return env('SEED_HOTEL_PARTNER_EMAIL') or 'seed-otel@waylo.test', ensure_secret('SEED_HOTEL_PARTNER_PASSWORD')
+
+
+def ensure_partner():
+    """Login, else register + mark verified (pattern of seed-car-partner.py). Returns token, or None in a dry run."""
+    email, pw = partner_creds()
+    if not pw:
+        print('  [dry] SEED_HOTEL_PARTNER_PASSWORD uretilip .env dosyasina yazilacak')
+        return None
+    tok = login(email, pw)
+    if tok:
+        return tok
+    if DRY:
+        print(f'  [dry] otel partner kullanicisi kayit edilecek: {email}')
+        return None
+    s, _ = call('POST', '/api/auth/register', {'firstName': 'Otel', 'lastName': 'Partner', 'email': email, 'password': pw})
+    if s not in (200, 201):
+        sys.exit(f'HATA [{s}] partner register (kullanici var ama sifre uyusmuyor olabilir)')
+    subprocess.run(['docker', 'exec', 'waylo-postgres', 'psql', '-U', 'waylo', '-d', 'auth_db', '-tAc',
+                    f"UPDATE users SET email_verified = true WHERE email = '{q(email)}'"], check=True, capture_output=True)
+    time.sleep(13)  # only after a NEW registration
+    tok = login(email, pw)
+    if not tok:
+        sys.exit('HATA partner login')
+    print(f'  otel partner kullanicisi olusturuldu: {email}')
+    return tok
+
+
+def find_org(name, token):
+    for m in call('GET', '/api/me/memberships', token=token)[1].get('data') or []:
         if m.get('organizationName') == name and m.get('organizationStatus') in ('ACTIVE', 'PENDING'):
-            if m['organizationStatus'] == 'PENDING':
-                call('POST', f'/api/admin/organizations/{m["organizationId"]}/approve', token=admin)
-            return m['organizationId']
-    org = must('POST', '/api/organizations', {'name': name}, admin)['id']
+            return m
+    return None
+
+
+def ensure_org(name, partner, admin):
+    """The partner owns the org, the admin only approves it."""
+    m = find_org(name, partner)
+    if m:
+        if m['organizationStatus'] == 'PENDING':
+            call('POST', f'/api/admin/organizations/{m["organizationId"]}/approve', token=admin)
+        return m['organizationId']
+    org = must('POST', '/api/organizations', {'name': name, 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, partner)['id']
     call('POST', f'/api/admin/organizations/{org}/approve', token=admin)
     print(f'  organizasyon olusturuldu: {name}')
     return org
@@ -120,46 +196,68 @@ def chunks(items, n):
         yield items[i:i + n]
 
 
-def publish(hotel_id, admin):
-    s, b = call('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, admin)
-    if s not in (200, 201):
-        print(f'  [!] yayin istegi {hotel_id}: {s}')
-        return False
-    d = b['data']
-    s, _ = call('POST', f'/api/admin/hotel-publications/{d["id"]}/decisions',
-                {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': d.get('version', 0)}, admin)
+def publish(hotel_id, partner, admin):
+    s, b = call('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, partner)
+    if s in (200, 201):
+        rid, ver = b['data']['id'], b['data'].get('version', 0)
+    else:  # an open request may already exist: decide that one
+        page = call('GET', f'/api/admin/hotel-publications?status=SUBMITTED&hotelId={hotel_id}', token=admin)[1].get('data') or {}
+        items = page.get('items') or []
+        if not items:
+            print(f'  [!] yayin istegi {hotel_id}: {s}')
+            return False
+        rid, ver = items[0]['requestId'], items[0]['version']
+    s, _ = call('POST', f'/api/admin/hotel-publications/{rid}/decisions',
+                {'decision': 'APPROVE_AND_PUBLISH', 'expectedVersion': ver}, admin)
     return s == 200
 
 
 def seed_hotels(admin):
-    org = ensure_org(HOTEL_ORG, admin)
-    today = datetime.date.today()
+    partner = ensure_partner()
+    today = datetime.datetime.now(TZ).date()
     days = [today + datetime.timedelta(days=i) for i in range(HOTEL_DAYS)]
-    existing = {h['name']: h for h in (call('GET', f'/api/hotels?organizationId={org}', token=admin)[1].get('data') or [])}
+    if not partner:
+        print(f'hotels : [dry] org "{HOTEL_ORG}", {len(DEMO_HOTELS)} otel, {len(ROOM_TYPES)} oda tipi, {HOTEL_DAYS} gun stok/fiyat olusturulacak')
+        return
+    if DRY and not find_org(HOTEL_ORG, partner):
+        print(f'hotels : [dry] org "{HOTEL_ORG}" olusturulacak, {len(DEMO_HOTELS)} otel, {HOTEL_DAYS} gun stok/fiyat')
+        return
+    org = find_org(HOTEL_ORG, partner)['organizationId'] if DRY else ensure_org(HOTEL_ORG, partner, admin)
+    if not DRY:
+        partner = login(*partner_creds())  # fresh token after org creation
+    existing = {h['name']: h for h in (call('GET', f'/api/hotels?organizationId={org}', token=partner)[1].get('data') or [])}
     new_h = new_stock = new_rates = 0
     for name, city, country, addr, stars, desc, base in DEMO_HOTELS:
         h = existing.get(name)
         if not h:
-            h = must('POST', '/api/hotels', {'name': name, 'city': city, 'country': country, 'address': addr,
-                                            'starRating': stars, 'description': desc, 'organizationId': org}, admin)
             new_h += 1
+            if DRY:
+                print(f'  [dry] otel olusturulacak: {name} (+{len(days) * len(ROOM_TYPES)} stok gunu, tum fiyatlar, yayin)')
+                continue
+            h = must('POST', '/api/hotels', {'name': name, 'city': city, 'country': country, 'address': addr,
+                                            'starRating': stars, 'description': desc, 'organizationId': org}, partner)
         hid = h['id']
-        types = {t['code']: t for t in (call('GET', f'/api/hotels/{hid}/room-types', token=admin)[1].get('data') or [])}
+        types = {t['code']: t for t in (call('GET', f'/api/hotels/{hid}/room-types', token=partner)[1].get('data') or [])}
         for code, tname, adults, kids, occ, _mult in ROOM_TYPES:
             if code not in types:
+                if DRY:
+                    continue
                 types[code] = must('POST', f'/api/hotels/{hid}/room-types', {
-                    'code': code, 'name': tname, 'maxAdults': adults, 'maxChildren': kids, 'maxOccupancy': occ}, admin)
-        plans = {p['code']: p for p in (call('GET', f'/api/hotels/{hid}/rate-plans', token=admin)[1].get('data') or [])}
-        if RATE_PLAN[0] not in plans:
+                    'code': code, 'name': tname, 'maxAdults': adults, 'maxChildren': kids, 'maxOccupancy': occ}, partner)
+        plans = {p['code']: p for p in (call('GET', f'/api/hotels/{hid}/rate-plans', token=partner)[1].get('data') or [])}
+        if RATE_PLAN[0] not in plans and not DRY:
             plans[RATE_PLAN[0]] = must('POST', f'/api/hotels/{hid}/rate-plans', {
                 'code': RATE_PLAN[0], 'name': RATE_PLAN[1], 'mealPlan': 'BREAKFAST',
-                'cancellationPolicy': 'FREE_CANCELLATION', 'freeCancellationDaysBefore': 2}, admin)
+                'cancellationPolicy': 'FREE_CANCELLATION', 'freeCancellationDaysBefore': 2}, partner)
+        if DRY and (len(types) < len(ROOM_TYPES) or RATE_PLAN[0] not in plans):
+            print(f'  [dry] {name}: eksik oda tipi/rate plan olusturulacak')
+            continue
         plan = plans[RATE_PLAN[0]]['id']
         frm, to = days[0].isoformat(), days[-1].isoformat()
         have_inv = {(i['roomTypeId'], i['stayDate']) for i in
-                    (call('GET', f'/api/hotels/{hid}/inventory?from={frm}&to={to}', token=admin)[1].get('data') or [])}
+                    (call('GET', f'/api/hotels/{hid}/inventory?from={frm}&to={to}', token=partner)[1].get('data') or [])}
         have_rate = {(r['roomTypeId'], r['stayDate'], r['occupancy']) for r in
-                     (call('GET', f'/api/hotels/{hid}/rates?from={frm}&to={to}', token=admin)[1].get('data') or [])}
+                     (call('GET', f'/api/hotels/{hid}/rates?from={frm}&to={to}', token=partner)[1].get('data') or [])}
         inv, rates = [], []
         for code, _n, _a, _k, occ, mult in ROOM_TYPES:
             rt = types[code]['id']
@@ -174,90 +272,148 @@ def seed_hotels(admin):
                     amount = round(base * mult * OCC_FACTOR.get(o, 1.45) * (1.15 if weekend else 1.0), -1)
                     rates.append({'roomTypeId': rt, 'ratePlanId': plan, 'stayDate': ds, 'occupancy': o,
                                   'currency': 'TRY', 'amount': amount, 'expectedVersion': None})
-        for part in chunks(inv, 200):
-            must('PUT', f'/api/hotels/{hid}/inventory', {'items': part, 'reason': 'demo seed'}, admin)
-        for part in chunks(rates, 400):
-            must('PUT', f'/api/hotels/{hid}/rates', {'items': part}, admin)
+        if not DRY:
+            for part in chunks(inv, 400):  # InventoryUpdateRequest: items max 400
+                must('PUT', f'/api/hotels/{hid}/inventory', {'items': part, 'reason': 'demo seed'}, partner)
+            for part in chunks(rates, 500):  # RateUpdateRequest: items max 500
+                must('PUT', f'/api/hotels/{hid}/rates', {'items': part}, partner)
         new_stock += len(inv)
         new_rates += len(rates)
-        if h.get('publicationStatus') != 'PUBLISHED':
-            if h.get('publicationStatus') == 'SUSPENDED':
+        status = h.get('publicationStatus')
+        if status != 'PUBLISHED':
+            if DRY:
+                print(f'  [dry] {name}: yayinlanacak (durum {status})')
+            elif status == 'SUSPENDED':
                 call('POST', f'/api/admin/hotels/{hid}/publication-status',
                      {'decision': 'REINSTATE', 'reason': 'demo seed reinstate'}, admin)
             else:
-                publish(hid, admin)
-    print(f'hotels : +{new_h} otel, +{new_stock} stok gunu, +{new_rates} fiyat satiri ({HOTEL_DAYS} gun)')
+                publish(hid, partner, admin)
+    print(f'hotels : {"[dry] " if DRY else ""}+{new_h} otel, +{new_stock} stok gunu, +{new_rates} fiyat satiri ({HOTEL_DAYS} gun, {today} baslangic)')
 
 
 def hide_other_hotels(admin):
-    if os.environ.get('SEED_KEEP_OTHER_HOTELS') == '1':
-        return
     demo = {h[0] for h in DEMO_HOTELS}
-    hidden = 0
+    now = datetime.datetime.now(datetime.timezone.utc)
+    hidden = legacy = protected = 0
     for h in call('GET', '/api/hotels', token=admin)[1].get('data') or []:
-        if h.get('name') in demo or h.get('publicationStatus') != 'PUBLISHED':
+        name = h.get('name') or ''
+        if name in demo or h.get('publicationStatus') != 'PUBLISHED':
+            continue
+        created = None
+        if h.get('createdAt'):
+            try:
+                created = datetime.datetime.fromisoformat(h['createdAt'].replace('Z', '+00:00'))
+            except ValueError:
+                pass
+        if name.startswith(PROTECTED_PREFIXES) or (created and now - created < datetime.timedelta(hours=2)):
+            protected += 1
+            continue
+        if not h.get('organizationId'):
+            legacy += 1  # publication-status API records decisions against the org; legacy hotels are locked
+            continue
+        if DRY:
+            hidden += 1
             continue
         s, _ = call('POST', f'/api/admin/hotels/{h["id"]}/publication-status',
                     {'decision': 'SUSPEND', 'reason': 'demo seed: test verisi gizlendi'}, admin)
         hidden += 1 if s == 200 else 0
-    print(f'cleanup: {hidden} test oteli gizlendi')
+    print(f'cleanup: {"[dry] " if DRY else ""}{hidden} otel gizlendi, {legacy} organizasyonsuz atlandi, {protected} korumali/yeni atlandi')
 
 
 def seed_cars():
+    # Never generate a password here: the car partner may already exist with another password (a new one cannot log
+    # in and seed-car-partner.py exits 401). Without SEED_CAR_PARTNER_PASSWORD the step is skipped with a hint.
     if not env('SEED_CAR_PARTNER_PASSWORD'):
-        print('cars   : atlandi (SEED_CAR_PARTNER_PASSWORD yok)')
+        print('cars   : atlandi (SEED_CAR_PARTNER_PASSWORD yok; mevcut filo varsa dokunulmaz)')
+        return
+    if DRY:
+        print('cars   : [dry] seed-car-partner.py calistirilacak (idempotent)')
         return
     r = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'seed-car-partner.py')], capture_output=True, text=True)
     print('cars   :', 'tamam' if r.returncode == 0 else 'HATA ' + r.stdout[-200:] + r.stderr[-200:])
 
 
+def flight_seller_org():
+    """Existing seller org: the .env id when it exists in auth_db, else the org named FLIGHT_ORG."""
+    wanted = env('FLIGHT_SELLER_ORGANIZATION_ID')
+    if wanted and psql('auth_db', f"SELECT id FROM organizations WHERE id = '{q(wanted)}'"):
+        return wanted
+    return psql('auth_db', f"SELECT id FROM organizations WHERE name = '{FLIGHT_ORG}' LIMIT 1") or None
+
+
 def seed_flights(admin):
-    org = ensure_org(FLIGHT_ORG, admin)
+    org = flight_seller_org()
+    if not org:
+        sys.exit(f'HATA: ucus satici organizasyonu yok ("{FLIGHT_ORG}"). Once scripts/test-flight-order.py calistirin.')
     rates = call('GET', '/api/admin/commission-rates', token=admin)[1].get('data') or []
     if not any(r.get('vertical') == 'FLIGHT' and str(r.get('supplierOrganizationId')) == org for r in rates):
-        must('POST', '/api/admin/commission-rates', {'vertical': 'FLIGHT', 'supplierOrganizationId': org, 'rate': FLIGHT_COMMISSION}, admin)
-        print(f'  FLIGHT komisyon orani {FLIGHT_COMMISSION} eklendi')
-    have = {a['iataCode'] for a in (call('GET', '/api/airports')[1].get('data') or [])}
+        print(f'  FLIGHT komisyon orani {FLIGHT_COMMISSION} {"eklenecek" if DRY else "eklendi"}')
+        if not DRY:
+            must('POST', '/api/admin/commission-rates', {'vertical': 'FLIGHT', 'supplierOrganizationId': org, 'rate': FLIGHT_COMMISSION}, admin)
+    have = {(a.get('iataCode') or '').upper() for a in (call('GET', '/api/airports', token=admin)[1].get('data') or [])}
     for code, name, city, country, tz, lat, lon in AIRPORTS:
         if code not in have:
-            must('POST', '/api/airports', {'iataCode': code, 'name': name, 'city': city, 'country': country,
-                                           'timezone': tz, 'latitude': lat, 'longitude': lon}, admin)
+            print(f'  havalimani {"eklenecek" if DRY else "ekleniyor"}: {code}')
+            if not DRY:
+                must('POST', '/api/airports', {'iataCode': code, 'name': name, 'city': city, 'country': country,
+                                               'timezone': tz, 'latitude': lat, 'longitude': lon}, admin)
     now = datetime.datetime.now(TZ)
-    new_f = 0
-    for off in range(1, FLIGHT_DAYS + 1):
-        day = now + datetime.timedelta(days=off)
-        doy = day.timetuple().tm_yday
+    earliest_today = now + datetime.timedelta(hours=3)
+    new_f = new_seats = 0
+    for off in range(0, FLIGHT_DAYS + 1):  # 0 = today's remaining departures, 1.. = from tomorrow 00:00
+        date = now.date() + datetime.timedelta(days=off)
+        doy = date.timetuple().tm_yday
         for r, frm, to, hh, mm, dur, eco, biz in ROUTES:
+            dep_local = datetime.datetime(date.year, date.month, date.day, hh, mm, tzinfo=TZ)
+            if off == 0 and dep_local < earliest_today:
+                continue
             no = f'WD{r}{doy:03d}'
             if call('GET', f'/api/flights/number/{no}')[0] != 200:
-                dep = day.replace(hour=hh, minute=mm, second=0, microsecond=0).astimezone(datetime.timezone.utc)
+                dep = dep_local.astimezone(datetime.timezone.utc)
                 arr = dep + datetime.timedelta(minutes=dur)
-                must('POST', '/api/flights', {'flightNumber': no, 'departureAirportCode': frm, 'arrivalAirportCode': to,
-                                              'airline': 'Waylo Air', 'departureTime': dep.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                              'arrivalTime': arr.strftime('%Y-%m-%dT%H:%M:%SZ')}, admin)
                 new_f += 1
-            if (call('GET', f'/api/seat-inventory/seats/{no}')[1].get('data') or []):
-                continue
-            weekend = 1.1 if day.weekday() in (4, 6) else 1.0
+                if not DRY:
+                    must('POST', '/api/flights', {'flightNumber': no, 'departureAirportCode': frm, 'arrivalAirportCode': to,
+                                                  'airline': 'Waylo Air', 'departureTime': dep.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                                  'arrivalTime': arr.strftime('%Y-%m-%dT%H:%M:%SZ')}, admin)
+            have_cabins = {s.get('seatType') for s in (call('GET', f'/api/seat-inventory/seats/{no}')[1].get('data') or [])}
+            weekend = 1.1 if date.weekday() in (4, 6) else 1.0
             for cabin, price, rows, letters in (('BUSINESS', biz, (1, 2), 'AC'), ('ECONOMY', eco, (3, 7), 'ABCD')):
-                must('POST', '/api/seat-inventory/seats/bulk', {'flightNumber': no, 'seatType': cabin,
-                                                                'price': round(price * weekend, -1), 'fromRow': rows[0],
-                                                                'toRow': rows[1], 'letters': letters}, admin)
-    print(f'flights: +{new_f} ucus ({FLIGHT_DAYS} gun, {len(ROUTES)} hat/gun)')
-    print(f'  package-booking icin: FLIGHT_SELLER_ORGANIZATION_ID={org}')
+                if cabin in have_cabins:
+                    continue
+                new_seats += (rows[1] - rows[0] + 1) * len(letters)
+                if not DRY:
+                    must('POST', '/api/seat-inventory/seats/bulk', {'flightNumber': no, 'seatType': cabin,
+                                                                    'price': round(price * weekend, -1), 'fromRow': rows[0],
+                                                                    'toRow': rows[1], 'letters': letters}, admin)
+    print(f'flights: {"[dry] " if DRY else ""}+{new_f} ucus, +{new_seats} koltuk (bugunun kalani + {FLIGHT_DAYS} gun, {len(ROUTES)} hat/gun)')
+    same = env('FLIGHT_SELLER_ORGANIZATION_ID') == org
+    print('  .env FLIGHT_SELLER_ORGANIZATION_ID ' + ('dogru' if same else 'FARKLI/EKSIK: .env guncellenip package-booking-service yeniden baslatilmali'))
 
 
 def main():
+    global DRY
+    ap = argparse.ArgumentParser(description='Rolling demo seed')
+    ap.add_argument('--dry-run', action='store_true', help='print what would be created, no writes')
+    ap.add_argument('--only', choices=('hotels', 'flights', 'cars'))
+    ap.add_argument('--hide-others', action='store_true', help='SUSPEND other published hotels (opt-in)')
+    args = ap.parse_args()
+    DRY = args.dry_run
+    todo = {args.only} if args.only else {'hotels', 'cars', 'flights'}
     email = env('SEED_ADMIN_EMAIL') or env('WAYLO_BOOTSTRAP_ADMIN_EMAIL')
     pw = env('SEED_ADMIN_PASSWORD') or env('WAYLO_BOOTSTRAP_ADMIN_PASSWORD')
     if not (email and pw):
         sys.exit('HATA: admin bilgisi gerekli (SEED_ADMIN_* veya WAYLO_BOOTSTRAP_ADMIN_*)')
     admin = must('POST', '/api/auth/login', {'email': email, 'password': pw})['token']
-    seed_hotels(admin)
-    admin = must('POST', '/api/auth/login', {'email': email, 'password': pw})['token']
-    hide_other_hotels(admin)
-    seed_cars()
-    seed_flights(admin)
+    if 'hotels' in todo:
+        seed_hotels(admin)
+        admin = must('POST', '/api/auth/login', {'email': email, 'password': pw})['token']
+    if args.hide_others:
+        hide_other_hotels(admin)
+    if 'cars' in todo:
+        seed_cars()
+    if 'flights' in todo:
+        seed_flights(admin)
 
 
 if __name__ == '__main__':

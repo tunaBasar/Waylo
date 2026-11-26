@@ -59,12 +59,13 @@ Frontend şu an tarayıcıdan `localhost:8080` adresine bağlanır. Bu kurulum y
 
 ## Demo verisi (kayan pencere)
 
-`python3 scripts/seed-demo.py` idempotenttir, istediğiniz kadar (örn. her gün) çalıştırın: yalnızca eksikleri ekler, pencere her zaman BUGÜNden başlar.
+`python3 scripts/seed-demo.py [--dry-run] [--only hotels|flights|cars] [--hide-others]` idempotenttir, istediğiniz kadar (örn. her gün) çalıştırın: yalnızca eksikleri ekler.
 
-- Oteller: birkaç şehirde yayınlanmış demo oteller, her biri için oda tipleri, stok ve her doluluk (1..maks. kişi) için gecelik fiyat, bugünden 60 gün (`SEED_HOTEL_DAYS`).
-- Uçuşlar: bugünden 30 gün (`SEED_FLIGHT_DAYS`), günlük her hat için uçuş + koltuk. Satıcı organizasyon (`Waylo Flights`) ve FLIGHT komisyon oranı (`SEED_FLIGHT_COMMISSION`, varsayılan 0.08) yoksa oluşturulur. Çıktıdaki `FLIGHT_SELLER_ORGANIZATION_ID` değerini `.env` içine yazın.
-- Araçlar: `SEED_CAR_PARTNER_PASSWORD` tanımlıysa `scripts/seed-car-partner.py` çağrılır.
-- Temizlik: demo olmayan yayındaki test otelleri admin durum API'si ile SUSPENDED yapılıp gizlenir (silinmez). Atlamak için `SEED_KEEP_OTHER_HOTELS=1`.
+- `--dry-run`: neyin oluşturulacağını yazar, hiçbir şey yazmaz. `--only`: tek bölüm çalıştırır.
+- Oteller: özel bir demo partner kullanıcısı (`SEED_HOTEL_PARTNER_EMAIL`, varsayılan `seed-otel@waylo.test`) `Waylo Demo Hotels` organizasyonunun sahibidir ve tüm otel yazımlarını yapar, admin yalnızca organizasyonu ve yayın talebini onaylar (admin kendi organizasyonunu inceleyemez). `SEED_HOTEL_PARTNER_PASSWORD` `.env` içinde yoksa üretilip `.env` sonuna eklenir (ekrana yazılmaz). Stok ve fiyat BUGÜNden (Europe/Istanbul) `SEED_HOTEL_DAYS` (60) gün, her doluluk (1..maks. kişi) için.
+- Uçuşlar: yarın 00:00'dan `SEED_FLIGHT_DAYS` (30) gün, ayrıca bugünün en az 3 saat sonrasındaki seferleri; günlük her hat için uçuş + koltuk. Satıcı organizasyon yeniden oluşturulmaz: `.env` içindeki `FLIGHT_SELLER_ORGANIZATION_ID` ya da `Waylo Ucus Satis` adlı mevcut organizasyon kullanılır (yoksa önce `scripts/test-flight-order.py`). FLIGHT komisyon oranı (`SEED_FLIGHT_COMMISSION`, varsayılan 0.08) yoksa eklenir. Konteyner yeniden başlatılmaz.
+- Araçlar: `scripts/seed-car-partner.py` çağrılır; `SEED_CAR_PARTNER_PASSWORD` yoksa üretilip `.env` içine yazılır.
+- `--hide-others` (isteğe bağlı): demo olmayan yayındaki oteller SUSPENDED yapılır (silinmez). `E2E`, `PubProj`, `Media`, `Cancel test` ile başlayanlar, son 2 saatte oluşanlar ve organizasyonsuz (legacy) oteller atlanır, sayılar yazılır.
 - Admin bilgisi: `.env` içindeki `WAYLO_BOOTSTRAP_ADMIN_EMAIL/PASSWORD` veya `SEED_ADMIN_EMAIL/PASSWORD`.
 
 ## SMTP
