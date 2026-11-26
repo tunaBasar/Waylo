@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
   BANK_STATUS_LABEL, BANK_STATUS_TONE, ESCROW_STATE_LABEL, PAYOUT_BLOCKED_LABEL, PAYOUT_STATUS_LABEL, PAYOUT_STATUS_TONE,
-  isValidTrIban, partnerApi, partnerErrorMessage, payoutErrorMessage, toAmount, validatePayoutAmount,
+  isValidTrIban, parseAmountInput, partnerApi, partnerErrorMessage, payoutErrorMessage, toAmount, validatePayoutAmount,
   type PartnerBankAccount, type PartnerEarnings, type PartnerPayout, type PartnerPayoutBalance, type PayoutCurrencyBalance,
 } from '@/lib/partner';
 import { ApiError } from '@/lib/api';
@@ -206,7 +206,7 @@ function BalanceBlock({ b, orgId, owner, onDone, onError }: { b: PayoutCurrencyB
     if (err) { setFieldError(err); return; }
     setBusy(true);
     try {
-      await partnerApi.requestPayout(orgId, { currency: cur, amount: Number(amount.replace(',', '.')) }, idemKey);
+      await partnerApi.requestPayout(orgId, { currency: cur, amount: parseAmountInput(amount) ?? 0 }, idemKey);
       setOpen(false);
       await onDone('Odeme talebiniz alindi.');
     } catch (e) {

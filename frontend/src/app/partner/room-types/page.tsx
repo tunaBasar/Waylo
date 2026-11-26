@@ -1,5 +1,6 @@
 'use client';
 
+import { codeHint, normalizeCode } from '@/lib/code';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
@@ -18,7 +19,8 @@ function RoomTypeForm({
   const toast = useToast();
   const isEdit = !!roomType;
 
-  const [code, setCode] = useState(roomType?.code ?? '');
+  const [rawCode, setRawCode] = useState(roomType?.code ?? '');
+  const code = normalizeCode(rawCode);
   const [name, setName] = useState(roomType?.name ?? '');
   // Number fields are kept as strings so the user can clear and retype them.
   const [maxAdults, setMaxAdults] = useState(String(roomType?.maxAdults ?? 2));
@@ -30,8 +32,7 @@ function RoomTypeForm({
   const inFlight = useRef(false);
 
   function upper(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '');
-    setCode(v);
+    setRawCode(e.target.value.toUpperCase());
   }
 
   const digits = (set: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -102,10 +103,11 @@ function RoomTypeForm({
         <Field
           label="Kod"
           error={codeValid ? undefined : code.length > 0 ? 'Gecerli kod: A-Z, 0-9, _ (2-30 karakter)' : undefined}
+          hint={isEdit ? undefined : (codeHint(rawCode) ?? 'Sadece harf ve rakam (ve _)')}
         >
           <input
             className={inputClass}
-            value={code}
+            value={rawCode}
             onChange={upper}
             maxLength={30}
             disabled={isEdit}

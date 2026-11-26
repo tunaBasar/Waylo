@@ -1,5 +1,6 @@
 'use client';
 
+import { codeHint, normalizeCode } from '@/lib/code';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
@@ -58,14 +59,14 @@ function RatePlanForm({
   const set =
     (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const v = k === 'code' ? e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') : e.target.value;
+      const v = k === 'code' ? e.target.value.toUpperCase() : e.target.value;
       setForm(f => ({ ...f, [k]: k === 'freeCancellationDaysBefore' && v !== '' ? parseInt(v, 10) : k === 'freeCancellationDaysBefore' && v === '' ? null : v }));
     };
 
   const validate = useCallback((): boolean => {
     let ok = true;
     const codeRegex = /^[A-Z0-9_]{2,30}$/;
-    if (!form.code.trim() || !codeRegex.test(form.code.trim())) {
+    if (!normalizeCode(form.code) || !codeRegex.test(normalizeCode(form.code))) {
       setCodeError('2-30 karakter, sadece A-Z 0-9 _');
       ok = false;
     } else {
@@ -110,7 +111,7 @@ function RatePlanForm({
         toast.success('Fiyat plani guncellendi');
       } else {
         const createBody = {
-          code: form.code.trim().toUpperCase(),
+          code: normalizeCode(form.code),
           name: form.name.trim(),
           description: form.description.trim() || null,
           mealPlan: form.mealPlan,
@@ -131,12 +132,12 @@ function RatePlanForm({
     }
   };
 
-  const codeValid = /^[A-Z0-9_]{2,30}$/.test(form.code.trim());
+  const codeValid = /^[A-Z0-9_]{2,30}$/.test(normalizeCode(form.code));
 
   return (
     <Card className="p-4">
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <Field label="Kod" error={codeError}>
+        <Field label="Kod" error={codeError} hint={isEdit ? undefined : (codeHint(form.code) ?? 'Sadece harf ve rakam (ve _)')}>
           <input
             className={inputClass}
             value={form.code}

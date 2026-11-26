@@ -8,6 +8,7 @@
  * locally and sent as two batch requests (inventory, then rates) when the user presses Kaydet.
  * The backend returns no row for days that were never set, so those cells start empty.
  */
+import { AMOUNT_ERROR, parseTrAmount } from '@/lib/amount';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
@@ -65,7 +66,6 @@ interface Edits {
 
 const NO_EDITS: Edits = { allotment: {}, stopSell: {}, amount: {} };
 
-const AMOUNT_RE = /^\d{1,10}([.,]\d{1,2})?$/;
 
 export default function CalendarPage() {
   const toast = useToast();
@@ -231,8 +231,7 @@ export default function CalendarPage() {
   const amountError = (key: string): string | null => {
     const raw = edits.amount[key];
     if (raw === undefined || raw === '') return null;
-    if (!AMOUNT_RE.test(raw.trim())) return 'Gecersiz tutar';
-    if (Number(raw.replace(',', '.')) <= 0) return 'Sifirdan buyuk olmali';
+    if (parseTrAmount(raw) == null) return /^\s*0+([.,]0+)?\s*$/.test(raw) ? 'Sifirdan buyuk olmali' : AMOUNT_ERROR;
     return null;
   };
 
@@ -275,7 +274,7 @@ export default function CalendarPage() {
         ratePlanId,
         stayDate,
         occupancy: roomType.maxOccupancy,
-        amount: Number(raw.replace(',', '.')),
+        amount: parseTrAmount(raw) ?? 0,
         currency,
         expectedVersion: rateByKey.get(key)?.version ?? null,
       });
@@ -342,7 +341,7 @@ export default function CalendarPage() {
     <div className="space-y-space-md">
       <PageHeader
         title="Musaitlik ve fiyat takvimi"
-        subtitle={`Fiyatlar ${roomType?.maxOccupancy ?? ''} kisilik konaklama icin, para birimi ${currency}`}
+        subtitle={`Fiyatlar odanin tam kapasitesi (${roomType?.maxOccupancy ?? ''} kisi) icindir; 1-${roomType?.maxOccupancy ?? ''} kisilik konaklamalarda da bu fiyat uygulanir. Para birimi ${currency}`}
         actions={
           <>
             {changeCount > 0 && <StatusPill tone="warning">{changeCount} kaydedilmemis degisiklik</StatusPill>}
@@ -457,8 +456,8 @@ export default function CalendarPage() {
             </tr>
             <tr className="border-t border-outline-variant/50">
               <td className="sticky left-0 z-10 bg-surface-container-lowest px-3 py-2">
-                <div className="font-medium text-on-surface">Satisa kapali</div>
-                <div className="text-[11px] text-outline">Isaretli gunler satilmaz</div>
+                <div className="font-medium text-on-surface">Satis durumu</div>
+                <div className="text-[11px] text-outline">Kapali gunler satilmaz</div>
               </td>
               {dates.map(d => {
                 const closed = stopSellValue(d);
@@ -470,11 +469,13 @@ export default function CalendarPage() {
                       disabled={!editable(d) || saving || gridBlocked}
                       onClick={() => { if (!inFlight.current && !gridLoading) setEdits(x => ({ ...x, stopSell: { ...x.stopSell, [d]: !closed } })); }}
                       className={cn(
-                        'w-9 h-8 rounded-lg inline-flex items-center justify-center transition-colors disabled:opacity-40',
+                        'min-w-[3.25rem] h-8 px-1 rounded-lg inline-flex items-center justify-center transition-colors disabled:opacity-40',
                         closed ? 'bg-error-container text-on-error-container' : 'bg-surface-container text-outline hover:bg-surface-container-high',
                         edits.stopSell[d] !== undefined && 'ring-2 ring-primary',
                       )}>
-                      <span className="material-symbols-outlined text-[18px]">{closed ? 'block' : 'check'}</span>
+                      {closed
+                        ? <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold"><span className="material-symbols-outlined text-[14px]">block</span>Kapali</span>
+                        : <span className="text-[11px] font-medium">Acik</span>}
                     </button>
                     {needsAllot && <div className="text-[10px] text-error mt-0.5 leading-tight">Once kontenjan</div>}
                   </td>
@@ -521,7 +522,7 @@ export default function CalendarPage() {
 
       <p className="text-xs text-on-surface-variant">
         Bos hucreler henuz tanimlanmamis gunlerdir. Bir gunu satisa acmak icin kontenjan ve en az bir fiyat girin.
-        Fiyat silme ve kisi sayisina gore farkli fiyat bu ekranda henuz yok.
+        Fiyat silme bu ekranda henuz yok. Fiyatlar 1.250 veya 1250,50 seklinde yazilabilir.
       </p>
     </div>
   );
