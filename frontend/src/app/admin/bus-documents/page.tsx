@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { adminBusApi, BUS_DOC_LABEL, type AdminBusDocument, type BusDocStatus } from '@/lib/bus';
+import { documentQueueEmptyText, formatLocalDate } from '@/lib/partner-car';
 
 type Filter = 'ALL' | BusDocStatus;
 const FILTER_LABEL: Record<Filter, string> = { ALL: 'Tumu', PENDING: 'Beklemede', APPROVED: 'Onayli', REJECTED: 'Reddedilen' };
@@ -87,7 +88,7 @@ export default function AdminBusDocumentsPage() {
       </div>
       {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
       {loading ? <p className="text-sm text-on-surface-variant">Yukleniyor</p> : shown.length === 0 ? (
-        <p className="text-center py-12 text-on-surface-variant text-sm">Belge bulunamadi</p>
+        <p className="text-center py-12 text-on-surface-variant text-sm">{documentQueueEmptyText(filter)}</p>
       ) : (
         <div className="space-y-space-sm">
           {shown.map(i => {
@@ -103,7 +104,7 @@ export default function AdminBusDocumentsPage() {
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-surface-container">{STATUS_LABEL[d.status]}</span>
                 </div>
-                <p className="text-xs text-on-surface-variant">Son kullanma: {d.validUntil ?? '-'}</p>
+                <p className="text-xs text-on-surface-variant">Son kullanma: {d.validUntil ? formatLocalDate(d.validUntil) : '-'}</p>
                 {d.status === 'REJECTED' && d.rejectReason && <p className="text-xs text-error">Red nedeni: {d.rejectReason}</p>}
                 <div className="flex flex-wrap items-center gap-2">
                   <button disabled={busy === d.id} onClick={() => download(i)}

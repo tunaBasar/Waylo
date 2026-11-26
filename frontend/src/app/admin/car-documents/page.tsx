@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { getAdminCarDocuments, approveCarDocument, rejectCarDocument, getAdminCarDocumentFile } from '@/lib/car';
+import { documentQueueEmptyText, formatLocalDate } from '@/lib/partner-car';
 
 type DocFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -182,7 +183,7 @@ export default function CarDocumentsPage() {
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-surface-container-lowest rounded-xl shadow-sm p-4 animate-pulse"><div className="h-5 bg-surface-container rounded w-1/3 mb-2"/><div className="h-4 bg-surface-container rounded w-1/2"/></div>)}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">description</span><p className="text-on-surface-variant text-sm">Belge bulunamadi</p></div>
+        <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">description</span><p className="text-on-surface-variant text-sm">{documentQueueEmptyText(filter)}</p></div>
       ) : (
         <div className="space-y-space-sm">
           {filtered.map(doc => {
@@ -223,7 +224,7 @@ export default function CarDocumentsPage() {
 
                 {/* Document info */}
                 <div className="grid grid-cols-2 gap-2 text-xs text-on-surface-variant mb-3">
-                  <p>Son kullanma: <span className="text-on-surface">{doc.validUntil || '-'}</span></p>
+                  <p>Son kullanma: <span className="text-on-surface">{doc.validUntil ? formatLocalDate(doc.validUntil) : '-'}</span></p>
                   {doc.reviewedBy && (
                     <p>Inceleme: <span className="text-on-surface">{doc.reviewedBy}</span></p>
                   )}

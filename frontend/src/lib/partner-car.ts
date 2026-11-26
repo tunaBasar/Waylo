@@ -491,9 +491,20 @@ export function formatLocalDate(iso: string | null | undefined): string {
     const parts = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!parts) return iso;
     const [, year, month, day] = parts;
-    return `${year}.${month}.${day}`;
+    // Turkish order dd.MM.yyyy (F75); "2027.11.30" read as year-first.
+    return `${day}.${month}.${year}`;
   } catch {
     return iso;
+  }
+}
+
+/** Empty-list text for the admin document queues (F75): says what is empty instead of "Belge bulunamadi". */
+export function documentQueueEmptyText(filter: string): string {
+  switch (filter) {
+    case 'PENDING': return 'Onay bekleyen belge yok.';
+    case 'APPROVED': return 'Onaylanmis belge yok.';
+    case 'REJECTED': return 'Reddedilmis belge yok.';
+    default: return 'Henuz belge yuklenmemis.';
   }
 }
 

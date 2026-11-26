@@ -6,7 +6,7 @@ import QRCode from 'qrcode';
 import { api, ApiError } from '@/lib/api';
 import { displayItemText } from '@/lib/order-text';
 import { canOfferCancel } from '@/lib/order-actions';
-import { showCreatedBanner } from '@/lib/order-banner';
+import { showCreatedBanner, sortOrdersForDisplay } from '@/lib/order-banner';
 import { orderPolicyText, refundText } from '@/lib/cancellation';
 import { checkinWindow, checkinDoneText } from '@/lib/checkin';
 import { REVIEW_WHEN_HINT, reviewApi, type ReviewableItem } from '@/lib/reviews';
@@ -465,7 +465,7 @@ function OrdersContent() {
   useEffect(() => { loadReviewable(); }, [loadReviewable]);
 
   const load = useCallback(() => {
-    api.get<Order[]>('/api/orders').then(response => setOrders(response.data)).catch((err: unknown) => {
+    api.get<Order[]>('/api/orders').then(response => setOrders(sortOrdersForDisplay(response.data ?? []))).catch((err: unknown) => {
       setError(err instanceof ApiError ? err.message : 'Siparisler yuklenemedi');
     });
   }, []);

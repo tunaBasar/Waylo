@@ -560,7 +560,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public List<OrderResponse> listOwn(UUID actorUserId) {
         requireIdentity(actorUserId);
-        return orderRepository.findByCustomerId(actorUserId).stream()
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(actorUserId).stream()
                 .map(order -> toResponse(order, orderItemRepository.findByOrderId(order.getId())))
                 .toList();
     }

@@ -369,3 +369,12 @@ test('carDocumentNeedsValidUntil mirrors the backend rule (F74)', () => {
   }
   assert.strictEqual(m.carDocumentNeedsValidUntil('TAX_CERTIFICATE'), false);
 });
+
+test('formatLocalDate is Turkish dd.MM.yyyy; queue empty texts name the filter (F75)', () => {
+  assert.strictEqual(m.formatLocalDate('2027-11-30'), '30.11.2027');
+  assert.strictEqual(m.formatLocalDate(''), '');
+  assert.strictEqual(m.formatLocalDate(null), '');
+  assert.strictEqual(m.formatLocalDate('not-a-date'), 'not-a-date');
+  assert.strictEqual(m.documentQueueEmptyText('PENDING'), 'Onay bekleyen belge yok.');
+  assert.strictEqual(m.documentQueueEmptyText('ALL'), 'Henuz belge yuklenmemis.');
+});

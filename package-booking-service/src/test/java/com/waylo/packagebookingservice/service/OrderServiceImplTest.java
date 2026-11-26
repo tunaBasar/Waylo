@@ -366,14 +366,16 @@ class OrderServiceImplTest {
     // --- listOwn ---
 
     @Test
-    void listOwn_returnsOnlyOwnOrders() {
+    void listOwn_returnsOnlyOwnOrders_newestFirst() {
+        // F76: the list comes from the createdAt-desc query; the unsorted findByCustomerId put a new unpaid order 13th.
         Order order = persistedOrder(UUID.randomUUID(), customerId, OrderStatus.PENDING, 0L);
-        when(orderRepository.findByCustomerId(customerId)).thenReturn(List.of(order));
+        when(orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId)).thenReturn(List.of(order));
         when(orderItemRepository.findByOrderId(order.getId())).thenReturn(List.of());
 
         List<OrderResponse> result = service.listOwn(customerId);
         assertThat(result).hasSize(1);
         assertThat(result.get(0).customerId()).isEqualTo(customerId);
+        verify(orderRepository, never()).findByCustomerId(customerId);
     }
 
     // --- cancel ---

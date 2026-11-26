@@ -12,6 +12,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID>,
 
     List<Order> findByCustomerId(UUID customerId);
 
+    /** The customer's own list (F76): newest first, so a just-created unpaid order is on top, not 13th. */
+    List<Order> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
+
     List<Order> findByCustomerIdAndStatus(UUID customerId, OrderStatus status);
 
     List<Order> findByStatus(OrderStatus status);
