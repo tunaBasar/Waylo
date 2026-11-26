@@ -17,6 +17,9 @@ eureka:
     fetch-registry: false
   server:
     enable-self-preservation: false
+    # F67: the read-only response cache (default 30s sync) served stale registries to clients.
+    # Sync it from the live registry every 3s so new registrations and removals show up fast.
+    response-cache-update-interval-ms: 3000
 
 management:
   endpoints:

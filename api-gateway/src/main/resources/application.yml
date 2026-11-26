@@ -11,6 +11,10 @@ spring:
   config:
     import: "optional:configserver:http://${CONFIG_USER:config}:${CONFIG_PASSWORD:}@localhost:8888"
   cloud:
+    loadbalancer:
+      cache:
+        # F67: default 35s. 5s bounds how long a dead IP can be served from the LB instance cache.
+        ttl: 5s
     gateway:
       server:
         webflux:
@@ -18,6 +22,24 @@ spring:
             locator:
               enabled: false
           default-filters:
+            # F67: a redeployed service gets a new IP, a connect-refused to the old one must not reach the customer.
+            # GET only (idempotent). POST/PUT/PATCH/DELETE (payments, orders) are never retried.
+            # retries=2: first retry hits a fresh/other instance. Backoff 100ms then 200ms (max 500ms) keeps added latency low.
+            # exceptions: ConnectException covers netty's AbstractChannel$AnnotatedConnectException (its subclass).
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                # Only connect failures. The factory defaults series to SERVER_ERROR, which would also retry every
+                # 5xx answer of a healthy service (3x load on a failing endpoint); empty series/statuses turn that off.
+                series:
+                statuses:
+                exceptions: java.net.ConnectException, io.netty.channel.AbstractChannel$AnnotatedConnectException
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
             - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
           globalcors:
             cors-configurations:
@@ -105,6 +127,8 @@ spring:
 
 eureka:
   client:
+    # F67: default 30s. Pull the registry every 5s so a recreated container's new IP is seen quickly.
+    registry-fetch-interval-seconds: 5
     service-url:
       defaultZone: http://${EUREKA_USER:eureka}:${EUREKA_PASSWORD:}@localhost:8761/eureka/
 
