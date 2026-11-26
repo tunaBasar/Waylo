@@ -15,6 +15,12 @@ P = F = 0
 failures = []
 
 
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
+
+
 def ok(cond, label):
     global P, F
     if cond:
@@ -72,6 +78,7 @@ def upload(token, hotel, fname, content, ctype="image/png", caption=None):
 
 def register(n):
     email = f"media{uuid.uuid4().hex}@example.test"
+    TEST_EMAILS.append(email)
     pw = "Pw7" + secrets.token_urlsafe(16)
     s, d = js("POST", "/api/auth/register", {"firstName": "T", "lastName": f"U{n}", "email": email, "password": pw})
     assert s == 200, f"register {s}"
@@ -111,6 +118,7 @@ def main():
     ta, tb = register("a"), register("b")
     s, d = js("POST", "/api/organizations", {"name": "Media Org A", "businessType": "HOTEL", "legalType": "COMPANY"}, ta)
     org_a = d["data"]["id"]
+    TEST_ORGS.append(org_a)
     js("POST", f"/api/admin/organizations/{org_a}/approve", {}, admin)
     s, d = js("POST", "/api/hotels", {"name": "Media Hotel", "city": "IST", "country": "TR", "address": "St1",
                                       "starRating": 4, "organizationId": org_a}, ta)
@@ -207,4 +215,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    finally:
+        org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)
+    sys.exit(code)

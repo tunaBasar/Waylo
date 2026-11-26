@@ -23,6 +23,9 @@ spec.loader.exec_module(ci)
 t = ci.t
 call, data, check = t.call, t.data, t.check
 case_ids = []
+sys.path.insert(0, str(HERE))
+import org_cleanup  # noqa: E402
+TEST_ORGS = []
 
 
 def mail_rows(email, subject):
@@ -113,6 +116,8 @@ def main():
     other = call('POST', '/api/organizations', {'name': f'SC Other {sfx}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, tok['o'])
     other_org = ((other[1] or {}).get('data') or {}).get('id')
     if other_org:
+        TEST_ORGS.append(other_org)
+    if other_org:
         call('POST', f'/api/admin/organizations/{other_org}/approve', token=admin)
         s, b = call('GET', f'/api/partner/organizations/{other_org}/support-cases', token=tok['o'])
         check('other org sees none of it', s == 200 and all(c['id'] != cid for c in data((s, b))), s)
@@ -173,7 +178,7 @@ if __name__ == '__main__':
     try:
         main()
     finally:
-        for fn in (cleanup_cases, t.cleanup):
+        for fn in (cleanup_cases, t.cleanup, lambda: org_cleanup.cleanup_test_orgs(TEST_ORGS)):
             try:
                 fn()
             except Exception as e:  # noqa: BLE001

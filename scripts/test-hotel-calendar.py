@@ -22,6 +22,12 @@ creds = {}
 H1 = H2 = H3 = RT1 = RT2 = RT3 = RP1 = RP2 = RP3 = None
 ORG_ID = None
 
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
+
+
 def ok(cond, label):
     """PASS on true (prints label); FAIL+raise AssertionError on false (stops test)."""
     global P, F
@@ -80,6 +86,8 @@ def ln(email, password):
 def mkorg(token, name="Org A"):
     s, d = req("POST", "/api/organizations", {"name": name, "businessType": "HOTEL", "legalType": "COMPANY"}, token=token)
     ok(s == 201, f"Org: 201 got {s}")
+    if s == 201:
+        TEST_ORGS.append(d["data"]["id"])
     # ApiResponse.success("Organization created", resp) → data is OrganizationResponse
     return d["data"]["id"]
 
@@ -472,6 +480,7 @@ def main():
         if failures:
             for f in failures: print(f"  ✗ {f}")
         print(f"  h1={H1}  h2={H2}  h3={H3}")
+        org_cleanup.cleanup_test_orgs(TEST_ORGS, list(creds))
     sys.exit(1 if F else 0)
 
 # ── Dry-run: unittest.mock tests (no network) ─────────────────────────────

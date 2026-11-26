@@ -12,6 +12,7 @@ import json
 import secrets
 import subprocess
 import time
+import sys
 import uuid
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -20,6 +21,9 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--gateway', default='http://localhost:8080')
 args = parser.parse_args()
 passed = 0
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
 
 
 def check(condition, label):
@@ -63,6 +67,7 @@ def psql(sql, db='hotel_db'):
 
 def register(tag):
     email, password = f'rls{tag.lower()}{uuid.uuid4().hex}@example.test', secrets.token_urlsafe(20)
+    TEST_EMAILS.append(email)
     status, result = request('POST', '/api/auth/register', {
         'firstName': 'Rls', 'lastName': tag, 'email': email, 'password': password})
     check(status == 200 and result['success'], f'register test user {tag}')
@@ -76,6 +81,7 @@ def register(tag):
 def fixture(token, tag):
     org = data('POST', '/api/organizations', {'name': f'RLS {tag} {uuid.uuid4().hex[:8]}',
                                               'businessType': 'HOTEL', 'legalType': 'COMPANY'}, token)
+    TEST_ORGS.append(org['id'])
     hotel = data('POST', '/api/hotels', {'name': f'RLS fixture {tag}', 'city': f'RLS{uuid.uuid4().hex[:8]}',
                                          'country': 'TR', 'address': 'Test only', 'starRating': 3,
                                          'organizationId': org['id']}, token)
@@ -222,5 +228,6 @@ finally:
             pass
     for hotel_id, token in hotels:
         request('POST', f'/api/hotels/{hotel_id}/deactivate', token=token)
+    org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)
 
 print(f'\n{passed} checks passed')

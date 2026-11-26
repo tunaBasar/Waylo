@@ -51,6 +51,7 @@ def main():
     (hotel, room, plan, nights, check_out), hotel_id, org = rev.hotel_with_stock(admin, partner, 'stay')
     other_org = data(call('POST', '/api/organizations', {'name': f'stay-oth-{uuid.uuid4().hex[:6]}',
                                                           'businessType': 'HOTEL', 'legalType': 'COMPANY'}, outsider))['id']
+    car.created_orgs.append(other_org)
     call('POST', f'/api/admin/organizations/{other_org}/approve', token=admin)
 
     order_id, item_id = rev.place_paid_order(hotel, room, plan, nights, check_out, cust)

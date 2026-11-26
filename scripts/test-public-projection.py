@@ -24,6 +24,12 @@ T = 15
 P = F = 0
 
 
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
+
+
 def ok(cond, label):
     global P, F
     if cond:
@@ -53,6 +59,7 @@ def req(method, path, body=None, token=None):
 def reg():
     uid = uuid.uuid4().hex
     email = f"pubproj{uid}@example.test"
+    TEST_EMAILS.append(email)
     password = "Pw7" + secrets.token_urlsafe(16)  # PasswordPolicy: letter + digit guaranteed
     s, d = req("POST", "/api/auth/register", {
         "firstName": "Test", "lastName": "User", "email": email, "password": password
@@ -103,6 +110,7 @@ def main():
     s, d = req("POST", "/api/organizations", {"name": f"PubProj Org {uuid.uuid4().hex[:8]}", "businessType": "HOTEL", "legalType": "COMPANY"}, token=token)
     ok(s == 201, f"Create org 201 got {s}")
     org_id = d["data"]["id"]
+    TEST_ORGS.append(org_id)
     ok(d["data"]["status"] == "PENDING", "New org starts PENDING")
 
     s, d = req("POST", "/api/hotels", {
@@ -260,4 +268,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    finally:
+        org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)
+    sys.exit(code)

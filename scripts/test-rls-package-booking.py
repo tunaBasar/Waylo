@@ -28,6 +28,10 @@ args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DB = 'package_booking_db'
 passed = 0
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
 
 
 def check(condition, label):
@@ -104,6 +108,7 @@ def jwt_sub(token):
 
 def register(tag):
     email, password = f'rls{tag.lower()}{uuid.uuid4().hex}@example.test', secrets.token_urlsafe(20)
+    TEST_EMAILS.append(email)
     status, result = request('POST', '/api/auth/register', {
         'firstName': 'Rls', 'lastName': tag, 'email': email, 'password': password})
     check(status == 200 and result['success'], f'register test user {tag}')
@@ -117,6 +122,7 @@ def register(tag):
 def org_for(token, admin, tag):
     org = data('POST', '/api/organizations', {'name': f'RLS PB {tag} {uuid.uuid4().hex[:8]}',
                                               'businessType': 'HOTEL', 'legalType': 'COMPANY'}, token)['id']
+    TEST_ORGS.append(org)
     request('POST', f'/api/admin/organizations/{org}/approve', token=admin)
     return org
 
@@ -198,5 +204,6 @@ finally:
         psql(f"DELETE FROM orders WHERE id = '{order}'")  # cascades to items and vouchers
     except RuntimeError:
         pass
+    org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)
 
 print(f'\n{passed} checks passed')

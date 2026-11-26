@@ -24,6 +24,10 @@ parser.add_argument('--gateway', default='http://localhost:8080')
 args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 passed = 0
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
 
 
 def check(condition, label):
@@ -95,6 +99,7 @@ def rejected_by_rls(db, org, sql):
 
 def register(tag):
     email, password = f'rls{tag.lower()}{uuid.uuid4().hex}@example.test', secrets.token_urlsafe(20)
+    TEST_EMAILS.append(email)
     status, result = request('POST', '/api/auth/register', {
         'firstName': 'Rls', 'lastName': tag, 'email': email, 'password': password})
     check(status == 200 and result['success'], f'register test user {tag}')
@@ -108,6 +113,7 @@ def register(tag):
 def org_for(token, admin, tag, business_type):
     org = data('POST', '/api/organizations', {'name': f'RLS {business_type} {tag} {uuid.uuid4().hex[:8]}',
                                               'businessType': business_type, 'legalType': 'COMPANY'}, token)['id']
+    TEST_ORGS.append(org)
     request('POST', f'/api/admin/organizations/{org}/approve', token=admin)
     return org
 
@@ -283,5 +289,6 @@ finally:
                 request('POST', f'/api/bus-partner/organizations/{bus_b}/trips/{item[2]}/cancel', token=token_b)
         except NameError:
             pass
+    org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)
 
 print(f'\n{passed} checks passed')

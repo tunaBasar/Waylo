@@ -36,6 +36,12 @@ if not admin:
 passed = 0
 
 
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import org_cleanup  # noqa: E402
+TEST_ORGS, TEST_EMAILS = [], []
+
+
 def check(condition, label):
     global passed
     if not condition:
@@ -66,6 +72,7 @@ def request(method, path, body=None, token=None, internal_token=None, direct=Fal
 
 def register():
     email, password = f'qh{uuid.uuid4().hex}@example.test', secrets.token_urlsafe(20)
+    TEST_EMAILS.append(email)
     status, result = request('POST', '/api/auth/register', {
         'firstName': 'QuoteHold', 'lastName': 'Acceptance', 'email': email, 'password': password,
     })
@@ -98,6 +105,7 @@ hotel_id = None
 try:
     organization = data('POST', '/api/organizations', {'name': f'QH acceptance {uuid.uuid4().hex[:10]}', 'businessType': 'HOTEL', 'legalType': 'COMPANY'}, owner)
     org_id = organization['id']
+    TEST_ORGS.append(org_id)
     hotel = data('POST', '/api/hotels', {
         'name': 'Quote hold acceptance fixture', 'city': f'QH{uuid.uuid4().hex[:10]}',
         'country': 'TR', 'address': 'Test only', 'starRating': 4, 'organizationId': org_id,
@@ -205,3 +213,4 @@ finally:
         status, _ = request('POST', f'/api/hotels/{hotel_id}/deactivate', token=owner)
         if status not in (200, 201):
             print('WARNING: test hotel cleanup failed, deactivate its dedicated fixture manually')
+    org_cleanup.cleanup_test_orgs(TEST_ORGS, TEST_EMAILS)

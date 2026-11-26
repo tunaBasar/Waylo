@@ -20,10 +20,18 @@ test('admin organizations: approve a pending org', async ({ page }) => {
   await expect(row).toContainText('Onay bekleyen');
   await expectNoRawIcons(page);
   await row.getByRole('button', { name: 'Onayla' }).click();
+  // F17 (2026-11-26): approving asks for the organization's commission rate first, so the org can sell
+  const form = row.getByTestId('approve-form');
+  await form.getByRole('textbox').fill('12,5');
+  await form.getByRole('button', { name: 'Kaydet ve onayla' }).click();
   await expect(page.getByText(id)).toHaveCount(0); // left the pending list
   const admin = (await login(adminAccount())).token;
   const orgs = await api<unknown[]>('GET', '/api/admin/organizations?status=ACTIVE', undefined, admin);
   expect(JSON.stringify(orgs.data)).toContain(id);
+  const rates = await api<Array<{ vertical: string; supplierOrganizationId: string | null; rate: number }>>('GET', '/api/admin/commission-rates', undefined, admin);
+  const own = (rates.data ?? []).find(r => r.supplierOrganizationId === id && r.vertical === 'HOTEL');
+  expect(Number(own?.rate)).toBeCloseTo(0.125, 4);
+  psql('payment_db', `DELETE FROM commission_rates WHERE supplier_organization_id='${id}'`);
 });
 
 test('admin payments page shows data', async ({ page }) => {
