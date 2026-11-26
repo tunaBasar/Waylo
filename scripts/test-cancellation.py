@@ -97,7 +97,12 @@ def main():
 
         # --- A: free-cancel hotel item, preview == actual, double cancel idempotent ---
         a = paid_order(flex)
-        ok(item_of(a)['cancellationPolicy'] == 'FREE_CANCELLATION', 'flex item snapshot FREE_CANCELLATION')
+        ia0 = item_of(a)
+        # N=2 days -> FREE_UNTIL 48h before check-in 00:00 Europe/Istanbul (CANCELLATION-CONTRACT decision 2)
+        ok(ia0['cancellationPolicy'] == 'FREE_UNTIL' and ia0['cancelFreeHoursBefore'] == 48,
+           f"flex item snapshot FREE_UNTIL 48h ({ia0['cancellationPolicy']}, {ia0.get('cancelFreeHoursBefore')})")
+        ok(str(ia0.get('freeCancellationUntil') or '').startswith((start - timedelta(days=3)).isoformat() + 'T21:00'),
+           f"freeCancellationUntil = check-in 00:00 Istanbul - 48h ({ia0.get('freeCancellationUntil')})")
         pa = must('GET', f'/api/orders/{a}/cancellation-preview', None, cust)
         ok(pa['cancellable'] and Decimal(str(pa['totalRefund'])) == Decimal('2500.00'), f"preview flex refund 2500 ({pa['totalRefund']})")
         ok(req('GET', f'/api/orders/{a}/cancellation-preview', None, other)[0] in (403, 404), 'stranger cannot preview')
@@ -164,6 +169,29 @@ def main():
         ok(ledger_count(d1) == n, 'no-show job idempotent across runs')
         s, _ = req('POST', f'/api/orders/{d1}/cancel', None, cust)
         ok(s == 422, f'cancel after no-show rejected ({s})')
+        # --- E: walkthrough regression 2026-11-26: a stay starting tomorrow under "free until 2 days before"
+        # is past its free-cancellation deadline: label and money must both say no refund ---
+        tomorrow = date.today() + timedelta(days=1)
+        e_nights = [tomorrow.isoformat()]
+        must('PUT', f'/api/hotels/{hotel_id}/inventory', {'items': [
+            {'roomTypeId': room['id'], 'stayDate': n, 'allotment': 2, 'expectedVersion': None} for n in e_nights],
+            'reason': 'late cancellation fixture'}, owner)
+        must('PUT', f'/api/hotels/{hotel_id}/rates', {'items': [
+            {'roomTypeId': room['id'], 'ratePlanId': flex['id'], 'stayDate': n, 'occupancy': 2, 'currency': 'TRY', 'amount': 1200.00}
+            for n in e_nights]}, owner)
+        q = must('POST', '/api/quotes', {'hotelId': hotel_id, 'roomTypeId': room['id'], 'ratePlanId': flex['id'],
+                                         'checkIn': e_nights[0], 'checkOut': (tomorrow + timedelta(days=1)).isoformat(),
+                                         'rooms': 1, 'adults': 2, 'childrenAges': []}, cust)
+        o = must('POST', '/api/orders/hotel', {'quoteId': q['quoteId']}, cust)
+        order_ids.append(o['id'])
+        i = must('POST', f"/api/payments/orders/{o['id']}/intent", None, cust)
+        must('POST', f"/api/payments/intents/{i['id']}/confirm", {'paymentToken': 'TEST_OK'}, cust)
+        ie = item_of(o['id'])
+        until = ie.get('freeCancellationUntil')
+        ok(ie['cancellationPolicy'] == 'FREE_UNTIL' and until is not None, f'late item has a deadline ({until})')
+        pe = must('GET', f"/api/orders/{o['id']}/cancellation-preview", None, cust)
+        ok(Decimal(str(pe['totalRefund'])) == 0 and pe['items'][0]['outcome'] == 'NO_REFUND',
+           f"stay tomorrow, deadline passed: preview NO_REFUND ({pe['items'][0]['outcome']}, {pe['totalRefund']})")
     except AssertionError as exc:
         ok(False, str(exc))
     finally:
