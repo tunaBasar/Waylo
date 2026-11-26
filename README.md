@@ -57,6 +57,16 @@ Frontend şu an tarayıcıdan `localhost:8080` adresine bağlanır. Bu kurulum y
 
 `.env` içinde `WAYLO_BOOTSTRAP_ADMIN_EMAIL` tanımlıysa (PASSWORD olmadan) auth-service açılışında, sistemde hiç ADMIN yoksa bu e-postaya sahip mevcut ve e-postası doğrulanmış kullanıcı bir kez ADMIN yapılır ve denetim satırı loglanır. ADMIN zaten varsa hiçbir şey yapmaz. Kullanıcı önce normal kayıt olup e-postasını doğrulamalıdır. (EMAIL + PASSWORD birlikte verilirse dev/seed modu: kullanıcı yoksa oluşturulur.)
 
+## Demo verisi (kayan pencere)
+
+`python3 scripts/seed-demo.py` idempotenttir, istediğiniz kadar (örn. her gün) çalıştırın: yalnızca eksikleri ekler, pencere her zaman BUGÜNden başlar.
+
+- Oteller: birkaç şehirde yayınlanmış demo oteller, her biri için oda tipleri, stok ve her doluluk (1..maks. kişi) için gecelik fiyat, bugünden 60 gün (`SEED_HOTEL_DAYS`).
+- Uçuşlar: bugünden 30 gün (`SEED_FLIGHT_DAYS`), günlük her hat için uçuş + koltuk. Satıcı organizasyon (`Waylo Flights`) ve FLIGHT komisyon oranı (`SEED_FLIGHT_COMMISSION`, varsayılan 0.08) yoksa oluşturulur. Çıktıdaki `FLIGHT_SELLER_ORGANIZATION_ID` değerini `.env` içine yazın.
+- Araçlar: `SEED_CAR_PARTNER_PASSWORD` tanımlıysa `scripts/seed-car-partner.py` çağrılır.
+- Temizlik: demo olmayan yayındaki test otelleri admin durum API'si ile SUSPENDED yapılıp gizlenir (silinmez). Atlamak için `SEED_KEEP_OTHER_HOTELS=1`.
+- Admin bilgisi: `.env` içindeki `WAYLO_BOOTSTRAP_ADMIN_EMAIL/PASSWORD` veya `SEED_ADMIN_EMAIL/PASSWORD`.
+
 ## SMTP
 
 Proje kökünde, Git tarafından dışlanan `.env` dosyasını oluşturun (`.env.example` örnektir):
