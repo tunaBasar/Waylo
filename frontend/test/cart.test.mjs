@@ -43,3 +43,46 @@ test('parseCart is defensive; itemIndexMessage', async () => {
   assert.equal(itemIndexMessage(1, [item('a', 'CAR', {}), item('b', 'BUS', {})]), '2. kalem (b)');
   assert.equal(itemIndexMessage(5, []), null);
 });
+
+function fakeBrowser(userId) {
+  const store = new Map();
+  if (userId) store.set('waylo_user', JSON.stringify({ id: userId }));
+  globalThis.window = {
+    localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) },
+    dispatchEvent: () => true,
+  };
+  return store;
+}
+
+test('cart is keyed by user, other users and guests see nothing', async () => {
+  const m = await mod();
+  const store = fakeBrowser('u1');
+  m.saveCart([item('a', 'HOTEL', { q: 1 })]);
+  assert.ok(store.has('waylo_cart.u1'));
+  assert.equal(m.loadCart().length, 1);
+  assert.equal(m.loadCart('u2').length, 0);
+  store.delete('waylo_user');
+  assert.equal(m.loadCart().length, 0);
+  m.saveCart([item('b', 'CAR', {})]); // guest: not persisted
+  assert.deepEqual([...store.keys()], ['waylo_cart.u1']);
+  delete globalThis.window;
+});
+
+test('logout clears the current user cart', async () => {
+  const m = await mod();
+  const store = fakeBrowser('u1');
+  m.saveCart([item('a', 'HOTEL', { q: 1 })]);
+  m.clearCart();
+  assert.equal(store.has('waylo_cart.u1'), false);
+  delete globalThis.window;
+});
+
+test('legacy key is removed and not adopted', async () => {
+  const m = await mod();
+  const store = fakeBrowser('u1');
+  store.set('waylo_cart', JSON.stringify([item('old', 'HOTEL', { q: 9 })]));
+  assert.deepEqual(m.loadCart(), []);
+  assert.equal(store.has('waylo_cart'), false);
+  assert.equal(store.has('waylo_cart.u1'), false);
+  delete globalThis.window;
+});

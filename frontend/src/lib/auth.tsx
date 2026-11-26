@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { clearCart } from './cart';
 import { isPublicBrowsePath, loginUrl, postLoginTarget } from './surface';
 import { AuthError, verifyEmailSentPath } from './email-verification';
 
@@ -152,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ refreshToken }),
       }).catch(() => {});
     }
+    clearCart(); // before waylo_user goes away: the cart is keyed by it
     setUser(null);
     setToken(null);
     localStorage.removeItem('waylo_user');

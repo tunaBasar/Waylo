@@ -47,7 +47,7 @@ export default function QuoteScreen() {
                 <Field label="Promosyon kodu (istege bagli)" value={promo} onChangeText={setPromo} autoCapitalize="characters" />
                 <Button title={busy ? 'Olusturuluyor...' : 'Rezervasyon yap'} onPress={book} disabled={busy} />
                 <Button kind="secondary" title="Sepete ekle" onPress={() => {
-                  const ok = cart.add({ vertical: 'HOTEL', label: q.roomTypeName, amount: q.totalAmount, currency: q.currency, request: { quoteId: q.quoteId } });
+                  const ok = cart.add({ vertical: 'HOTEL', label: `${q.roomTypeName} · ${q.ratePlanName} · ${q.checkIn} - ${q.checkOut}`, amount: q.totalAmount, currency: q.currency, request: { quoteId: q.quoteId } });
                   setAdded(ok ? 'Sepete eklendi' : 'Zaten sepette veya sepet dolu');
                 }} />
                 {added ? <Muted>{added}</Muted> : null}

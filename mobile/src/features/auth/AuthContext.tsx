@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setSessionExpiredListener, type AuthData, type Profile } from '@/api';
+import { clearCart } from '@/features/cart/storage';
 import { clearOrdersSnapshot } from '@/features/orders/cache';
 import { defaultPushDeps, registerForPush, unregisterFromPush } from '@/features/push/registration';
 
@@ -59,13 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (t) api.publicPost('/api/auth/logout', { refreshToken: t.refreshToken }).catch(() => {});
     await api.tokens.clear();
     await clearOrdersSnapshot();
+    await clearCart(user?.id);
     setUser(null);
-  }, []);
+  }, [user?.id]);
 
   const applyAuth = useCallback(async (d: { token: string; refreshToken: string }) => {
     await api.tokens.set({ token: d.token, refreshToken: d.refreshToken });
   }, []);
-  const clearSession = useCallback(async () => { await api.tokens.clear(); await clearOrdersSnapshot(); setUser(null); }, []);
+  const clearSession = useCallback(async () => { await api.tokens.clear(); await clearOrdersSnapshot(); await clearCart(user?.id); setUser(null); }, [user?.id]);
 
   const forgotPassword = useCallback(async (email: string) => {
     await api.publicPost('/api/auth/forgot-password', { email });

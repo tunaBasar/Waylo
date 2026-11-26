@@ -6,7 +6,7 @@ import { useCart } from '@/features/cart/CartContext';
 import { checkoutErrorMessage, ordersApi } from '@/features/orders/api';
 import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { useOnline } from '@/features/network/NetworkContext';
-import { money } from '@/features/format';
+import { money, verticalText } from '@/features/format';
 
 export default function CartScreen() {
   const cart = useCart();
@@ -33,7 +33,7 @@ export default function CartScreen() {
       <Title>Sepet</Title>
       {cart.items.map((i) => (
         <Card key={i.id}>
-          <Muted>{i.vertical}</Muted>
+          <Muted>{verticalText(i.vertical)}</Muted>
           <Text>{i.label}</Text>
           {i.amount != null && i.currency ? <Text style={{ fontWeight: '700' }}>{money(i.amount, i.currency)}</Text> : null}
           <View><Button kind="secondary" title="Kaldir" onPress={() => cart.remove(i.id)} /></View>

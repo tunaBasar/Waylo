@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
 import { loadCart, saveCart } from './storage';
 import type { CartItem } from '@/api';
 
@@ -16,19 +17,26 @@ const Ctx = createContext<CartState | null>(null);
 
 /** Cart persisted in AsyncStorage (never tokens). Prices shown are the offers the user saw, the server re-prices at checkout. */
 export function CartProvider({ children }: { children: ReactNode }) {
+  // key: a different account gets a fresh in-memory cart, so items never carry over between accounts
+  const userId = useAuth().user?.id ?? null;
+  return <CartScope key={userId ?? 'guest'} userId={userId}>{children}</CartScope>;
+}
+
+function CartScope({ userId, children }: { userId: string | null; children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const hydrated = useRef(false);
+  // The cart belongs to one account: switching or leaving the account drops the in-memory items first.
   useEffect(() => {
     let alive = true;
-    loadCart().then((saved) => {
+    loadCart(userId).then((saved) => {
       if (!alive) return;
       // merge: anything added before hydration finished wins
       setItems((cur) => (cur.length ? [...saved, ...cur].slice(0, MAX_ITEMS) : saved));
       hydrated.current = true;
     });
     return () => { alive = false; };
-  }, []);
-  useEffect(() => { if (hydrated.current) void saveCart(items); }, [items]);
+  }, [userId]);
+  useEffect(() => { if (hydrated.current) void saveCart(userId, items); }, [items, userId]);
   const add = useCallback((item: Omit<CartItem, 'id'>) => {
     let ok = false;
     setItems((cur) => {

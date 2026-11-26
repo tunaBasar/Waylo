@@ -18,7 +18,15 @@ export interface CartItem {
   request: Record<string, unknown>;
 }
 
-export const CART_KEY = 'waylo_cart';
+/** Pre-account-scoping key: its content belongs to an unknown user, so it is deleted and never adopted. */
+export const LEGACY_CART_KEY = 'waylo_cart';
+export const CART_KEY_PREFIX = 'waylo_cart.';
+
+/** Per-user cart key; null without a user (guests have no persisted cart). */
+export function cartKey(userId: string | null | undefined): string | null {
+  return userId ? `${CART_KEY_PREFIX}${userId}` : null;
+}
+
 export const CART_MAX_ITEMS = 10;
 
 export function addItem(items: CartItem[], item: CartItem): CartItem[] {
@@ -70,14 +78,37 @@ export function itemIndexMessage(index: unknown, items: CartItem[]): string | nu
   return `${index + 1}. kalem (${items[index].label})`;
 }
 
-export function loadCart(): CartItem[] {
-  if (typeof window === 'undefined') return [];
-  return parseCart(window.localStorage.getItem(CART_KEY));
+/** Id of the signed-in user, read from the session the auth layer stores. */
+export function currentUserId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const u = JSON.parse(window.localStorage.getItem('waylo_user') ?? 'null') as { id?: unknown } | null;
+    return u && typeof u.id === 'string' ? u.id : null;
+  } catch {
+    return null;
+  }
 }
 
-export function saveCart(items: CartItem[]): void {
-  window.localStorage.setItem(CART_KEY, JSON.stringify(items));
+export function loadCart(userId: string | null = currentUserId()): CartItem[] {
+  if (typeof window === 'undefined') return [];
+  window.localStorage.removeItem(LEGACY_CART_KEY);
+  const key = cartKey(userId);
+  return key ? parseCart(window.localStorage.getItem(key)) : [];
+}
+
+export function saveCart(items: CartItem[], userId: string | null = currentUserId()): void {
+  const key = cartKey(userId);
+  if (!key) return;
+  window.localStorage.setItem(key, JSON.stringify(items));
   window.dispatchEvent(new Event('waylo-cart'));
+}
+
+/** Logout: drops the user's persisted cart (call before the session is removed). */
+export function clearCart(userId: string | null = currentUserId()): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(LEGACY_CART_KEY);
+  const key = cartKey(userId);
+  if (key) window.localStorage.removeItem(key);
 }
 
 export function addToCart(item: Omit<CartItem, 'id'>): boolean {
