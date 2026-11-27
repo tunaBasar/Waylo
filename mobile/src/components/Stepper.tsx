@@ -1,7 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
-import { color, radius, space, type } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 
 export function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  const { color, type, radius } = useTheme();
   const btn = (t: string, d: number, ok: boolean) => (
     <Pressable accessibilityRole="button" accessibilityLabel={`${label} ${d > 0 ? 'artır' : 'azalt'}`} disabled={!ok} onPress={() => onChange(value + d)}
       style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: color.surfaceContainer, alignItems: 'center', justifyContent: 'center', opacity: ok ? 1 : 0.4 }}>

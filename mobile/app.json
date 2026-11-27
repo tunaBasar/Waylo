@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/waylo-icon.png",
     "scheme": "waylo",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.waylo.app",
       "buildNumber": "1",
@@ -49,9 +49,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
+          "backgroundColor": "#FAF7F2",
           "image": "./assets/images/waylo-splash.png",
-          "imageWidth": 160
+          "imageWidth": 160,
+          "dark": {
+            "backgroundColor": "#0F141B",
+            "image": "./assets/images/waylo-splash.png"
+          }
         }
       ],
       "expo-secure-store",

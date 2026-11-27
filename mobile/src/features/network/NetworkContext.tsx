@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { color, space, type } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 import NetInfo from '@react-native-community/netinfo';
 
 const Ctx = createContext(true);
@@ -26,6 +27,7 @@ export const useOnline = () => useContext(Ctx);
 
 export function OfflineBanner() {
   const online = useOnline();
+  const { color, type } = useTheme();
   if (online) return null;
   return (
     <View accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="offline-banner"

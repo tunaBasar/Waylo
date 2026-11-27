@@ -5,10 +5,11 @@ import { needsLogin, peekReturnTo, setReturnTo, takeReturnTo } from '@/features/
 import { useCart } from '@/features/cart/CartContext';
 import { peekPendingOrderLink } from '@/features/deeplinks';
 import { BottomBar } from '@/components/BottomBar';
-import { color, font, type } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 
 export default function TabsLayout() {
   const router = useRouter();
+  const { color, type } = useTheme();
   const { user } = useAuth();
   const { items } = useCart();
   // After login the protected stack lands here: open an order deep link that arrived while signed out.
@@ -36,9 +37,9 @@ export default function TabsLayout() {
     <Tabs
       tabBar={(p) => <BottomBar {...p} cartCount={items.length} onCart={openCart} />}
       screenOptions={{
-        headerStyle: { backgroundColor: color.primary },
-        headerTintColor: color.onPrimary,
-        headerTitleStyle: { fontFamily: font.displaySemi, fontSize: type.headlineMd.fontSize },
+        headerStyle: { backgroundColor: color.surface },
+        headerTintColor: color.onSurface,
+        headerTitleStyle: { fontFamily: type.headlineMd.fontFamily, fontSize: type.headlineMd.fontSize },
       }}>
       <Tabs.Screen name="hotels" options={{ title: 'Oteller' }} />
       <Tabs.Screen name="flights" options={{ title: 'Uçuşlar' }} />

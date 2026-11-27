@@ -1,7 +1,9 @@
 import { createElement, useState } from 'react';
 import { Platform, Pressable, Text, View, StyleSheet } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { color, radius, space, type } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { fmtDate, fmtTime, isoDate } from '@/features/dates';
 
 const p2 = (n: number) => String(n).padStart(2, '0');
@@ -13,6 +15,8 @@ const p2 = (n: number) => String(n).padStart(2, '0');
 export function DateField({ label, value, onChange, mode = 'date', minimumDate }: {
   label: string; value: Date; onChange: (d: Date) => void; mode?: 'date' | 'datetime'; minimumDate?: Date;
 }) {
+  const { color, type, radius } = useTheme();
+  const s = useStyles(makeStyles);
   const [show, setShow] = useState<null | 'date' | 'time'>(null);
 
   if (Platform.OS === 'web') {
@@ -60,7 +64,7 @@ export function DateField({ label, value, onChange, mode = 'date', minimumDate }
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ color, type, radius }: Theme) => StyleSheet.create({
   label: { ...type.labelSm, color: color.onSurfaceVariant },
-  input: { minHeight: 44, justifyContent: 'center', backgroundColor: color.surfaceLowest, borderRadius: radius.md, borderWidth: 1, borderColor: color.outlineVariant, paddingHorizontal: space.md, paddingVertical: space.sm },
+  input: { minHeight: 48, justifyContent: 'center', backgroundColor: color.surfaceLowest, borderRadius: radius.md, borderWidth: 1, borderColor: color.outlineVariant, paddingHorizontal: space.md, paddingVertical: space.sm },
 });

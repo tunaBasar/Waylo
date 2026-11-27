@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { color, radius, space, type } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 
 export type Mode = 'hotels' | 'flights' | 'cars' | 'bus';
 const MODES: { key: Mode; label: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
@@ -13,16 +15,19 @@ const MODES: { key: Mode; label: string; icon: React.ComponentProps<typeof Mater
 
 export function ModeTabs({ active, onChange }: { active: Mode; onChange?: (m: Mode) => void }) {
   const router = useRouter();
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const go = (m: Mode) => { if (onChange) onChange(m); else if (m !== active) router.replace(`/${m}`); };
   return (
     <View accessibilityRole="tablist" style={s.row}>
       {MODES.map((m) => {
         const on = m.key === active;
+        const fg = on ? color.onPrimary : color.onSurfaceVariant;
         return (
           <Pressable key={m.key} accessibilityRole="tab" accessibilityLabel={m.label} accessibilityState={{ selected: on }} onPress={() => go(m.key)}
-            style={[s.pill, on && s.pillOn]}>
-            <MaterialCommunityIcons name={m.icon} size={20} color={on ? color.onPrimary : color.onSurfaceVariant} accessibilityElementsHidden importantForAccessibility="no" />
-            <Text style={[type.labelSm, { color: on ? color.onPrimary : color.onSurfaceVariant }]}>{m.label}</Text>
+            style={[s.tile, on && s.tileOn]}>
+            <MaterialCommunityIcons name={m.icon} size={24} color={fg} accessibilityElementsHidden importantForAccessibility="no" />
+            <Text style={[type.labelSm, { color: fg }]}>{m.label}</Text>
           </Pressable>
         );
       })}
@@ -30,8 +35,8 @@ export function ModeTabs({ active, onChange }: { active: Mode; onChange?: (m: Mo
   );
 }
 
-const s = StyleSheet.create({
-  row: { flexDirection: 'row', gap: space.xs, backgroundColor: color.surfaceLowest, paddingHorizontal: space.lg, paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: color.outlineVariant },
-  pill: { flex: 1, minHeight: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.xs, backgroundColor: color.surfaceLow },
-  pillOn: { backgroundColor: color.primary },
+const makeStyles = ({ color, radius, card }: Theme) => StyleSheet.create({
+  row: { flexDirection: 'row', gap: space.sm, backgroundColor: color.surface, paddingHorizontal: space.xl, paddingVertical: space.sm },
+  tile: { flex: 1, aspectRatio: 1, maxHeight: 84, minHeight: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: space.xs, backgroundColor: card.backgroundColor, borderWidth: card.borderWidth, borderColor: card.borderColor },
+  tileOn: { backgroundColor: color.primary, borderColor: color.primary },
 });

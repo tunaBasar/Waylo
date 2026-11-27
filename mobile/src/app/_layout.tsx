@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts, WixMadeforDisplay_600SemiBold, WixMadeforDisplay_700Bold } from '@expo-google-fonts/wix-madefor-display';
-import { InstrumentSans_400Regular, InstrumentSans_600SemiBold, InstrumentSans_700Bold } from '@expo-google-fonts/instrument-sans';
-import { SplineSansMono_500Medium, SplineSansMono_600SemiBold } from '@expo-google-fonts/spline-sans-mono';
-import { color, font, type } from '@/theme/tokens';
+import { useFonts } from '@expo-google-fonts/crimson-pro/useFonts';
+import { CrimsonPro_600SemiBold } from '@expo-google-fonts/crimson-pro/600SemiBold';
+import { Lato_400Regular } from '@expo-google-fonts/lato/400Regular';
+import { Lato_700Bold } from '@expo-google-fonts/lato/700Bold';
+import { SourceCodePro_500Medium } from '@expo-google-fonts/source-code-pro/500Medium';
+import { SourceCodePro_600SemiBold } from '@expo-google-fonts/source-code-pro/600SemiBold';
+import { AlegreyaSans_700Bold } from '@expo-google-fonts/alegreya-sans/700Bold';
+import { Alegreya_400Regular } from '@expo-google-fonts/alegreya/400Regular';
+import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import * as Linking from 'expo-linking';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { CartProvider } from '@/features/cart/CartContext';
@@ -23,6 +29,7 @@ function usePendingOrderLink(signedIn: boolean) {
 }
 
 function Routes() {
+  const { color, type } = useTheme();
   const { user, loading } = useAuth();
   usePendingOrderLink(!!user);
   // The stored session is restored first: deciding earlier would send a signed-in visitor to login.
@@ -30,9 +37,10 @@ function Routes() {
   return (
     <Stack screenOptions={{
       headerShown: true,
-      headerStyle: { backgroundColor: color.primary },
-      headerTintColor: color.onPrimary,
-      headerTitleStyle: { fontFamily: font.displaySemi, fontSize: type.headlineMd.fontSize },
+      headerStyle: { backgroundColor: color.surface },
+      headerShadowVisible: false,
+      headerTintColor: color.onSurface,
+      headerTitleStyle: { fontFamily: type.headlineMd.fontFamily, fontSize: type.headlineMd.fontSize },
       contentStyle: { backgroundColor: color.surface },
     }}>
       {/* open to guests: the catalog is served anonymously */}
@@ -62,25 +70,51 @@ function Routes() {
   );
 }
 
+/** On a wide web window the app is a centered phone-width column. */
+function WebFrame({ children }: { children: React.ReactNode }) {
+  const { color, name } = useTheme();
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View style={{ flex: 1, minHeight: '100%' as unknown as number, flexDirection: 'row', justifyContent: 'center', backgroundColor: color.backdrop }}>
+      <View style={{
+        flex: 1, width: '100%', maxWidth: 480, backgroundColor: color.surface,
+        borderLeftWidth: name === 'light' ? 1 : 0, borderRightWidth: name === 'light' ? 1 : 0, borderColor: color.outlineVariant,
+      }}>{children}</View>
+    </View>
+  );
+}
+
+function Shell() {
+  const { color, name } = useTheme();
+  return (
+    <WebFrame>
+      <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
+      <NetworkProvider>
+        <AuthProvider>
+          <CartProvider>
+            <View style={{ flex: 1, backgroundColor: color.surface }}>
+              <OfflineBanner />
+              <Routes />
+            </View>
+          </CartProvider>
+        </AuthProvider>
+      </NetworkProvider>
+    </WebFrame>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    WixMadeforDisplay_600SemiBold, WixMadeforDisplay_700Bold,
-    InstrumentSans_400Regular, InstrumentSans_600SemiBold, InstrumentSans_700Bold,
-    SplineSansMono_500Medium, SplineSansMono_600SemiBold,
+    CrimsonPro_600SemiBold, Lato_400Regular, Lato_700Bold,
+    SourceCodePro_500Medium, SourceCodePro_600SemiBold,
+    AlegreyaSans_700Bold, Alegreya_400Regular,
   });
   const fontsReady = fontsLoaded || !!fontError; // on error continue with system fonts
   useEffect(() => { if (fontsReady) SplashScreen.hideAsync().catch(() => {}); }, [fontsReady]);
   if (!fontsReady) return null;
   return (
-    <NetworkProvider>
-      <AuthProvider>
-        <CartProvider>
-          <View style={{ flex: 1 }}>
-            <OfflineBanner />
-            <Routes />
-          </View>
-        </CartProvider>
-      </AuthProvider>
-    </NetworkProvider>
+    <ThemeProvider>
+      <Shell />
+    </ThemeProvider>
   );
 }

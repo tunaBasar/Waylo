@@ -1,8 +1,10 @@
 import { Pressable, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { color, space } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeContext';
 
 export function StarPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const { color } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: space.xs }}>
       {[1, 2, 3, 4, 5].map((n) => (

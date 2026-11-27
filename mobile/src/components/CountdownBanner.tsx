@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatCountdown } from '@/components/countdown';
-import { color, radius, space, type } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 
 /** Live mm:ss until an ISO instant, ticking every second. */
 export function CountdownBanner({ until, label }: { until: string; label: string }) {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -24,6 +28,6 @@ export function CountdownBanner({ until, label }: { until: string; label: string
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ radius }: Theme) => StyleSheet.create({
   box: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md },
 });
