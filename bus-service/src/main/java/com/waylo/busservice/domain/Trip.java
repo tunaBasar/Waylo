@@ -15,5 +15,6 @@ public class Trip extends Audited {
     @Enumerated(EnumType.STRING) @Column(nullable = false) public TripStatus status;
     @Column(name = "departure_at", nullable = false) public Instant departureAt;
     @Column(nullable = false) public String currency;
+    @Column(name = "schedule_id") public UUID scheduleId;
     @Version public Long version;
 }

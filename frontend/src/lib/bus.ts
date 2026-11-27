@@ -52,7 +52,23 @@ export interface TripStop { seq: number; terminalId: string; city: string | null
 export interface Trip {
   id: string; organizationId: string; busId: string; code: string; status: 'PUBLISHED' | 'CANCELLED';
   currency: string; stops: TripStop[]; fares: TripFareInput[]; soldSeats: number; seatCount: number;
+  scheduleId: string | null;
 }
+export type Weekday = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+export interface ScheduleStopInput { terminalId: string; arrivalOffsetMinutes: number; departureOffsetMinutes: number }
+export interface ScheduleRequest {
+  busId: string; code: string; currency: string; weekdays: Weekday[]; departureTime: string; validFrom: string;
+  validTo: string | null; horizonDays: number; stops: ScheduleStopInput[]; fares: TripFareInput[];
+  expectedVersion?: number | null;
+}
+export interface TripSchedule {
+  id: string; organizationId: string; busId: string; code: string; currency: string; weekdays: Weekday[];
+  departureTime: string; validFrom: string; validTo: string | null; horizonDays: number; active: boolean;
+  version: number; stops: (ScheduleStopInput & { seq: number; city: string | null; terminalName: string | null })[];
+  fares: TripFareInput[]; nextDepartures: string[]; generatedCount: number;
+}
+export interface ScheduleSummary { created: number; updated: number; skippedExisting: number; skippedManual: number; skippedPast: number }
+export interface ScheduleResult { schedule: TripSchedule; summary: ScheduleSummary }
 export interface BusDocument {
   id: string; organizationId: string; busId: string | null; type: BusDocType; documentNumber: string;
   validUntil: string | null; status: BusDocStatus; rejectReason: string | null; fileName: string;
@@ -103,6 +119,13 @@ export const partnerBusApi = {
   trips: (orgId: string) => api.get<Trip[]>(`${P(orgId)}/trips`),
   createTrip: (orgId: string, body: TripRequest) => api.post<Trip>(`${P(orgId)}/trips`, body),
   cancelTrip: (orgId: string, id: string) => api.post<Trip>(`${P(orgId)}/trips/${enc(id)}/cancel`, {}),
+  schedules: (orgId: string) => api.get<TripSchedule[]>(`${P(orgId)}/trip-schedules`),
+  createSchedule: (orgId: string, body: ScheduleRequest) => api.post<ScheduleResult>(`${P(orgId)}/trip-schedules`, body),
+  updateSchedule: (orgId: string, id: string, body: ScheduleRequest) =>
+    api.put<ScheduleResult>(`${P(orgId)}/trip-schedules/${enc(id)}`, body),
+  setScheduleActive: (orgId: string, id: string, active: boolean) =>
+    api.post<ScheduleResult | { schedule: TripSchedule }>(`${P(orgId)}/trip-schedules/${enc(id)}/${active ? 'activate' : 'deactivate'}`, {}),
+  applySchedules: (orgId: string) => api.post<ScheduleSummary>(`${P(orgId)}/trip-schedules/apply`, {}),
   documents: (orgId: string) => api.get<BusDocument[]>(`${P(orgId)}/documents`),
   uploadDocument: (orgId: string, body: { file: File; type: BusDocType; documentNumber: string; validUntil: string | null; busId: string | null }) => {
     const fd = new FormData();
@@ -194,6 +217,50 @@ export function formatMoney(amount: number, currency = 'TRY'): string {
   return `${grouped},${dec} ${currency === 'TRY' ? 'TL' : currency}`;
 }
 
+const DAY_ORDER: Weekday[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+const DAY_SHORT: Record<Weekday, string> = {
+  MONDAY: 'Pzt', TUESDAY: 'Sal', WEDNESDAY: 'Car', THURSDAY: 'Per', FRIDAY: 'Cum', SATURDAY: 'Cmt', SUNDAY: 'Paz',
+};
+export const WEEKDAYS: { value: Weekday; label: string }[] = DAY_ORDER.map(value => ({ value, label: DAY_SHORT[value] }));
+
+/** "Pzt Cum Paz": week order, duplicates dropped, unknown names ignored. */
+export function weekdayLabel(days: readonly string[]): string {
+  return DAY_ORDER.filter(d => days.includes(d)).map(d => DAY_SHORT[d]).join(' ');
+}
+
+export interface ScheduleClockStop { terminalId: string; arrival: string; arrivalNextDay: boolean; departure: string; departureNextDay: boolean }
+
+function clockMinutes(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const h = Number(m[1]); const min = Number(m[2]);
+  return h > 23 || min > 59 ? null : h * 60 + min;
+}
+
+/**
+ * Clock times (HH:mm, optional "+1 gun" marker per time) to minute offsets from the first departure.
+ * The first stop is always 0/0. Returns null when a time is missing or invalid. A time that is earlier than the
+ * previous one without a marker is not auto-corrected: the backend rejects it with INVALID_SCHEDULE.
+ */
+export function scheduleOffsets(departureTime: string, stops: ScheduleClockStop[]): ScheduleStopInput[] | null {
+  const base = clockMinutes(departureTime);
+  if (base === null) return null;
+  const out: ScheduleStopInput[] = [];
+  for (let i = 0; i < stops.length; i++) {
+    const s = stops[i];
+    if (i === 0) { out.push({ terminalId: s.terminalId, arrivalOffsetMinutes: 0, departureOffsetMinutes: 0 }); continue; }
+    const a = clockMinutes(s.arrival);
+    const d = clockMinutes(s.departure);
+    if (a === null || d === null) return null;
+    out.push({
+      terminalId: s.terminalId,
+      arrivalOffsetMinutes: a + (s.arrivalNextDay ? 1440 : 0) - base,
+      departureOffsetMinutes: d + (s.departureNextDay ? 1440 : 0) - base,
+    });
+  }
+  return out;
+}
+
 /** Fare table sanity check mirroring backend TripRules.validateFares; returns an error text or null. */
 export function validateFares(stopCount: number, fares: TripFareInput[]): string | null {
   const seen = new Set<string>();
@@ -219,6 +286,8 @@ const ERROR_TEXT: Record<string, string> = {
   SEGMENT_NOT_OFFERED: 'Bu guzergah icin fiyat yok.',
   ADMIN_CANNOT_PURCHASE: 'Platform yoneticisi hesabi ile satin alma yapilamaz.',
   COMMISSION_RATE_MISSING: SALES_CLOSED_MESSAGE,
+  SCHEDULE_CODE_TAKEN: 'Bu plan kodu zaten kullaniliyor. Baska bir kod secin.',
+  INVALID_SCHEDULE: 'Plan bilgileri gecersiz: gun secimi, tarih araligi, kac gun ileri ve durak saatlerini kontrol edin.',
 };
 
 /** Trip rule errors share INVALID_STOPS / INVALID_FARES; the backend text tells which rule failed (F71). */

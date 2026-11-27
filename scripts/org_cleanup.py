@@ -86,7 +86,10 @@ def delete_org_rows(org_ids):
     psql('bus_db', f'DELETE FROM bookings WHERE organization_id IN ({o})')
     for t in ('trip_fares', 'trip_stops'):
         psql('bus_db', f'DELETE FROM {t} WHERE trip_id IN (SELECT id FROM trips WHERE organization_id IN ({o}))')
-    for t in ('trips', 'documents', 'buses'):
+    # weekly timetables (V4): children first, then trips (schedule_id FK), then the schedules (bus FK)
+    for t in ('trip_schedule_fares', 'trip_schedule_stops'):
+        psql('bus_db', f'DELETE FROM {t} WHERE schedule_id IN (SELECT id FROM trip_schedules WHERE organization_id IN ({o}))')
+    for t in ('trips', 'trip_schedules', 'documents', 'buses'):
         psql('bus_db', f'DELETE FROM {t} WHERE organization_id IN ({o})')
     # payment-service (money rows are excluded by has_money_or_orders before this point)
     psql('payment_db', f'DELETE FROM commission_rates WHERE supplier_organization_id IN ({o})')

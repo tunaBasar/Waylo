@@ -173,9 +173,19 @@ public class BusService {
         auth.requireBusManager(userId, orgId);
         Bus bus = ownBus(orgId, req.busId());
         if (!bus.active) throw new BusinessRuleException("BUS_INACTIVE", "Bus is not active");
-        TripRules.validateStops(clock.instant(), req.stops());
-        TripRules.validateFares(req.stops().size(), req.fares());
-        Set<UUID> terminalIds = req.stops().stream().map(StopItem::terminalId).collect(Collectors.toSet());
+        Trip trip = createTripFrom(orgId, bus, req.code().trim(), req.currency(), req.stops(), req.fares(), null);
+        return tripResponse(trip, bus);
+    }
+
+    /**
+     * Shared by createTrip and the schedule generator: validates stops, fares and terminals, then saves a PUBLISHED
+     * trip with its stops and fares. The caller has already done the access check and the bus checks.
+     */
+    Trip createTripFrom(UUID orgId, Bus bus, String code, String currency, List<StopItem> stopItems,
+                        List<FareItem> fareItems, UUID scheduleId) {
+        TripRules.validateStops(clock.instant(), stopItems);
+        TripRules.validateFares(stopItems.size(), fareItems);
+        Set<UUID> terminalIds = stopItems.stream().map(StopItem::terminalId).collect(Collectors.toSet());
         Map<UUID, Terminal> terminalMap = terminals.findAllById(terminalIds).stream()
                 .collect(Collectors.toMap(t -> t.id, t -> t));
         for (UUID tid : terminalIds) {
@@ -185,14 +195,15 @@ public class BusService {
         Trip trip = new Trip();
         trip.id = UUID.randomUUID();
         trip.organizationId = orgId;
+        trip.scheduleId = scheduleId;
         trip.busId = bus.id;
-        trip.code = req.code().trim();
+        trip.code = code;
         trip.status = TripStatus.PUBLISHED;
-        trip.departureAt = TripRules.toInstant(req.stops().get(0).departureAt());
-        trip.currency = req.currency();
+        trip.departureAt = TripRules.toInstant(stopItems.get(0).departureAt());
+        trip.currency = currency;
         trips.saveAndFlush(trip);
         int seq = 0;
-        for (StopItem s : req.stops()) {
+        for (StopItem s : stopItems) {
             TripStop st = new TripStop();
             st.id = UUID.randomUUID();
             st.tripId = trip.id;
@@ -202,7 +213,7 @@ public class BusService {
             st.departureAt = TripRules.toInstant(s.departureAt());
             stops.save(st);
         }
-        for (FareItem f : req.fares()) {
+        for (FareItem f : fareItems) {
             TripFare tf = new TripFare();
             tf.id = UUID.randomUUID();
             tf.tripId = trip.id;
@@ -211,7 +222,7 @@ public class BusService {
             tf.price = SeatRules.money(f.price());
             fares.save(tf);
         }
-        return tripResponse(trip, bus);
+        return trip;
     }
 
     @Transactional(readOnly = true)
@@ -258,7 +269,7 @@ public class BusService {
                 .map(f -> new FareResponse(f.fromSeq, f.toSeq, f.price)).toList();
         long sold = tickets.findBlocking(trip.id, clock.instant()).stream().map(t -> t.seatNo).distinct().count();
         return new TripResponse(trip.id, trip.organizationId, trip.busId, trip.code, trip.status, trip.currency,
-                ss, fs, sold, bus.seatCount);
+                ss, fs, sold, bus.seatCount, trip.scheduleId);
     }
 
     // ---- status, bookings, admin ----

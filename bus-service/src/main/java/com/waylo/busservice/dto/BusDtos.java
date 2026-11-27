@@ -7,7 +7,9 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +35,17 @@ public final class BusDtos {
                               @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
                               @NotNull @Size(min = 2, max = 20) List<@Valid StopItem> stops,
                               @NotNull @Size(min = 1, max = 200) List<@Valid FareItem> fares) { }
+
+    public record ScheduleStopItem(@NotNull UUID terminalId, @Min(0) int arrivalOffsetMinutes,
+                                   @Min(0) int departureOffsetMinutes) { }
+
+    public record ScheduleRequest(@NotNull UUID busId, @NotBlank @Size(max = 40) String code,
+                                  @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency,
+                                  @NotNull List<DayOfWeek> weekdays, @NotNull LocalTime departureTime,
+                                  @NotNull LocalDate validFrom, LocalDate validTo, @NotNull Integer horizonDays,
+                                  @NotNull @Size(min = 2, max = 20) List<@Valid ScheduleStopItem> stops,
+                                  @NotNull @Size(min = 1, max = 200) List<@Valid FareItem> fares,
+                                  Long expectedVersion) { }
 
     public record RejectRequest(@NotBlank @Size(max = 500) String reason) { }
 
@@ -66,7 +79,30 @@ public final class BusDtos {
 
     public record TripResponse(UUID id, UUID organizationId, UUID busId, String code, TripStatus status,
                                String currency, List<StopResponse> stops, List<FareResponse> fares,
-                               long soldSeats, int seatCount) { }
+                               long soldSeats, int seatCount, UUID scheduleId) { }
+
+    public record ScheduleStopResponse(int seq, UUID terminalId, String city, String terminalName,
+                                       int arrivalOffsetMinutes, int departureOffsetMinutes) { }
+
+    public record ScheduleResponse(UUID id, UUID organizationId, UUID busId, String code, String currency,
+                                   List<DayOfWeek> weekdays, String departureTime, LocalDate validFrom,
+                                   LocalDate validTo, int horizonDays, boolean active, Long version,
+                                   List<ScheduleStopResponse> stops, List<FareResponse> fares,
+                                   List<LocalDateTime> nextDepartures, long generatedCount) { }
+
+    /** Counters of one generator run. Fields that do not apply to buses stay 0. */
+    public record ScheduleSummary(int created, int updated, int skippedExisting, int skippedManual, int skippedPast) {
+        public static final ScheduleSummary ZERO = new ScheduleSummary(0, 0, 0, 0, 0);
+
+        public ScheduleSummary plus(ScheduleSummary o) {
+            return new ScheduleSummary(created + o.created, updated + o.updated, skippedExisting + o.skippedExisting,
+                    skippedManual + o.skippedManual, skippedPast + o.skippedPast);
+        }
+    }
+
+    public record ScheduleResult(ScheduleResponse schedule, ScheduleSummary summary) { }
+
+    public record ScheduleOnly(ScheduleResponse schedule) { }
 
     public record DocumentResponse(UUID id, UUID organizationId, UUID busId, DocumentType type,
                                    String documentNumber, LocalDate validUntil, DocumentStatus status,

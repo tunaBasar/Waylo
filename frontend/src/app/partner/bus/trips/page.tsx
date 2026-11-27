@@ -8,6 +8,7 @@ import {
   type BusUnit, type Terminal, type Trip, type TripFareInput,
 } from '@/lib/bus';
 import { useToast } from '@/components/Toast';
+import ScheduleSection from './ScheduleSection';
 import { Button, Card, EmptyState, Field, LoadingRows, PageHeader, StatusPill, inputClass } from '@/components/partner/ui';
 
 interface StopDraft { terminalId: string; arrivalAt: string; departureAt: string }
@@ -162,6 +163,10 @@ export default function TripsPage() {
       <PageHeader title="Seferler" subtitle="Guzergah, saatler ve fiyat tablosu"
         actions={!showForm && <Button icon="add" disabled={!canCreate} onClick={() => setShowForm(true)}>Sefer ekle</Button>} />
       {!canCreate && <p className="text-sm text-on-surface-variant">Sefer eklemek icin once aktif bir otobus ekleyin. Duraklar platform tarafindan tanimlanir.</p>}
+      {organizationId && (
+        <ScheduleSection organizationId={organizationId} buses={buses} terminals={terminals} canCreate={canCreate}
+          onChanged={() => setVersion(v => v + 1)} />
+      )}
       {showForm && organizationId && (
         <TripForm organizationId={organizationId} buses={buses} terminals={terminals}
           onDone={saved => { setShowForm(false); if (saved) setVersion(v => v + 1); }} />
@@ -183,6 +188,7 @@ export default function TripsPage() {
                 <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
                 {t.status === 'PUBLISHED' && <Button variant="ghost" icon="cancel" onClick={() => cancel(t)}>Iptal et</Button>}
               </div>
+              {t.scheduleId && <p className="text-xs text-on-surface-variant">Plan: {t.code}</p>}
               {badge.hint && <p className="text-xs text-on-surface-variant">{badge.hint}</p>}
               <p className="text-xs text-on-surface-variant">
                 {t.stops.map(s => `${s.city} ${formatTripTime(s.departureAt).slice(11)}`).join(' > ')}
