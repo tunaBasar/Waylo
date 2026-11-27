@@ -103,7 +103,12 @@ export default function Bus() {
   const [date, setDate] = useState(() => addDays(new Date(), 7));
   const [q, setQ] = useState<{ from: string; to: string; date: string } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const trips = useAsync(() => busApi.search(q!.from, q!.to, q!.date).catch((e: unknown) => { throw new Error(busErrorMessage(e, 'Seferler yuklenemedi.')); }), [q], q !== null && status.data?.enabled === true);
+  // No `q!.x` inside the closure: the React Compiler (app.json reactCompiler) reads non-null access paths as memo
+  // dependencies during render, and q is null until the first search (crashed the tab on Expo web, 27.11).
+  const trips = useAsync(
+    () => (q ? busApi.search(q.from, q.to, q.date) : Promise.resolve([] as TripOffer[]))
+      .catch((e: unknown) => { throw new Error(busErrorMessage(e, 'Seferler yuklenemedi.')); }),
+    [q], q !== null && status.data?.enabled === true);
   return (
     <Screen>
       <Title>Otobus bileti</Title>
