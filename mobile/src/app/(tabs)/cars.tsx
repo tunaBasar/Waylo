@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { Branch, CarOffer } from '@/api';
@@ -12,7 +12,10 @@ import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen } from '@/co
 import { AppHeader } from '@/components/AppHeader';
 import { ModeTabs } from '@/components/ModeTabs';
 import { Price } from '@/components/Price';
-import { color, MIN_TOUCH, radius, space, type } from '@/theme/tokens';
+import { GuestLoginPill } from '@/components/GuestLoginPill';
+import { MIN_TOUCH, space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { DateField } from '@/components/DateField';
 import { addDays, isoLocalDateTime, validateRentalTimes } from '@/features/dates';
 import { carErrorMessage, defaultPickup, PICKUP_LEAD_HINT, pickupLeadError } from '@/features/cars/lead';
@@ -22,6 +25,7 @@ type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; ret
 
 export default function Cars() {
   const cart = useCart();
+  const s = useStyles(makeStyles);
   const router = useRouter();
   const { user } = useAuth();
   const branches = useAsync(() => carsApi.branches(), []);
@@ -50,22 +54,18 @@ export default function Cars() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.surface }}>
+    <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
-      <AppHeader title="Waylo" right={user ? undefined : (
-        <Pressable accessibilityRole="button" accessibilityLabel="Giriş yap" onPress={() => { setReturnTo(q ? buildCarsReturn({ pickupBranchId: q.pickupBranchId, returnBranchId: q.returnBranchId, pickupAt: new Date(q.pickupAt), returnAt: new Date(q.returnAt), driverAge: q.driverAge }) : '/cars'); router.navigate('/(auth)/login'); }} style={{ minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: space.sm }}>
-          <Text style={[type.labelLg, { color: color.onPrimary }]}>Giriş yap</Text>
-        </Pressable>
-      )} />
+      <AppHeader title="Waylo" right={user ? undefined : <GuestLoginPill onPress={() => { setReturnTo(q ? buildCarsReturn({ pickupBranchId: q.pickupBranchId, returnBranchId: q.returnBranchId, pickupAt: new Date(q.pickupAt), returnAt: new Date(q.returnAt), driverAge: q.driverAge }) : '/cars'); router.navigate('/(auth)/login'); }} />} />
       <ModeTabs active="cars" />
       <Screen>
         <Card>
           <AsyncView<Branch[]> state={branches} isEmpty={(d) => d.length === 0} emptyText="Şu an kiralama şubesi yok.">
             {(list) => (
               <>
-                <Text style={[type.labelLg, { color: color.onSurface }]}>Alış şubesi</Text>
+                <Text style={s.label}>Alış şubesi</Text>
                 {list.map((b) => <BranchRow key={b.id} b={b} on={pickup === b.id} onPress={() => setPickup(b.id)} />)}
-                <Text style={[type.labelLg, { color: color.onSurface }]}>Teslim şubesi</Text>
+                <Text style={s.label}>Teslim şubesi</Text>
                 <Muted>Farklı şube seçerseniz tek yön kiralama olur, ek ücret olabilir.</Muted>
                 {list.map((b) => <BranchRow key={`r-${b.id}`} b={b} on={returnId === b.id} onPress={() => setRet(b.id)} />)}
               </>
@@ -73,7 +73,7 @@ export default function Cars() {
           </AsyncView>
           <DateField label="Alış" mode="datetime" value={pAt} minimumDate={new Date()} onChange={(d) => { setPAt(d); if (rAt <= d) setRAt(addDays(d, 1)); }} />
           <DateField label="Teslim" mode="datetime" value={rAt} minimumDate={pAt} onChange={setRAt} />
-          {formError ? null : <Muted>{PICKUP_LEAD_HINT}</Muted>}
+          {formError ? null : <Text style={s.hint}>{PICKUP_LEAD_HINT}</Text>}
           <Field label="Sürücü yaşı" value={age} onChangeText={setAge} keyboardType="number-pad" />
           <ErrorBanner message={formError} />
           <Button title="Ara" disabled={!pickup || !returnId} onPress={search} />
@@ -82,18 +82,18 @@ export default function Cars() {
           <AsyncView<CarOffer[]> state={offers} isEmpty={(d) => d.length === 0} emptyText="Bu tarihlerde araç bulunamadı.">
             {(list) => list.map((o, i) => (
               <Card key={`${o.category}-${o.transmission}-${i}`}>
-                <Text style={[type.titleMd, { color: color.onSurface }]}>{`${o.exampleModel} ve benzeri`}</Text>
-                <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${o.category} · ${o.transmission} · ${o.fuelType} · ${o.seatCount} koltuk`}</Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${o.chargeableDays} gün × `}</Text>
+                <Text style={s.title}>{`${o.exampleModel} ve benzeri`}</Text>
+                <Text style={s.muted}>{`${o.category} · ${o.transmission} · ${o.fuelType} · ${o.seatCount} koltuk`}</Text>
+                <View style={s.rowBetween}>
+                  <Text style={s.muted}>{`${o.chargeableDays} gün × `}</Text>
                   <Price amount={o.dailyRate} currency={o.currency} size="sm" />
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>Toplam</Text>
+                <View style={s.rowBetween}>
+                  <Text style={s.muted}>Toplam</Text>
                   <Price amount={o.totalAmount} currency={o.currency} />
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>Depozito</Text>
+                <View style={s.rowBetween}>
+                  <Text style={s.muted}>Depozito</Text>
                   <Price amount={o.depositAmount} currency={o.currency} size="sm" />
                 </View>
                 <Button kind="secondary" title="Sepete ekle" onPress={() => {
@@ -115,11 +115,25 @@ export default function Cars() {
 }
 
 function BranchRow({ b, on, onPress }: { b: Branch; on: boolean; onPress: () => void }) {
+  const { color } = useTheme();
+  const s = useStyles(makeStyles);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${b.name}, ${b.city}`} accessibilityState={{ selected: on }} onPress={onPress}
-      style={{ minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: on ? 2 : 1, borderColor: on ? color.primary : color.outlineVariant, backgroundColor: on ? color.surfaceLow : color.surfaceLowest }}>
+      style={[s.branch, on && s.branchOn]}>
       <MaterialCommunityIcons name={on ? 'radiobox-marked' : 'radiobox-blank'} size={20} color={on ? color.primary : color.outline} accessibilityElementsHidden importantForAccessibility="no" />
-      <Text style={[type.bodyLg, { color: color.onSurface, flex: 1 }]}>{`${b.name} · ${b.city}`}</Text>
+      <Text style={s.branchText}>{`${b.name} · ${b.city}`}</Text>
     </Pressable>
   );
 }
+
+const makeStyles = ({ color, type, radius }: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.surface },
+  label: { ...type.labelSm, color: color.onSurfaceVariant },
+  hint: { ...type.labelSm, color: color.onSurfaceVariant },
+  title: { ...type.titleMd, color: color.onSurface },
+  muted: { ...type.bodyMd, color: color.onSurfaceVariant },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  branch: { minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: color.outlineVariant, backgroundColor: color.surfaceLowest },
+  branchOn: { borderWidth: 2, borderColor: color.primary, backgroundColor: color.surfaceLow },
+  branchText: { ...type.bodyLg, color: color.onSurface, flex: 1 },
+});

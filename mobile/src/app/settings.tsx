@@ -1,11 +1,29 @@
 import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/features/auth/AuthContext';
 import { api, ApiError } from '@/api';
-import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
-import { Hint, Section } from '@/features/account/AccountUi';
+import { Button, ErrorBanner, Field } from '@/components/ui';
+import { Hint, Icon, Section, StackScreen } from '@/features/account/AccountUi';
+import { MIN_TOUCH, space, type Theme, type ThemePreference } from '@/theme/theme';
+import { useStyles, useTheme, useThemePreference } from '@/theme/ThemeContext';
+
+const OPTIONS: { value: ThemePreference; label: string; sub?: string; icon: 'theme-light-dark' | 'white-balance-sunny' | 'weather-night' }[] = [
+  { value: 'system', label: 'Sistem', sub: 'Telefonun ayarını izler', icon: 'theme-light-dark' },
+  { value: 'light', label: 'Açık', icon: 'white-balance-sunny' },
+  { value: 'dark', label: 'Koyu', icon: 'weather-night' },
+];
+
+const makeStyles = ({ color, radius }: Theme) => StyleSheet.create({
+  radio: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: MIN_TOUCH + 8, paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: color.outlineVariant },
+  radioOn: { borderColor: color.primary, backgroundColor: color.surfaceContainer },
+  grow: { flex: 1 },
+});
 
 export default function Settings() {
   const { clearSession, logout } = useAuth();
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
+  const { preference, setPreference } = useThemePreference();
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,7 +56,22 @@ export default function Settings() {
     } finally { setBusy(false); }
   }
   return (
-    <Screen>
+    <StackScreen title="Ayarlar">
+      <Section title="Görünüm">
+        {OPTIONS.map((o) => {
+          const checked = preference === o.value;
+          return (
+            <Pressable key={o.value} accessibilityRole="radio" accessibilityLabel={o.label} accessibilityState={{ checked }} onPress={() => setPreference(o.value)} style={[s.radio, checked && s.radioOn]}>
+              <Icon name={o.icon} tint={checked ? color.primary : color.onSurfaceVariant} />
+              <View style={s.grow}>
+                <Text style={[type.bodyLg, { color: color.onSurface }]}>{o.label}</Text>
+                {o.sub ? <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{o.sub}</Text> : null}
+              </View>
+              <Icon name={checked ? 'radiobox-marked' : 'radiobox-blank'} tint={checked ? color.primary : color.outline} />
+            </Pressable>
+          );
+        })}
+      </Section>
       <Hint>Adınızı ve şifrenizi Profil sekmesinden değiştirebilirsiniz.</Hint>
       <Button kind="secondary" title="Çıkış yap" onPress={() => { void logout(); }} />
       <Section title="E-posta adresini değiştir">
@@ -67,6 +100,6 @@ export default function Settings() {
           </>
         )}
       </Section>
-    </Screen>
+    </StackScreen>
   );
 }

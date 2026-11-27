@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { StatusPill, type Tone } from '@/components/StatusPill';
 import { Price } from '@/components/Price';
-import { color, radius, space, type } from '@/theme/tokens';
+import { space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import type { Order } from '@/api';
 import { ordersApi } from '@/features/orders/api';
@@ -17,6 +19,8 @@ import { orderSummary } from '@/features/orders/summary';
 const STATUS_TONE: Record<string, Tone> = { PENDING: 'warning', CONFIRMED: 'success', CANCELLED: 'neutral', EXPIRED: 'error' };
 
 function OrderList({ orders }: { orders: Order[] }) {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const router = useRouter();
   return sortOrdersForDisplay(orders).map((o) => {
     const status = orderStatusInfo(o.status).label;
@@ -40,6 +44,8 @@ function OrderList({ orders }: { orders: Order[] }) {
 }
 
 export default function Orders() {
+  const { color, type, font, radius } = useTheme();
+  const s = useStyles(makeStyles);
   const state = useAsync(async () => { const d = await ordersApi.list(); void saveOrdersSnapshot(d); return d; }, []);
   // Tabs stay mounted: refetch when the tab is re-focused (first focus is covered by the initial load).
   const focused = useRef(false);
@@ -58,6 +64,7 @@ export default function Orders() {
       <Stack.Screen options={{ headerShown: false }} />
       <AppHeader title="Siparişlerim" />
       <Screen>
+      <Text accessibilityRole="header" style={[type.headlineLg, { color: color.onSurface, fontFamily: font.display }]}>Siparişlerim</Text>
       {state.offline && cached ? (
         <>
           <Text accessibilityRole="alert" style={[type.bodyMd, { backgroundColor: color.warningContainer, color: color.onWarningContainer, padding: space.md, borderRadius: radius.md, overflow: 'hidden' }]}>
@@ -75,7 +82,7 @@ export default function Orders() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ color }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.surface },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
 });

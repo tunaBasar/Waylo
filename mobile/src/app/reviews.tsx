@@ -3,11 +3,12 @@ import { Text } from 'react-native';
 import { ApiError } from '@/api';
 import { reviewsApi, reviewErrorMessage, REVIEW_WHEN_HINT, validateReview, MAX_REVIEW_TEXT, type ReviewableItem } from '@/features/reviews/api';
 import { useAsync } from '@/features/useAsync';
-import { AsyncView, Button, ErrorBanner, Field, Screen } from '@/components/ui';
-import { accountStyles, Hint, Section } from '@/features/account/AccountUi';
+import { AsyncView, Button, ErrorBanner, Field } from '@/components/ui';
+import { Hint, Section, StackScreen, useAccountStyles } from '@/features/account/AccountUi';
 import { StarPicker } from '@/components/StarPicker';
 
 function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void }) {
+  const accountStyles = useAccountStyles();
   const [score, setScore] = useState(0);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +36,11 @@ function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void
 export default function Reviews() {
   const state = useAsync(() => reviewsApi.reviewable(), []);
   return (
-    <Screen>
+    <StackScreen title="Yorumlar">
       <Hint>{REVIEW_WHEN_HINT}</Hint>
       <AsyncView<ReviewableItem[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Yorum yazılacak konaklama yok.">
         {(list) => list.map((i) => <ReviewForm key={i.orderItemId} item={i} onDone={state.reload} />)}
       </AsyncView>
-    </Screen>
+    </StackScreen>
   );
 }

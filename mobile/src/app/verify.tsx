@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator } from 'react-native';
 import { api } from '@/api';
-import { Button, ErrorBanner, Screen } from '@/components/ui';
+import { Button, ErrorBanner } from '@/components/ui';
 import { AuthShell, Hint, Section, SuccessNote } from '@/features/account/AccountUi';
 
 /** Email verification deep link: waylo://verify?token=... or https://<host>/verify?token=... */
@@ -22,7 +22,6 @@ export default function Verify() {
 
   const s = token ? state : { status: 'error' as const, message: 'Doğrulama tokeni bulunamadı' };
   return (
-    <Screen>
       <AuthShell title="E-posta doğrulama">
       {s.status === 'loading' ? (
         <Section><ActivityIndicator accessibilityLabel="Doğrulanıyor" /><Hint>E-posta doğrulanıyor...</Hint></Section>
@@ -31,6 +30,5 @@ export default function Verify() {
       ) : <ErrorBanner message={s.message} />}
       {s.status !== 'loading' ? <Button kind="secondary" title="Uygulamaya dön" onPress={() => router.replace('/')} /> : null}
       </AuthShell>
-    </Screen>
   );
 }

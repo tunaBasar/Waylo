@@ -1,16 +1,24 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import type { Order } from '@/api';
 import { ordersApi } from '@/features/orders/api';
 import { useAsync } from '@/features/useAsync';
 import { supportApi, supportErrorMessage, validateNewCase } from '@/features/support/api';
-import { AsyncView, Button, ErrorBanner, Field, Screen } from '@/components/ui';
-import { accountStyles, Icon, Section } from '@/features/account/AccountUi';
-import { color, MIN_TOUCH, type } from '@/theme/tokens';
+import { AsyncView, Button, ErrorBanner, Field } from '@/components/ui';
+import { Icon, Section, StackScreen, useAccountStyles } from '@/features/account/AccountUi';
+import { MIN_TOUCH, space, type Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
+
+const makeStyles = (_t: Theme) => StyleSheet.create({
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: MIN_TOUCH },
+});
 
 export default function NewSupportCase() {
   const router = useRouter();
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
+  const accountStyles = useAccountStyles();
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const order = useAsync(() => ordersApi.get(orderId), [orderId]);
   const [subject, setSubject] = useState('');
@@ -33,7 +41,7 @@ export default function NewSupportCase() {
   }
 
   return (
-    <Screen>
+    <StackScreen title="Destek talebi">
       <AsyncView<Order> state={order} emptyText="Sipariş bulunamadı.">
         {(o) => (
           <>
@@ -45,7 +53,7 @@ export default function NewSupportCase() {
                   return (
                     <Pressable key={i.id} accessibilityRole="radio" accessibilityState={{ selected }}
                       accessibilityLabel={`Kalem: ${i.description}`} onPress={() => setItemId(selected ? null : i.id)}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: MIN_TOUCH }}>
+                      <View style={s.itemRow}>
                         <Icon name={selected ? 'radiobox-marked' : 'radiobox-blank'} tint={selected ? color.primary : color.outline} />
                         <Text style={[type.bodyLg, { flex: 1, color: selected ? color.primary : color.onSurface }]}>{i.description}</Text>
                       </View>
@@ -63,6 +71,6 @@ export default function NewSupportCase() {
           </>
         )}
       </AsyncView>
-    </Screen>
+    </StackScreen>
   );
 }

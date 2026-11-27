@@ -5,11 +5,12 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
 import { AppHeader } from '@/components/AppHeader';
 import { StatusPill } from '@/components/StatusPill';
-import { accountStyles, Hint, NavRow, Section, SuccessNote } from '@/features/account/AccountUi';
+import { useAccountStyles, Hint, NavRow, Section, SuccessNote } from '@/features/account/AccountUi';
 import { profileApi, validateName, validatePasswordChange, PASSWORD_HINT } from '@/features/profile/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const accountStyles = useAccountStyles();
   const { user, logout, refreshProfile, applyAuth } = useAuth();
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
@@ -55,12 +56,6 @@ export default function ProfileScreen() {
             <StatusPill tone={user.emailVerified ? 'success' : 'warning'} text={user.emailVerified ? 'E-posta doğrulandı' : 'E-posta doğrulanmadı'} />
           </Section>
         ) : null}
-        <Section>
-          <NavRow icon="star-outline" label="Yorum yazabileceğim konaklamalar" onPress={() => router.push('/reviews')} />
-          <NavRow icon="bell-outline" label="Bildirimler" onPress={() => router.push('/notifications')} />
-          <NavRow icon="lifebuoy" label="Destek taleplerim" onPress={() => router.push('/support' as Href)} />
-          <NavRow icon="cog-outline" label="Ayarlar" onPress={() => router.push('/settings')} last />
-        </Section>
         <Section title="Ad ve soyad">
           <Field label="Ad" value={first} onChangeText={setFirst} autoCapitalize="words" />
           <Field label="Soyad" value={last} onChangeText={setLast} autoCapitalize="words" />
@@ -74,6 +69,12 @@ export default function ProfileScreen() {
           <Field label="Yeni şifre (tekrar)" value={conf} onChangeText={setConf} secureTextEntry />
           {pwMsg && (pwMsg.ok ? <SuccessNote text={pwMsg.text} /> : <ErrorBanner message={pwMsg.text} />)}
           <Button title="Şifreyi güncelle" disabled={busy} onPress={savePassword} />
+        </Section>
+        <Section>
+          <NavRow icon="star-outline" label="Yorum yazabileceğim konaklamalar" onPress={() => router.push('/reviews')} />
+          <NavRow icon="bell-outline" label="Bildirimler" onPress={() => router.push('/notifications')} />
+          <NavRow icon="lifebuoy" label="Destek taleplerim" onPress={() => router.push('/support' as Href)} />
+          <NavRow icon="cog-outline" label="Ayarlar" onPress={() => router.push('/settings')} last />
         </Section>
         <Button kind="danger" title="Çıkış yap" onPress={() => { void logout(); }} />
       </Screen>

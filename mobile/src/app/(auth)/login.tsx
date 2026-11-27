@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { Button, ErrorBanner, Field } from '@/components/ui';
 import { AuthShell, Hint, LinkText } from '@/features/account/AccountUi';
 
 export default function Login() {
@@ -18,7 +18,6 @@ export default function Login() {
     finally { setBusy(false); }
   }
   return (
-    <Screen>
       <AuthShell title="Waylo'ya giriş">
       <Hint>Otel, uçuş ve araç kiralama tek yerde</Hint>
       <ErrorBanner message={error} />
@@ -28,6 +27,5 @@ export default function Login() {
       <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabın yok mu? Kayıt ol"><LinkText>Hesabın yok mu? Kayıt ol</LinkText></Link>
       <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Şifremi unuttum"><LinkText>Şifremi unuttum</LinkText></Link>
       </AuthShell>
-    </Screen>
   );
 }

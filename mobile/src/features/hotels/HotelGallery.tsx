@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { API_URL } from '@/config';
 import { PhotoFallback } from '@/components/PhotoFallback';
-import { color, radius, space, type } from '@/theme/tokens';
+import { MIN_TOUCH, space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { photoAspect, photoUrl, type HotelPhoto } from './api';
 
 function Slide({ hotelId, photo, width }: { hotelId: string; photo: HotelPhoto; width: number }) {
@@ -21,32 +23,59 @@ function Slide({ hotelId, photo, width }: { hotelId: string; photo: HotelPhoto; 
   );
 }
 
-/** Paged photo gallery. Renders nothing when there are no photos. */
+/** Paged photo gallery with counter chip and thumbnails. Renders nothing when there are no photos. */
 export function HotelGallery({ hotelId, photos }: { hotelId: string; photos: HotelPhoto[] }) {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
+  const list = useRef<FlatList<HotelPhoto>>(null);
   if (photos.length === 0) return null;
+  const goTo = (i: number) => {
+    setIndex(i);
+    list.current?.scrollToIndex({ index: i, animated: true });
+  };
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={s.box}>
-      {width > 0 ? (
+    <View style={{ gap: space.sm }}>
+      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={s.box}>
+        {width > 0 ? (
+          <FlatList
+            ref={list}
+            data={photos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(p) => p.id}
+            getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+            onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+            renderItem={({ item }) => <Slide hotelId={hotelId} photo={item} width={width} />}
+          />
+        ) : null}
+        <View accessible accessibilityLabel={`Fotoğraf ${index + 1} / ${photos.length}`} style={s.counter}>
+          <Text style={[type.monoSm, { color: color.surface }]}>{`${index + 1} / ${photos.length}`}</Text>
+        </View>
+      </View>
+      {photos.length > 1 ? (
         <FlatList
           data={photos}
           horizontal
-          pagingEnabled
           showsHorizontalScrollIndicator={false}
           keyExtractor={(p) => p.id}
-          onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-          renderItem={({ item }) => <Slide hotelId={hotelId} photo={item} width={width} />}
+          contentContainerStyle={{ gap: space.sm }}
+          renderItem={({ item, index: i }) => (
+            <Pressable accessibilityRole="button" accessibilityLabel={`Fotoğraf ${i + 1} göster`} onPress={() => goTo(i)} style={[s.thumb, i === index && { borderColor: color.primary }]}>
+              <Image source={{ uri: photoUrl(API_URL, hotelId, item.id) }} contentFit="cover" style={s.thumbImg} />
+            </Pressable>
+          )}
         />
       ) : null}
-      <View accessible accessibilityLabel={`Fotoğraf ${index + 1} / ${photos.length}`} style={s.counter}>
-        <Text style={[type.monoSm, { color: color.onPrimary }]}>{`${index + 1} / ${photos.length}`}</Text>
-      </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ color, radius }: Theme) => StyleSheet.create({
   box: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: color.surfaceContainer },
-  counter: { position: 'absolute', right: space.md, bottom: space.md, backgroundColor: 'rgba(25,28,32,0.72)', borderRadius: radius.full, paddingHorizontal: space.sm, paddingVertical: space.xs },
+  counter: { position: 'absolute', right: space.md, bottom: space.md, backgroundColor: color.onSurface, borderRadius: radius.full, paddingHorizontal: space.sm, paddingVertical: space.xs },
+  thumb: { width: MIN_TOUCH + 20, height: MIN_TOUCH + 20, borderRadius: radius.md, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  thumbImg: { width: '100%', height: '100%' },
 });

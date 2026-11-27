@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { Button, ErrorBanner, Field } from '@/components/ui';
 import { AuthShell, Hint } from '@/features/account/AccountUi';
 
 export default function Forgot() {
@@ -17,7 +17,6 @@ export default function Forgot() {
     finally { setBusy(false); }
   }
   return (
-    <Screen>
       <AuthShell title="Şifremi unuttum">
       <ErrorBanner message={error} />
       {done ? <Hint>Hesap varsa şifre sıfırlama bağlantısı e-postana gönderildi.</Hint> : (
@@ -27,6 +26,5 @@ export default function Forgot() {
         </>
       )}
       </AuthShell>
-    </Screen>
   );
 }

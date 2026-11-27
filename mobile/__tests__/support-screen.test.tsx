@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import SupportList from '../src/app/support/index';
 import { supportApi } from '../src/features/support/api';
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true }), Stack: { Screen: () => null } }));
 jest.mock('expo-secure-store', () => ({}));
 
 describe('Support list screen', () => {

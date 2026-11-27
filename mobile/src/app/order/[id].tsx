@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { ApiError, type CancellationPreview, type Order, type OrderItem, type Voucher } from '@/api';
@@ -12,15 +12,32 @@ import { AppHeader } from '@/components/AppHeader';
 import { CountdownBanner } from '@/components/CountdownBanner';
 import { Price } from '@/components/Price';
 import { StatusPill, type Tone } from '@/components/StatusPill';
-import { color, space, type } from '@/theme/tokens';
+import { space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { canOfferCancel } from '@/features/orders/actions';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
-import { displayItemText, fmtLocal, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText, voucherStatusText } from '@/features/format';
+import { displayItemText, fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, verticalText, voucherStatusText } from '@/features/format';
 
 const VOUCHER_TONE: Record<string, Tone> = { ACTIVE: 'success', REDEEMED: 'neutral', VOID: 'error', NO_SHOW: 'warning' };
 const ORDER_TONE: Record<string, Tone> = { PENDING: 'warning', CONFIRMED: 'success', CANCELLED: 'neutral', EXPIRED: 'error' };
 
+function ActionButton({ title, kind, disabled, onPress }: { title: string; kind: 'secondary' | 'outlineError' | 'tonalError'; disabled?: boolean; onPress: () => void }) {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
+  const dark = useTheme().name === 'dark';
+  const look = kind === 'secondary' ? { bg: color.secondary, fg: color.onSecondary, bw: 0 }
+    : dark ? { bg: color.errorContainer, fg: color.onErrorContainer, bw: 0 } : { bg: 'transparent', fg: color.error, bw: 1 };
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress}
+      style={[s.action, { backgroundColor: look.bg, borderWidth: look.bw, borderColor: color.error, opacity: disabled ? 0.5 : 1 }]}>
+      <Text style={[type.labelLg, { color: look.fg }]}>{title}</Text>
+    </Pressable>
+  );
+}
+
 function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: OrderCheckin | undefined; onDone: () => void }) {
+  const { color, type } = useTheme();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
@@ -35,34 +52,48 @@ function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: Or
   }
   return (
     <>
-      <Button title={busy ? 'İşleniyor...' : 'Online check-in'} disabled={!win.open || busy} onPress={run} />
+      <ActionButton kind="secondary" title={busy ? 'İşleniyor...' : 'Online check-in'} disabled={!win.open || busy} onPress={run} />
       {!win.open && win.reason ? <Muted>{win.reason}</Muted> : null}
       <ErrorBanner message={msg} />
     </>
   );
 }
 
-function Vouchers({ orderId, checkedInItemIds, freeCancel }: { orderId: string; checkedInItemIds: Set<string>; freeCancel: Record<string, string> }) {
+function Vouchers({ orderId, items, checkedInItemIds, freeCancel }: { orderId: string; items: OrderItem[]; checkedInItemIds: Set<string>; freeCancel: Record<string, string> }) {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const state = useAsync(() => ordersApi.vouchers(orderId), [orderId]);
   return (
     <AsyncView<Voucher[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Kupon henüz oluşmadı.">
-      {(list) => list.map((v) => (
-        <Card key={v.voucherId}>
-          <View style={st.top}>
-            <Text style={[type.titleMd, { color: color.onSurface, flex: 1 }]}>{displayItemText(v.description)}</Text>
-            <StatusPill tone={VOUCHER_TONE[v.status] ?? 'neutral'} text={voucherStatusText(v.status)} />
-          </View>
-          {v.payload ? <View style={st.qr}><QRCode value={v.payload} size={200} /></View> : null}
-          <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{`Geçerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Text>
-          {v.orderItemId && freeCancel[v.orderItemId] ? <Muted>{freeCancel[v.orderItemId]}</Muted> : null}
-          {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={[type.labelLg, { color: color.success }]}>Biniş kartı (QR)</Text> : null}
-        </Card>
-      ))}
+      {(list) => list.map((v) => {
+        const item = items.find((i) => i.id === v.orderItemId);
+        const text = displayItemText(v.description);
+        return (
+          <Card key={v.voucherId}>
+            <View style={s.top}>
+              <View style={{ flex: 1, gap: space.xs }}>
+                <Text style={[type.titleMd, { color: color.onSurface }]}>{item ? `${verticalText(item.vertical)} · ${text}` : text}</Text>
+                <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{`Geçerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Text>
+              </View>
+              <StatusPill tone={VOUCHER_TONE[v.status] ?? 'neutral'} text={voucherStatusText(v.status)} />
+            </View>
+            {v.payload || (v.orderItemId && freeCancel[v.orderItemId]) ? (
+              <View style={s.inset}>
+                {v.payload ? <View style={s.qrBox}><QRCode value={v.payload} size={180} color="black" backgroundColor="white" /></View> : null}
+                {v.orderItemId && freeCancel[v.orderItemId] ? <Muted>{freeCancel[v.orderItemId]}</Muted> : null}
+              </View>
+            ) : null}
+            {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={[type.labelLg, { color: color.success }]}>Biniş kartı (QR)</Text> : null}
+          </Card>
+        );
+      })}
     </AsyncView>
   );
 }
 
 export default function OrderDetail() {
+  const { color, type } = useTheme();
+  const s = useStyles(makeStyles);
   const online = useOnline();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -100,9 +131,10 @@ export default function OrderDetail() {
   }
 
   return (
-    <View style={st.root}>
+    <View style={s.root}>
     <Stack.Screen options={{ headerShown: false }} />
-    <AppHeader title={`Sipariş #${(id ?? '').slice(0, 8)}`} onBack={() => router.back()}
+    <AppHeader title={`Sipariş #${(id ?? '').slice(0, 8)}`} subtitle={state.data ? money(state.data.totalAmount, state.data.currency) : undefined}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/hotels'))}
       right={state.data ? <StatusPill tone={ORDER_TONE[state.data.status] ?? 'neutral'} text={orderStatusInfo(state.data.status).label} /> : undefined} />
     <Screen>
       <AsyncView<Order> state={state} emptyText="Sipariş bulunamadı.">
@@ -133,16 +165,19 @@ export default function OrderDetail() {
                 <Button kind="secondary" title="Reddedilen test ödemesi" disabled={busy || !online} onPress={() => pay('TEST_DECLINE')} />
               </>
             )}
-            <Button kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
-            {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} freeCancel={Object.fromEntries((o.items ?? []).map((i) => [i.id, orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)]))} />}
+            <ActionButton kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
+            {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} items={o.items ?? []} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} freeCancel={Object.fromEntries((o.items ?? []).map((i) => [i.id, orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)]))} />}
             {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && canOfferCancel(o, vouchers.data) && (
-              <Button kind="secondary" title="Siparişi iptal et" disabled={busy} onPress={loadPreview} />
+              <ActionButton kind="tonalError" title="Siparişi iptal et" disabled={busy} onPress={loadPreview} />
             )}
             {preview && (
               <Card>
                 {preview.cancellable ? (
                   <>
-                    <Text style={[type.titleMd, { color: color.onSurface }]}>{o.status === 'PENDING' ? 'Ödeme yapılmadı, tutar çekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
+                    <View style={s.top}>
+                      <Text style={[type.bodyMd, { color: color.onSurface, flex: 1 }]}>{o.status === 'PENDING' ? 'Ödeme yapılmadı, tutar çekilmeyecek.' : 'İptal halinde iade tutarı'}</Text>
+                      {o.status === 'PENDING' ? null : <Text style={[type.monoMd, { color: color.onSurface }]}>{preview.totalRefund > 0 ? money(preview.totalRefund, preview.currency) : 'İade yapılmayacak'}</Text>}
+                    </View>
                     <Button kind="danger" title="İptali onayla" disabled={busy || !online} onPress={confirmCancel} />
                   </>
                 ) : <Text>{`Bu sipariş iptal edilemez (${preview.blockedReason}).`}</Text>}
@@ -157,8 +192,10 @@ export default function OrderDetail() {
   );
 }
 
-const st = StyleSheet.create({
+const makeStyles = ({ color, radius, name }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.surface },
+  action: { minHeight: 48, borderRadius: radius.md, paddingHorizontal: space.lg, alignItems: 'center', justifyContent: 'center' },
+  inset: { backgroundColor: name === 'light' ? color.surfaceLow : color.surfaceContainer, borderRadius: radius.md, padding: space.md, gap: space.sm, alignItems: 'center' },
+  qrBox: { backgroundColor: 'white', padding: space.md, borderRadius: radius.md },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
-  qr: { alignItems: 'center', paddingVertical: space.md },
 });

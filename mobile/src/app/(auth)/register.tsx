@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { Button, ErrorBanner, Field } from '@/components/ui';
 import { AuthShell, Hint, LinkText } from '@/features/account/AccountUi';
 
 export default function Register() {
@@ -20,16 +20,13 @@ export default function Register() {
   }
   if (sentTo) {
     return (
-      <Screen>
-        <AuthShell title="E-postanı doğrula">
+          <AuthShell title="E-postanı doğrula">
         <Hint>{`${sentTo} adresine doğrulama bağlantısı gönderildi. Doğruladıktan sonra giriş yapabilirsin.`}</Hint>
         <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girişe dön"><LinkText>Girişe dön</LinkText></Link>
         </AuthShell>
-      </Screen>
-    );
+      );
   }
   return (
-    <Screen>
       <AuthShell title="Kayıt ol">
       <ErrorBanner message={error} />
       <Field label="Ad" value={f.firstName} onChangeText={set('firstName')} autoCapitalize="words" />
@@ -38,6 +35,5 @@ export default function Register() {
       <Field label="Şifre" value={f.password} onChangeText={set('password')} secureTextEntry />
       <Button title={busy ? 'Kaydediliyor...' : 'Kayıt ol'} onPress={submit} disabled={busy || !f.firstName || !f.lastName || !f.email || !f.password} />
       </AuthShell>
-    </Screen>
   );
 }

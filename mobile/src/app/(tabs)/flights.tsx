@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { setReturnTo } from '@/features/auth/gate';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,10 +14,15 @@ import { Price } from '@/components/Price';
 import { DateField } from '@/components/DateField';
 import { addDays, isoDate } from '@/features/dates';
 import { fmtLocal } from '@/features/format';
-import { color, MIN_TOUCH, space, type } from '@/theme/tokens';
+import { GuestLoginPill } from '@/components/GuestLoginPill';
+import { space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 
 export default function Flights() {
   const router = useRouter();
+  const { color } = useTheme();
+  const s = useStyles(makeStyles);
   const { user } = useAuth();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -26,13 +31,9 @@ export default function Flights() {
   const [q, setQ] = useState<{ from: string; to: string; date: string } | null>(null);
   const state = useAsync(() => (q ? flightsApi.search(q) : Promise.resolve([] as FlightOffer[])), [q], q !== null);
   return (
-    <View style={{ flex: 1, backgroundColor: color.surface }}>
+    <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
-      <AppHeader title="Waylo" right={user ? undefined : (
-        <Pressable accessibilityRole="button" accessibilityLabel="Giriş yap" onPress={() => { setReturnTo('/flights'); router.navigate('/(auth)/login'); }} style={{ minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: space.sm }}>
-          <Text style={[type.labelLg, { color: color.onPrimary }]}>Giriş yap</Text>
-        </Pressable>
-      )} />
+      <AppHeader title="Waylo" right={user ? undefined : <GuestLoginPill onPress={() => { setReturnTo('/flights'); router.navigate('/(auth)/login'); }} />} />
       <ModeTabs active="flights" />
       <Screen>
         <Card>
@@ -50,19 +51,16 @@ export default function Flights() {
             {(offers) => offers.map((o) => (
               <Pressable key={o.offerId} accessibilityRole="button" accessibilityLabel={`${o.airline} ${o.flightNumber}, ${o.departureAirport} ${fmtLocal(o.departureTime)} ${o.arrivalAirport} ${fmtLocal(o.arrivalTime)}`} onPress={() => router.push(`/flight/${o.offerId}`)}>
                 <Card>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={[type.titleMd, { color: color.onSurface }]}>{o.airline}</Text>
-                    <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{o.flightNumber}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                    <Text style={[type.monoMd, { color: color.onSurface }]}>{`${o.departureAirport} ${fmtLocal(o.departureTime)}`}</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={16} color={color.onSurfaceVariant} accessibilityElementsHidden importantForAccessibility="no" />
-                    <Text style={[type.monoMd, { color: color.onSurface }]}>{`${o.arrivalAirport} ${fmtLocal(o.arrivalTime)}`}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${o.cabin} · ${o.availableSeats} boş koltuk`}</Text>
+                  <View style={s.rowBetween}>
+                    <Text style={s.title}>{`${o.airline} ${o.flightNumber}`}</Text>
                     <Price amount={o.totalAmount} currency={o.currency} />
                   </View>
+                  <View style={s.route}>
+                    <Text style={s.mono}>{`${o.departureAirport} ${fmtLocal(o.departureTime)}`}</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={16} color={color.onSurfaceVariant} accessibilityElementsHidden importantForAccessibility="no" />
+                    <Text style={s.mono}>{`${o.arrivalAirport} ${fmtLocal(o.arrivalTime)}`}</Text>
+                  </View>
+                  <Text style={s.muted}>{`${o.cabin} · ${o.availableSeats} boş koltuk`}</Text>
                 </Card>
               </Pressable>
             ))}
@@ -72,3 +70,12 @@ export default function Flights() {
     </View>
   );
 }
+
+const makeStyles = ({ color, type }: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.surface },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm },
+  route: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  title: { ...type.titleMd, color: color.onSurface, flex: 1 },
+  mono: { ...type.monoMd, color: color.onSurface },
+  muted: { ...type.bodyMd, color: color.onSurfaceVariant },
+});

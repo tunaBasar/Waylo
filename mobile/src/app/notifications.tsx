@@ -1,13 +1,14 @@
 import { Text, View } from 'react-native';
 import { notificationsApi, type AppNotification } from '@/features/notifications/api';
 import { useAsync } from '@/features/useAsync';
-import { AsyncView, Screen } from '@/components/ui';
-import { accountStyles, Icon, Section } from '@/features/account/AccountUi';
+import { AsyncView } from '@/components/ui';
+import { StackScreen, useAccountStyles, Icon, Section } from '@/features/account/AccountUi';
 
 export default function Notifications() {
   const state = useAsync(() => notificationsApi.mine(), []);
+  const accountStyles = useAccountStyles();
   return (
-    <Screen>
+    <StackScreen title="Bildirimler">
       <AsyncView<AppNotification[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Bildiriminiz yok.">
         {(list) => list.map((n) => (
           <Section key={n.id}>
@@ -22,6 +23,6 @@ export default function Notifications() {
           </Section>
         ))}
       </AsyncView>
-    </Screen>
+    </StackScreen>
   );
 }

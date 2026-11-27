@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,44 +17,53 @@ import { AppHeader } from '@/components/AppHeader';
 import { ModeTabs } from '@/components/ModeTabs';
 import { Price } from '@/components/Price';
 import { StickyActionBar, STICKY_ACTION_BAR_HEIGHT } from '@/components/StickyActionBar';
-import { color, radius, space, type, MIN_TOUCH } from '@/theme/tokens';
+import { GuestLoginPill } from '@/components/GuestLoginPill';
+import { MIN_TOUCH, space } from '@/theme/theme';
+import type { Theme } from '@/theme/theme';
+import { useStyles, useTheme } from '@/theme/ThemeContext';
 import { DateField } from '@/components/DateField';
 import { addDays, isoDate, parseIsoDate } from '@/features/dates';
-import { fmtLocal } from '@/features/format';
+import { fmtLocal, money } from '@/features/format';
 
 const GENDERS: Gender[] = ['FEMALE', 'MALE'];
 
-type Bar = { amount: number; currency: string; ready: boolean };
+type Bar = { amount: number; currency: string; ready: boolean; count: number };
 type TripQ = { from: string; to: string; date: string };
 
 const SEAT = 40;
 const GENDER_LETTER: Record<Gender, string> = { FEMALE: 'K', MALE: 'E' };
 const GENDER_WORD: Record<Gender, string> = { FEMALE: 'kadın', MALE: 'erkek' };
-const FEMALE_BG = '#FBE3EC';
-const MALE_BG = '#DCE8F8';
+const hhmm = (iso: string) => fmtLocal(iso).slice(-5);
+const dmy = (iso: string) => fmtLocal(iso).slice(0, 10);
 
 function LegendItem({ children, label }: { children: React.ReactNode; label: string }) {
+  const s = useStyles(makeStyles);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+    <View style={s.legendItem}>
       {children}
-      <Text style={[type.labelSm, { color: color.onSurface }]}>{label}</Text>
+      <Text style={s.legendText}>{label}</Text>
     </View>
   );
 }
 
-function SeatBox({ bg, border, children }: { bg: string; border?: string; children?: React.ReactNode }) {
-  return (
-    <View style={{ width: 24, height: 24, borderRadius: radius.sm, backgroundColor: bg, borderWidth: 1, borderColor: border ?? bg, alignItems: 'center', justifyContent: 'center' }}>{children}</View>
-  );
+function SeatBox({ bg, fg, border, children }: { bg: string; fg: string; border?: string; children?: React.ReactNode }) {
+  const s = useStyles(makeStyles);
+  return <View style={[s.legendBox, { backgroundColor: bg, borderColor: border ?? bg }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Text style={[s.legendBoxText, { color: fg }]}>{children}</Text></View>;
 }
 
 function Legend() {
+  const { color } = useTheme();
+  const s = useStyles(makeStyles);
   return (
-    <View accessible accessibilityLabel="Açıklama: boş, seçili, kadın yolcu K, erkek yolcu E" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-      <LegendItem label="Boş"><SeatBox bg={color.surfaceLowest} border={color.outline} /></LegendItem>
-      <LegendItem label="Seçili"><SeatBox bg={color.primary}><MaterialCommunityIcons name="check" size={16} color={color.onPrimary} accessibilityElementsHidden importantForAccessibility="no" /></SeatBox></LegendItem>
-      <LegendItem label="Kadın"><SeatBox bg={FEMALE_BG}><Text style={[type.labelSm, { color: color.onSurface }]}>K</Text></SeatBox></LegendItem>
-      <LegendItem label="Erkek"><SeatBox bg={MALE_BG}><Text style={[type.labelSm, { color: color.onSurface }]}>E</Text></SeatBox></LegendItem>
+    <View accessible accessibilityLabel="Açıklama: boş, seçili, kadın yolcu K, erkek yolcu E" style={s.legend}>
+      <LegendItem label="Boş"><SeatBox bg={color.seatEmptyBg} fg={color.onSurface} border={color.seatEmptyBorder}>1</SeatBox></LegendItem>
+      <LegendItem label="Seçili">
+        <View style={[s.legendBox, { backgroundColor: color.seatSelectedBg, borderColor: color.seatSelectedBg }]}>
+          <MaterialCommunityIcons name="check" size={16} color={color.seatSelectedFg} accessibilityElementsHidden importantForAccessibility="no" />
+        </View>
+      </LegendItem>
+      <LegendItem label="Kadın dolu"><SeatBox bg={color.seatFemaleBg} fg={color.seatFemaleFg}>K</SeatBox></LegendItem>
+      <LegendItem label="Erkek dolu"><SeatBox bg={color.seatMaleBg} fg={color.seatMaleFg}>E</SeatBox></LegendItem>
     </View>
   );
 }
@@ -63,6 +72,8 @@ function SeatPicker({ offer, search, onBar, register }: {
   offer: TripOffer; search: TripQ; onBar: (b: Bar | null) => void; register: (fn: (() => void) | null) => void;
 }) {
   const router = useRouter();
+  const { color } = useTheme();
+  const s = useStyles(makeStyles);
   const { user } = useAuth();
   const cart = useCart();
   const map = useAsync<SeatMap>(() => busApi.seats(offer.tripId, offer.fromSeq, offer.toSeq), [offer.tripId, offer.fromSeq, offer.toSeq]);
@@ -99,79 +110,105 @@ function SeatPicker({ offer, search, onBar, register }: {
   useEffect(() => { register(() => actionRef.current()); return () => register(null); }, [register]);
   const barCount = picked.length;
   useEffect(() => {
-    onBar(barCount > 0 ? { amount: total, currency: offer.currency, ready } : null);
+    onBar(barCount > 0 ? { amount: total, currency: offer.currency, ready, count: barCount } : null);
   }, [barCount, total, ready, offer.currency, onBar]);
   useEffect(() => () => onBar(null), [onBar]);
 
   return (
     <AsyncView<SeatMap> state={map} emptyText="Koltuk haritası alınamadı.">
       {(m) => (
-        <Card>
-          <Legend />
-          <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{GENDER_RULE_TEXT}</Text>
-          <Text style={[type.labelSm, { color: color.onSurfaceVariant }]}>{`En fazla ${MAX_SEATS} koltuk seçebilirsiniz.`}</Text>
-          <Text style={[type.labelSm, { color: color.onSurfaceVariant }]}>Yeni seçimde cinsiyet:</Text>
-          <GenderToggle value={defaultGender} onChange={setDefaultGender} />
-          <View style={{ gap: space.sm, alignItems: 'center', paddingVertical: space.sm }}>
-            {seatRows(m.layout, m.seats).map((row, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                <Text style={[type.monoSm, { width: 20, color: color.onSurfaceVariant, textAlign: 'right' }]}>{i + 1}</Text>
-                {row.map((block, k) => (
-                  <View key={k} style={{ flexDirection: 'row', gap: space.xs, minWidth: k === 0 ? 2 * SEAT + space.xs : SEAT, marginLeft: k === 1 ? space.xl : 0 }}>
-                    {block.map((s) => {
-                      const isPicked = picked.some((p) => p.seatNo === s.seatNo);
-                      const taken = !s.available;
-                      const g = s.occupantGender;
-                      const bg = taken ? (g === 'FEMALE' ? FEMALE_BG : g === 'MALE' ? MALE_BG : color.surfaceHigh) : isPicked ? color.primary : color.surfaceLowest;
-                      const label = taken
-                        ? `Koltuk ${s.seatNo}, dolu${g ? `, ${GENDER_WORD[g]} yolcu` : ''}`
-                        : `Koltuk ${s.seatNo}, ${isPicked ? 'seçili' : 'boş'}`;
-                      return (
-                        <Pressable key={s.seatNo} disabled={taken} onPress={() => toggle(s.seatNo)} accessibilityRole="button"
-                          accessibilityLabel={label} accessibilityState={{ selected: isPicked, disabled: taken }}
-                          style={{ width: SEAT, height: SEAT, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: bg,
-                            borderWidth: conflicts.has(s.seatNo) ? 2 : 1, borderColor: conflicts.has(s.seatNo) ? color.error : taken ? bg : isPicked ? color.primary : color.outline }}>
-                          {isPicked
-                            ? <MaterialCommunityIcons name="check" size={20} color={color.onPrimary} accessibilityElementsHidden importantForAccessibility="no" />
-                            : taken
-                              ? <Text style={[type.labelLg, { color: color.onSurface }]}>{g ? GENDER_LETTER[g] : '–'}</Text>
-                              : <Text style={[type.monoSm, { color: color.onSurface }]}>{s.seatNo}</Text>}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ))}
-              </View>
-            ))}
+        <>
+          <View style={s.card}>
+            <Legend />
           </View>
+          <View style={s.infoBox}>
+            <MaterialCommunityIcons name="information-outline" size={20} color={color.onSurfaceVariant} accessibilityElementsHidden importantForAccessibility="no" />
+            <View style={s.infoText}>
+              <Text style={s.body}>{GENDER_RULE_TEXT}</Text>
+              <Text style={s.label}>{`En fazla ${MAX_SEATS} koltuk seçebilirsiniz.`}</Text>
+            </View>
+          </View>
+          <View style={s.card}>
+            <View style={s.mapHeader}>
+              <Text style={s.label}>Ön · Kaptan</Text>
+              <Text style={s.monoSm}>{`${m.layout === 'TWO_PLUS_TWO' ? '2+2' : '2+1'} · ${m.seats.length} koltuk`}</Text>
+            </View>
+            <Text style={s.label}>Yeni seçimde cinsiyet:</Text>
+            <GenderToggle value={defaultGender} onChange={setDefaultGender} />
+            <View style={s.map}>
+              {seatRows(m.layout, m.seats).map((row, i) => (
+                <View key={i} style={s.mapRow}>
+                  {row.map((block, k) => (
+                    <View key={k} style={s.block}>
+                      {k === 1 ? <Text style={s.rowNo}>{i + 1}</Text> : null}
+                      <View style={[s.blockSeats, { minWidth: k === 0 ? 2 * SEAT + space.xs : SEAT }]}>
+                        {block.map((st) => {
+                          const isPicked = picked.some((p) => p.seatNo === st.seatNo);
+                          const taken = !st.available;
+                          const g = st.occupantGender;
+                          const bg = taken ? (g === 'FEMALE' ? color.seatFemaleBg : g === 'MALE' ? color.seatMaleBg : color.surfaceHigh) : isPicked ? color.seatSelectedBg : color.seatEmptyBg;
+                          const fg = taken ? (g === 'FEMALE' ? color.seatFemaleFg : g === 'MALE' ? color.seatMaleFg : color.onSurfaceVariant) : isPicked ? color.seatSelectedFg : color.onSurface;
+                          const conflict = conflicts.has(st.seatNo);
+                          const label = taken
+                            ? `Koltuk ${st.seatNo}, dolu${g ? `, ${GENDER_WORD[g]} yolcu` : ''}`
+                            : `Koltuk ${st.seatNo}, ${isPicked ? 'seçili' : 'boş'}`;
+                          return (
+                            <Pressable key={st.seatNo} disabled={taken} onPress={() => toggle(st.seatNo)} accessibilityRole="button"
+                              accessibilityLabel={label} accessibilityState={{ selected: isPicked, disabled: taken }}
+                              style={[s.seat, { backgroundColor: bg, borderWidth: conflict ? 2 : 1, borderColor: conflict ? color.error : taken ? bg : isPicked ? color.seatSelectedBg : color.seatEmptyBorder }]}>
+                              {isPicked
+                                ? <MaterialCommunityIcons name="check" size={20} color={fg} accessibilityElementsHidden importantForAccessibility="no" />
+                                : (
+                                  <>
+                                    <Text style={[s.seatNo, { color: fg }]}>{st.seatNo}</Text>
+                                    {taken && g ? <Text style={[s.seatLetter, { color: fg }]}>{GENDER_LETTER[g]}</Text> : null}
+                                  </>
+                                )}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
+          <Text accessibilityRole="header" style={s.section}>{`Yolcu bilgileri (${picked.length} / ${MAX_SEATS} koltuk)`}</Text>
           {picked.length === 0 ? <Muted>Haritadan koltuk seçin.</Muted> : null}
           {picked.map((p) => (
-            <View key={p.seatNo} style={{ gap: space.sm, padding: space.md, backgroundColor: color.surfaceLow, borderRadius: radius.lg }}>
-              <Text style={[type.titleMd, { color: color.onSurface }]}>{`Koltuk ${p.seatNo}`}</Text>
+            <View key={p.seatNo} style={s.card}>
+              <View style={s.passHead}>
+                <Text style={s.seatTitle}>{`Koltuk ${p.seatNo}`}</Text>
+                <Text style={s.monoMd}>{money(offer.price, offer.currency)}</Text>
+              </View>
               <Field label="Ad soyad" value={p.name} onChangeText={(t) => patch(p.seatNo, { name: t })} maxLength={150} />
               <GenderToggle value={p.gender} onChange={(g) => patch(p.seatNo, { gender: g })} />
-              {conflicts.has(p.seatNo) ? <Text accessibilityRole="alert" style={[type.bodyMd, { color: color.error }]}>Yan koltukta farklı cinsiyet var</Text> : null}
+              {conflicts.has(p.seatNo) ? <Text accessibilityRole="alert" style={s.conflict}>Yan koltukta farklı cinsiyet var</Text> : null}
             </View>
           ))}
           <ErrorBanner message={err} />
           {msg ? <Muted>{msg}</Muted> : null}
-        </Card>
+        </>
       )}
     </AsyncView>
   );
 }
 
 function GenderToggle({ value, onChange }: { value: Gender; onChange: (g: Gender) => void }) {
+  const { color } = useTheme();
+  const s = useStyles(makeStyles);
   return (
-    <View style={{ flexDirection: 'row', gap: space.sm }}>
+    <View style={s.toggleRow}>
       {GENDERS.map((g) => {
         const on = value === g;
+        const bg = g === 'FEMALE' ? color.seatFemaleBg : color.seatMaleBg;
+        const fg = g === 'FEMALE' ? color.seatFemaleFg : color.seatMaleFg;
         return (
           <Pressable key={g} accessibilityRole="button" accessibilityLabel={GENDER_LABEL[g]} accessibilityState={{ selected: on }} onPress={() => onChange(g)}
-            style={{ flex: 1, minHeight: MIN_TOUCH, borderRadius: radius.md, flexDirection: 'row', gap: space.xs, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: on ? color.primary : color.surfaceLowest, borderWidth: 1, borderColor: on ? color.primary : color.outline }}>
-            {on ? <MaterialCommunityIcons name="check" size={16} color={color.onPrimary} accessibilityElementsHidden importantForAccessibility="no" /> : null}
-            <Text style={[type.labelLg, { color: on ? color.onPrimary : color.onSurface }]}>{GENDER_LABEL[g]}</Text>
+            style={[s.toggle, on ? { backgroundColor: bg, borderColor: fg } : null]}>
+            {on ? <MaterialCommunityIcons name="check" size={16} color={fg} accessibilityElementsHidden importantForAccessibility="no" /> : null}
+            <Text style={[s.toggleText, { color: on ? fg : color.onSurface }]}>{GENDER_LABEL[g]}</Text>
           </Pressable>
         );
       })}
@@ -181,6 +218,7 @@ function GenderToggle({ value, onChange }: { value: Gender; onChange: (g: Gender
 
 export default function Bus() {
   const router = useRouter();
+  const s = useStyles(makeStyles);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const status = useAsync(() => busApi.salesStatus(), []);
@@ -203,19 +241,28 @@ export default function Bus() {
       .catch((e: unknown) => { throw new Error(busErrorMessage(e, 'Seferler yüklenemedi.')); }),
     [q], q !== null && status.data?.enabled === true);
   const showBar = bar !== null && selected !== null;
+  const list = trips.data ?? [];
+  const open = selected !== null && q ? list.find((t) => `${t.tripId}-${t.fromSeq}-${t.toSeq}` === selected) : undefined;
   return (
-    <View style={{ flex: 1, backgroundColor: color.surface }}>
+    <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
-      <AppHeader title="Waylo" right={user ? undefined : (
-        <Pressable accessibilityRole="button" accessibilityLabel="Giriş yap" onPress={() => { setReturnTo(q ? buildBusReturn({ from: q.from, to: q.to, date: q.date }) : '/bus'); router.navigate('/(auth)/login'); }} style={{ minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: space.sm }}>
-          <Text style={[type.labelLg, { color: color.onPrimary }]}>Giriş yap</Text>
-        </Pressable>
-      )} />
-      <ModeTabs active="bus" />
+      {open && q ? (
+        <AppHeader title={`${open.fromCity} → ${open.toCity}`}
+          subtitle={`${open.companyName ? `${open.companyName} · ` : ''}${hhmm(open.departureAt)} - ${hhmm(open.arrivalAt)} · ${money(open.price, open.currency)}`}
+          onBack={() => setSelected(null)} />
+      ) : (
+        <>
+          <AppHeader title="Waylo" right={user ? undefined : <GuestLoginPill onPress={() => { setReturnTo(q ? buildBusReturn({ from: q.from, to: q.to, date: q.date }) : '/bus'); router.navigate('/(auth)/login'); }} />} />
+          <ModeTabs active="bus" />
+        </>
+      )}
       <View style={{ flex: 1 }}>
         <Screen>
+          {open && q ? (
+            <SeatPicker offer={open} search={{ from: q.from, to: q.to, date: q.date }} onBar={onBar} register={register} />
+          ) : (
           <AsyncView<{ enabled: boolean }> state={status} emptyText="Durum alınamadı.">
-            {(s) => !s.enabled ? <Muted>Otobüs satışı şu an kapalı.</Muted> : (
+            {(st) => !st.enabled ? <Muted>Otobüs satışı şu an kapalı.</Muted> : (
               <>
                 <Card>
                   <Field label="Nereden (şehir)" value={from} onChangeText={setFrom} autoCapitalize="words" />
@@ -225,35 +272,69 @@ export default function Bus() {
                 </Card>
                 {q && (
                   <AsyncView<TripOffer[]> state={trips} isEmpty={(d) => d.length === 0} emptyText="Sefer bulunamadı.">
-                    {(list) => list.map((t) => {
+                    {(items) => items.map((t) => {
                       const key = `${t.tripId}-${t.fromSeq}-${t.toSeq}`;
                       return (
-                        <View key={key} style={{ gap: space.sm }}>
-                          <Card>
-                            {t.companyName ? <Text style={[type.labelLg, { color: color.onSurfaceVariant }]}>{t.companyName}</Text> : null}
-                            <Text style={[type.titleMd, { color: color.onSurface }]}>{`${t.fromCity} → ${t.toCity}`}</Text>
-                            <Text style={[type.monoMd, { color: color.onSurface }]}>{`${fmtLocal(t.departureAt)} → ${fmtLocal(t.arrivalAt)}`}</Text>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${t.availableSeats} boş koltuk`}</Text>
-                              <Price amount={t.price} currency={t.currency} />
-                            </View>
-                            <Button kind="secondary" title={selected === key ? 'Koltuk seçimini kapat' : 'Koltuk seç'} onPress={() => setSelected(selected === key ? null : key)} />
-                          </Card>
-                          {selected === key ? <SeatPicker offer={t} search={{ from: q.from, to: q.to, date: q.date }} onBar={onBar} register={register} /> : null}
-                        </View>
+                        <Card key={key}>
+                          <View style={s.rowBetween}>
+                            <Text style={s.title}>{t.companyName ?? `${t.fromCity} → ${t.toCity}`}</Text>
+                            <Price amount={t.price} currency={t.currency} />
+                          </View>
+                          <Text style={s.mono}>{`${hhmm(t.departureAt)} → ${hhmm(t.arrivalAt)}`}<Text style={s.muted}>{`  ${dmy(t.departureAt)}`}</Text></Text>
+                          {t.companyName ? <Text style={s.body}>{`${t.fromCity} → ${t.toCity}`}</Text> : null}
+                          <Text style={s.muted}>{`${t.availableSeats} boş koltuk`}</Text>
+                          <Button kind="secondary" title="Koltuk seç" onPress={() => setSelected(key)} />
+                        </Card>
                       );
                     })}
                   </AsyncView>
                 )}
-                {showBar ? <View style={{ height: STICKY_ACTION_BAR_HEIGHT + insets.bottom }} /> : null}
               </>
             )}
           </AsyncView>
+          )}
+          {showBar ? <View style={{ height: STICKY_ACTION_BAR_HEIGHT + insets.bottom }} /> : null}
         </Screen>
       </View>
       {bar && selected !== null ? (
-        <StickyActionBar amount={bar.amount} currency={bar.currency} actionLabel="Sepete ekle" disabled={!bar.ready} onAction={() => { if (action) action(); }} />
+        <StickyActionBar totalLabel={`Toplam (${bar.count} koltuk)`} amount={bar.amount} currency={bar.currency} actionLabel="Sepete ekle" disabled={!bar.ready} onAction={() => { if (action) action(); }} />
       ) : null}
     </View>
   );
 }
+
+const makeStyles = ({ color, type, radius, card }: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.surface },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm },
+  title: { ...type.titleMd, color: color.onSurface, flex: 1 },
+  mono: { ...type.monoMd, color: color.onSurface },
+  monoMd: { ...type.monoMd, color: color.onSurface },
+  monoSm: { ...type.monoSm, color: color.onSurfaceVariant },
+  muted: { ...type.bodyMd, color: color.onSurfaceVariant },
+  body: { ...type.bodyMd, color: color.onSurface },
+  label: { ...type.labelSm, color: color.onSurfaceVariant },
+  section: { ...type.titleMd, color: color.onSurface },
+  card: { ...card, borderRadius: radius.lg, padding: space.lg, gap: space.md },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', rowGap: space.md },
+  legendItem: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  legendText: { ...type.labelSm, color: color.onSurface },
+  legendBox: { width: 28, height: 28, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  legendBoxText: { ...type.monoSm },
+  infoBox: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: color.surfaceContainer },
+  infoText: { flex: 1, gap: space.xs },
+  mapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  map: { gap: space.sm, alignItems: 'center', paddingVertical: space.sm },
+  mapRow: { flexDirection: 'row', alignItems: 'center' },
+  block: { flexDirection: 'row', alignItems: 'center' },
+  blockSeats: { flexDirection: 'row', gap: space.xs },
+  rowNo: { ...type.monoSm, color: color.onSurfaceVariant, width: 32, textAlign: 'center' },
+  seat: { width: SEAT, height: SEAT, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  seatNo: { ...type.monoSm },
+  seatLetter: { ...type.labelSm, fontSize: 10, lineHeight: 12 },
+  passHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  seatTitle: { ...type.titleMd, color: color.primary },
+  conflict: { ...type.bodyMd, color: color.error },
+  toggleRow: { flexDirection: 'row', gap: space.sm },
+  toggle: { flex: 1, minHeight: MIN_TOUCH, borderRadius: radius.md, flexDirection: 'row', gap: space.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: color.surfaceLowest, borderWidth: 1, borderColor: color.outlineVariant },
+  toggleText: { ...type.labelLg },
+});

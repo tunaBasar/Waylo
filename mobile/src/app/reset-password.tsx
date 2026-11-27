@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { api } from '@/api';
-import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { Button, ErrorBanner, Field } from '@/components/ui';
 import { AuthShell, Hint, SuccessNote } from '@/features/account/AccountUi';
 
 // Same rule and wording as the web reset page.
@@ -29,7 +29,6 @@ export default function ResetPassword() {
   }
 
   return (
-    <Screen>
       <AuthShell title="Yeni şifre belirle">
       <ErrorBanner message={error} />
       {done ? (
@@ -43,6 +42,5 @@ export default function ResetPassword() {
         </>
       ) : null}
       </AuthShell>
-    </Screen>
   );
 }
