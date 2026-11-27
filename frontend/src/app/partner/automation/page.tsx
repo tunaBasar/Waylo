@@ -9,7 +9,7 @@ import { useToast } from '@/components/Toast';
 import { usePartner } from '@/lib/partner-context';
 import { useSingleFlight } from '@/lib/use-single-flight';
 import { AMOUNT_ERROR, formatTrAmountInput, parseTrAmount } from '@/lib/amount';
-import { automationErrorMessage, deriveOccupancyPrices, summaryMessage } from '@/lib/automation';
+import { automationErrorMessage, deriveOccupancyPrices, summaryMessage, visibleFormErrors } from '@/lib/automation';
 import {
   partnerApi,
   sectionErrorMessage,
@@ -101,7 +101,23 @@ export default function AutomationPage() {
   const [error, setError] = useState<{ err: unknown } | null>(null);
 
   const [stockDrafts, setStockDrafts] = useState<Record<string, { allotment: string; horizon: number; active: boolean }>>({});
-  const [form, setForm] = useState<RuleForm | null>(null);
+  const [form, setFormState] = useState<RuleForm | null>(null);
+  // Fields the user edited in the open rule form (errors show only for these, or for all after a save attempt).
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
+  const setForm = (next: RuleForm | null) => {
+    if (next === null || form === null || next.roomTypeId !== form.roomTypeId || next.id !== form.id) {
+      setTouched(new Set());
+      setSubmitted(false);
+    } else {
+      const changed = (Object.keys(next) as (keyof RuleForm)[]).filter(k => next[k] !== form[k]);
+      const field: Record<string, string> = { name: 'name', validFrom: 'dates', validTo: 'dates', season: 'dates',
+        baseOccupancy: 'baseOcc', baseAmount: 'base', weekendBaseAmount: 'weekend', extraPersonAmount: 'extra',
+        reducedPersonAmount: 'reduced' };
+      if (changed.length > 0) setTouched(prev => new Set([...prev, ...changed.map(k => field[k] ?? k)]));
+    }
+    setFormState(next);
+  };
   const [resetOpen, setResetOpen] = useState(false);
   const [resetRoomType, setResetRoomType] = useState('');
   const [resetFrom, setResetFrom] = useState<IsoDate>(today);
@@ -209,9 +225,12 @@ export default function AutomationPage() {
     return { weekday: deriveOccupancyPrices(input), weekend: parsed.weekend != null ? deriveOccupancyPrices(input, true) : null };
   }, [form, parsed, formRoomType, formErrors.baseOcc]);
 
+  const shownErrors = visibleFormErrors(formErrors, touched, submitted);
+
   const effectiveCurrency = hotelCurrency ?? currency;
 
   async function saveRule() {
+    setSubmitted(true);
     if (!hotelId || !form || !parsed || Object.keys(formErrors).length > 0 || parsed.base == null) return;
     const body: RateRuleRequest = {
       roomTypeId: form.roomTypeId, ratePlanId: form.ratePlanId, name: form.name.trim(),
@@ -399,7 +418,7 @@ export default function AutomationPage() {
                 <div className="rounded-lg border border-outline-variant/60 p-3 space-y-3">
                   <h4 className="text-sm font-semibold">{form.id ? 'Kurali duzenle' : 'Yeni fiyat kurali'}</h4>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <Field label="Kural adi" error={formErrors.name}>
+                    <Field label="Kural adi" error={shownErrors.name}>
                       <input className={inputClass} maxLength={80} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </Field>
                     <Field label="Fiyat plani">
@@ -419,7 +438,7 @@ export default function AutomationPage() {
                     </label>
                     {form.season && (
                       <>
-                        <Field label="Baslangic" error={formErrors.dates}>
+                        <Field label="Baslangic" error={shownErrors.dates}>
                           <input type="date" className={inputClass} value={form.validFrom} onChange={e => setForm({ ...form, validFrom: e.target.value })} />
                         </Field>
                         <Field label="Bitis">
@@ -428,23 +447,23 @@ export default function AutomationPage() {
                         <div />
                       </>
                     )}
-                    <Field label="Temel kisi sayisi" error={formErrors.baseOcc}>
+                    <Field label="Temel kisi sayisi" error={shownErrors.baseOcc}>
                       <input className={inputClass} inputMode="numeric" value={form.baseOccupancy}
                         onChange={e => setForm({ ...form, baseOccupancy: e.target.value.replace(/\D/g, '') })} />
                     </Field>
-                    <Field label="Temel fiyat" error={formErrors.base}>
+                    <Field label="Temel fiyat" error={shownErrors.base}>
                       <input className={inputClass} inputMode="decimal" value={form.baseAmount} placeholder="4.000,00"
                         onChange={e => setForm({ ...form, baseAmount: e.target.value.replace(/[^\d.,]/g, '') })} />
                     </Field>
-                    <Field label="Hafta sonu fiyati (Cuma, Cumartesi)" hint="Bos birakirsaniz temel fiyat kullanilir" error={formErrors.weekend}>
+                    <Field label="Hafta sonu fiyati (Cuma, Cumartesi)" hint="Bos birakirsaniz temel fiyat kullanilir" error={shownErrors.weekend}>
                       <input className={inputClass} inputMode="decimal" value={form.weekendBaseAmount}
                         onChange={e => setForm({ ...form, weekendBaseAmount: e.target.value.replace(/[^\d.,]/g, '') })} />
                     </Field>
-                    <Field label="Fazla kisi basina ekle" error={formErrors.extra}>
+                    <Field label="Fazla kisi basina ekle" error={shownErrors.extra}>
                       <input className={inputClass} inputMode="decimal" value={form.extraPersonAmount}
                         onChange={e => setForm({ ...form, extraPersonAmount: e.target.value.replace(/[^\d.,]/g, '') })} />
                     </Field>
-                    <Field label="Eksik kisi basina indir" error={formErrors.reduced}>
+                    <Field label="Eksik kisi basina indir" error={shownErrors.reduced}>
                       <input className={inputClass} inputMode="decimal" value={form.reducedPersonAmount}
                         onChange={e => setForm({ ...form, reducedPersonAmount: e.target.value.replace(/[^\d.,]/g, '') })} />
                     </Field>
@@ -475,7 +494,7 @@ export default function AutomationPage() {
                   )}
 
                   <div className="flex gap-2">
-                    <Button icon="save" disabled={Object.keys(formErrors).length > 0 || !form.ratePlanId} onClick={() => void saveRule()}>Kaydet ve uygula</Button>
+                    <Button icon="save" disabled={!form.ratePlanId} onClick={() => void saveRule()}>Kaydet ve uygula</Button>
                     <Button variant="ghost" onClick={() => setForm(null)}>Vazgec</Button>
                   </div>
                 </div>

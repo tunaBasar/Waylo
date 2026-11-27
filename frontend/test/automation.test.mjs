@@ -60,3 +60,12 @@ test('summaryMessage: matches the contract example and handles empty runs', () =
   );
   assert.equal(summaryMessage({ created: 0, updated: 0, skippedManual: 0 }), 'Yeni olusturulacak gun yok, her sey guncel');
 });
+
+test('visibleFormErrors: nothing on a fresh form, touched fields only, everything after save', async () => {
+  const { visibleFormErrors } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}#v`);
+  const errors = { name: 'Kural adi gerekli', base: 'Gecersiz tutar' };
+  assert.deepEqual(visibleFormErrors(errors, new Set(), false), {});
+  assert.deepEqual(visibleFormErrors(errors, new Set(['base']), false), { base: 'Gecersiz tutar' });
+  assert.deepEqual(visibleFormErrors(errors, new Set(), true), errors);
+  assert.deepEqual(visibleFormErrors({}, new Set(['name']), true), {});
+});

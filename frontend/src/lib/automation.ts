@@ -81,3 +81,18 @@ export function summaryMessage(s: AutomationSummaryLike): string {
   if (s.skippedManual > 0) parts.push(`${trInt(s.skippedManual)} elle degistirilmis gun korundu`);
   return parts.join('; ');
 }
+
+/**
+ * Errors to show in the rate rule form: a field's error appears only after the user edited that field or pressed
+ * save (an empty new form must not open with red "gerekli" texts). The save button still uses all errors.
+ */
+export function visibleFormErrors(
+  errors: Record<string, string>, touched: ReadonlySet<string>, submitted: boolean,
+): Record<string, string> {
+  if (submitted) return errors;
+  const out: Record<string, string> = {};
+  for (const [field, message] of Object.entries(errors)) {
+    if (touched.has(field)) out[field] = message;
+  }
+  return out;
+}
