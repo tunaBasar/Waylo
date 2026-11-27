@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from '@/features/auth/AuthContext';
 import { loadCart, saveCart } from './storage';
 import type { CartItem } from '@/api';
+import { isValidGuestName } from './guest';
 
 const MAX_ITEMS = 10;
 
@@ -60,9 +61,17 @@ export function useCart(): CartState {
 }
 
 /** Wire shape of POST /api/orders/package. */
-export function toPackageRequest(items: CartItem[], promoCode?: string) {
+export function toPackageRequest(items: CartItem[], promoCode?: string, guest?: { firstName?: string | null; lastName?: string | null }) {
+  // Hotel lead guest: only a name the backend would accept, never blocks the purchase.
+  const first = isValidGuestName(guest?.firstName) ? guest!.firstName!.trim() : undefined;
+  const last = isValidGuestName(guest?.lastName) ? guest!.lastName!.trim() : undefined;
   return {
-    items: items.map((i) => ({ vertical: i.vertical, ...i.request })),
+    items: items.map((i) => ({
+      vertical: i.vertical,
+      ...i.request,
+      ...(i.vertical === 'HOTEL' && first ? { guestFirstName: first } : {}),
+      ...(i.vertical === 'HOTEL' && last ? { guestLastName: last } : {}),
+    })),
     ...(promoCode && promoCode.trim() ? { promoCode: promoCode.trim().toUpperCase() } : {}),
   };
 }

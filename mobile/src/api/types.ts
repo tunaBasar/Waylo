@@ -133,8 +133,17 @@ export interface Terminal {
   name: string;
 }
 
+export type SeatLayout = 'TWO_PLUS_TWO' | 'TWO_PLUS_ONE';
+export type Gender = 'FEMALE' | 'MALE';
+export interface SeatState { seatNo: number; available: boolean; occupantGender: Gender | null }
+export interface SeatMap { tripId: string; layout: SeatLayout; rowCount: number; fromSeq: number; toSeq: number; seats: SeatState[] }
+export interface PassengerInput { seatNo: number; name: string; gender: Gender }
+
 export interface TripOffer {
   tripId: string;
+  fromSeq: number;
+  toSeq: number;
+  layout: SeatLayout;
   companyName: string | null;
   code: string;
   fromCity: string;

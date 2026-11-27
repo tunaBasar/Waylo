@@ -7,11 +7,12 @@ import { loadOrdersSnapshot, saveOrdersSnapshot } from '@/features/orders/cache'
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Card, Muted, Screen, Title } from '@/components/ui';
 import { money, orderStatusInfo } from '@/features/format';
+import { sortOrdersForDisplay } from '@/features/orders/sort';
 import { orderSummary } from '@/features/orders/summary';
 
 function OrderList({ orders }: { orders: Order[] }) {
   const router = useRouter();
-  return orders.map((o) => {
+  return sortOrdersForDisplay(orders).map((o) => {
     const status = orderStatusInfo(o.status).label;
     const sum = orderSummary(o);
     return (

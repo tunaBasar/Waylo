@@ -9,7 +9,7 @@ export const ordersApi = {
   vouchers: (id: string) => api.get<Voucher[]>(`/api/orders/${e(id)}/vouchers`),
   cancelPreview: (id: string) => api.get<CancellationPreview>(`/api/orders/${e(id)}/cancellation-preview`),
   cancel: (id: string) => api.post(`/api/orders/${e(id)}/cancel`, {}),
-  createPackage: (items: CartItem[], promo?: string) => api.post<{ id: string }>('/api/orders/package', toPackageRequest(items, promo)),
+  createPackage: (items: CartItem[], promo?: string, guest?: { firstName?: string | null; lastName?: string | null } | null) => api.post<{ id: string }>('/api/orders/package', toPackageRequest(items, promo, guest ?? undefined)),
   createIntent: (orderId: string) => api.post<PaymentIntent>(`/api/payments/orders/${e(orderId)}/intent`, {}),
   confirmIntent: (intentId: string, paymentToken: string) =>
     api.post<PaymentIntent>(`/api/payments/intents/${e(intentId)}/confirm`, { paymentToken }),

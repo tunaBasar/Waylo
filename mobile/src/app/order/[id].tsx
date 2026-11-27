@@ -8,6 +8,7 @@ import { useAsync } from '@/features/useAsync';
 import { useOnline } from '@/features/network/NetworkContext';
 import { orderLinkOpened } from '@/features/deeplinks';
 import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
+import { canOfferCancel } from '@/features/orders/actions';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
 import { displayItemText, fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText, voucherStatusText } from '@/features/format';
 
@@ -59,6 +60,7 @@ export default function OrderDetail() {
   const loaded = state.data != null;
   useEffect(() => { if (id && loaded) orderLinkOpened(id); }, [id, loaded]);
   const checkins = useAsync(() => checkinApi.mine(), [id]);
+  const vouchers = useAsync(() => ordersApi.vouchers(id), [id]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [preview, setPreview] = useState<CancellationPreview | null>(null);
@@ -119,7 +121,7 @@ export default function OrderDetail() {
             )}
             <Button kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
             {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} />}
-            {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && (
+            {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && canOfferCancel(o, vouchers.data) && (
               <Button kind="secondary" title="Siparisi iptal et" disabled={busy} onPress={loadPreview} />
             )}
             {preview && (

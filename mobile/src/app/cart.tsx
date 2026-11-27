@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ApiError } from '@/api';
+import { useAuth } from '@/features/auth/AuthContext';
 import { useCart } from '@/features/cart/CartContext';
 import { checkoutErrorMessage, ordersApi } from '@/features/orders/api';
 import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
@@ -12,6 +13,7 @@ export default function CartScreen() {
   const cart = useCart();
   const router = useRouter();
   const online = useOnline();
+  const { user } = useAuth();
   const [promo, setPromo] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export default function CartScreen() {
   async function buy() {
     setBusy(true); setError(null);
     try {
-      const o = await ordersApi.createPackage(cart.items, promo.trim() || undefined);
+      const o = await ordersApi.createPackage(cart.items, promo.trim() || undefined, user);
       cart.clear();
       router.replace(`/order/${o.id}`);
     } catch (e) {

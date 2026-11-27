@@ -10,6 +10,7 @@ import { useCart } from '@/features/cart/CartContext';
 import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { DateField } from '@/components/DateField';
 import { addDays, isoLocalDateTime, validateRentalTimes } from '@/features/dates';
+import { carErrorMessage, defaultPickup, pickupLeadError } from '@/features/cars/lead';
 import { money } from '@/features/format';
 
 type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; returnAt: string; driverAge: number };
@@ -21,17 +22,17 @@ export default function Cars() {
   const branches = useAsync(() => carsApi.branches(), []);
   const [pickup, setPickup] = useState<string | null>(null);
   const [ret, setRet] = useState<string | null>(null);
-  const [pAt, setPAt] = useState(() => { const d = addDays(new Date(), 7); d.setHours(10, 0, 0, 0); return d; });
+  const [pAt, setPAt] = useState(() => defaultPickup(new Date()));
   const [rAt, setRAt] = useState(() => { const d = addDays(new Date(), 10); d.setHours(10, 0, 0, 0); return d; });
   const [age, setAge] = useState('30');
   const [q, setQ] = useState<Q | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const offers = useAsync(() => carsApi.offers(q!), [q], q !== null);
+  const offers = useAsync(() => carsApi.offers(q!).catch((e: unknown) => { throw new Error(carErrorMessage(e)); }), [q], q !== null);
   const returnId = ret ?? pickup;
 
   function search() {
-    const err = validateRentalTimes(pAt, rAt);
+    const err = pickupLeadError(pAt, Date.now()) ?? validateRentalTimes(pAt, rAt);
     const ageN = parseInt(age, 10) || 0;
     setFormError(err ?? (ageN < 18 ? 'Surucu yasi en az 18 olmali.' : null));
     if (err || ageN < 18) return;
