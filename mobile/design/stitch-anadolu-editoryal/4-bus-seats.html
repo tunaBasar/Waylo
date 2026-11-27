@@ -1,0 +1,263 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Anadolu Editoryal: Otobüs Koltuk Seçimi</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#973319',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#B84A2E',
+        'on-primary-container': '#FFECE8',
+        'secondary': '#466275',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#C7E3FA',
+        'on-secondary-container': '#173345',
+        'tertiary': '#005E6E',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#D8F6FF',
+        'on-tertiary-container': '#003640',
+        'success': '#1B6B44',
+        'on-success': '#FFFFFF',
+        'success-container': '#DCF5E7',
+        'on-success-container': '#0E3F27',
+        'warning': '#8C5100',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D6',
+        'on-warning-container': '#4D2B00',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#FAF7F2',
+        'on-background': '#241916',
+        'surface': '#FAF7F2',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#F5EFE6',
+        'surface-container': '#EDE5D8',
+        'surface-container-high': '#E5DACB',
+        'on-surface': '#241916',
+        'on-surface-variant': '#57423D',
+        'outline': '#8B716B',
+        'outline-variant': '#D9C9BE',
+      },
+      borderRadius: {
+        'sm': '6px',
+        'DEFAULT': '12px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Crimson Pro"', 'sans-serif'],
+        'headline': ['"Crimson Pro"', 'sans-serif'],
+        'title': ['"Lato"', 'sans-serif'],
+        'body': ['"Lato"', 'sans-serif'],
+        'label': ['"Lato"', 'sans-serif'],
+        'mono': ['"Source Code Pro"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.4px', fontWeight: '600' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.25px', fontWeight: '600' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.1px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0.1px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0.2px', fontWeight: '700' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.3px', fontWeight: '700' }],
+        'mono-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&amp;family=Lato:wght@400;700&amp;family=Source+Code+Pro:wght@500;600&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Contextual Header -->
+    <header class="sticky top-0 z-20 bg-surface border-b border-outline-variant px-lg py-md flex items-center gap-md">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface shrink-0">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+      </button>
+      <div class="min-w-0 flex-1">
+        <h1 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">İstanbul → Ankara</h1>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant tabular-nums">
+          Waylo Otobüs İşletmesi · 22:30 - 05:00 · ₺750,00
+        </p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-xl py-xl flex flex-col gap-xl">
+
+      <!-- Legend (Never Color Alone) -->
+      <section aria-label="Koltuk durumları" class="grid grid-cols-2 gap-sm bg-surface-container-lowest border border-outline-variant rounded-lg p-md">
+        <div class="flex items-center gap-sm">
+          <span class="w-6 h-6 rounded-sm border border-outline-variant bg-surface-container-lowest inline-flex items-center justify-center text-[11px] font-mono">1</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Boş</span>
+        </div>
+        <div class="flex items-center gap-sm">
+          <span class="w-6 h-6 rounded-sm bg-primary text-on-primary inline-flex items-center justify-center">
+            <span class="material-symbols-outlined text-[14px]" aria-hidden="true">check</span>
+          </span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Seçili</span>
+        </div>
+        <div class="flex items-center gap-sm">
+          <span class="w-6 h-6 rounded-sm bg-tertiary-container text-on-tertiary-container border border-tertiary inline-flex items-center justify-center font-label text-label-sm">K</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Kadın dolu</span>
+        </div>
+        <div class="flex items-center gap-sm">
+          <span class="w-6 h-6 rounded-sm bg-secondary-container text-on-secondary-container border border-secondary inline-flex items-center justify-center font-label text-label-sm">E</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Erkek dolu</span>
+        </div>
+      </section>
+
+      <!-- Rule Notice -->
+      <div class="p-md rounded-md bg-surface-container-low border border-outline-variant flex items-start gap-sm">
+        <span class="material-symbols-outlined text-[18px] text-secondary shrink-0 mt-0.5" aria-hidden="true">info</span>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">
+          Yabancı bir karşı cins yolcunun yanına oturulamaz. En fazla 5 koltuk seçebilirsiniz.
+        </p>
+      </div>
+
+      <!-- 2+2 Bus Seat Map (48 Seats) -->
+      <section aria-label="2+2 Otobüs koltuk düzeni" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-sm">
+        <div class="flex items-center justify-between pb-sm border-b border-outline-variant">
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Ön · Kaptan</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">2+2 · 48 koltuk</span>
+        </div>
+
+        <div id="seat-grid" class="flex flex-col gap-xs pt-sm">
+          <!-- Rows 1 to 12 rendered cleanly via inline script -->
+        </div>
+      </section>
+
+      <!-- Selected Passengers -->
+      <section class="flex flex-col gap-md">
+        <h2 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">Yolcu Bilgileri (2 / 5 koltuk)</h2>
+
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-md">
+          <div class="flex items-center justify-between">
+            <span data-design-text-token="label-lg" class="font-label text-label-lg text-primary">Koltuk 17</span>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">₺750,00</span>
+          </div>
+          <label class="flex flex-col gap-xs">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Yolcu adı soyadı</span>
+            <input type="text" value="Zeynep Yılmaz" class="min-h-[44px] px-md rounded-md bg-surface border border-outline-variant text-on-surface font-body text-body-lg">
+          </label>
+          <div class="grid grid-cols-2 gap-sm">
+            <button type="button" aria-pressed="true" class="min-h-[44px] rounded-md bg-tertiary-container text-on-tertiary-container border border-tertiary font-label text-label-lg">Kadın</button>
+            <button type="button" aria-pressed="false" class="min-h-[44px] rounded-md bg-surface border border-outline-variant text-on-surface font-label text-label-lg">Erkek</button>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-md">
+          <div class="flex items-center justify-between">
+            <span data-design-text-token="label-lg" class="font-label text-label-lg text-primary">Koltuk 18</span>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">₺750,00</span>
+          </div>
+          <label class="flex flex-col gap-xs">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Yolcu adı soyadı</span>
+            <input type="text" value="Mert Yılmaz" class="min-h-[44px] px-md rounded-md bg-surface border border-outline-variant text-on-surface font-body text-body-lg">
+          </label>
+          <div class="grid grid-cols-2 gap-sm">
+            <button type="button" aria-pressed="false" class="min-h-[44px] rounded-md bg-surface border border-outline-variant text-on-surface font-label text-label-lg">Kadın</button>
+            <button type="button" aria-pressed="true" class="min-h-[44px] rounded-md bg-secondary-container text-on-secondary-container border border-secondary font-label text-label-lg">Erkek</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Sticky Bottom Action -->
+    <footer class="sticky bottom-0 z-20 bg-surface-container-lowest border-t border-outline-variant px-xl py-md flex items-center justify-between gap-md">
+      <div class="flex flex-col">
+        <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Toplam (2 koltuk)</span>
+        <span data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface tabular-nums">₺1.500,00</span>
+      </div>
+      <button data-component-id="button-primary" data-component-type="button" data-component-variant="primary" type="button" class="inline-flex items-center justify-center min-h-[48px] px-xl rounded-md bg-primary text-on-primary font-label">
+        <span data-design-text-token="label-lg" class="text-label-lg">Sepete ekle</span>
+      </button>
+    </footer>
+
+  </div>
+
+  <script>
+    (function () {
+      const takenK = new Set([1, 2, 5, 9, 10, 21, 29, 30]);
+      const takenE = new Set([3, 4, 7, 15, 19, 25, 26, 35]);
+      const selected = new Set([17, 18]);
+      const grid = document.getElementById('seat-grid');
+      for (let r = 0; r < 12; r++) {
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-[1fr_1fr_20px_1fr_1fr] gap-xs items-center';
+        const base = r * 4 + 1;
+        [base, base + 1, null, base + 2, base + 3].forEach((num) => {
+          if (num === null) {
+            const aisle = document.createElement('div');
+            aisle.className = 'text-center font-mono text-mono-sm text-on-surface-variant';
+            aisle.textContent = r + 1;
+            row.appendChild(aisle);
+            return;
+          }
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'min-h-[44px] rounded-sm font-mono text-mono-sm flex flex-col items-center justify-center leading-tight ';
+          if (selected.has(num)) {
+            btn.className += 'bg-primary text-on-primary font-bold';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">Seçili</span>';
+          } else if (takenK.has(num)) {
+            btn.disabled = true;
+            btn.className += 'bg-tertiary-container text-on-tertiary-container border border-tertiary';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">K</span>';
+          } else if (takenE.has(num)) {
+            btn.disabled = true;
+            btn.className += 'bg-secondary-container text-on-secondary-container border border-secondary';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">E</span>';
+          } else {
+            btn.className += 'bg-surface border border-outline-variant text-on-surface hover:border-primary';
+            btn.textContent = num;
+          }
+          row.appendChild(btn);
+        });
+        grid.appendChild(row);
+      }
+    })();
+  </script>
+
+
+</body></html>

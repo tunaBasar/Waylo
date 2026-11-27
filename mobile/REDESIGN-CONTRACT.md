@@ -1,137 +1,171 @@
-# Waylo mobile redesign: contract (2026-11-27)
+# Waylo mobile redesign: contract (2026-11-27, revision 2)
 
-The user rejected the current mobile UI and generated three directions with Google Stitch from `mobile/DESIGN-BRIEF.md`
-(Anadolu Editoryal, Bosphorus Express, Gece Ekspresi). User decision 2026-11-27 14:00: "use these designs, remove the
-AI slop". Chosen direction: **Bosphorus Express** (closest to the web app and the app icon, which are both blue; the
-most data-first layout for a booking app; the dark Gece Ekspresi conflicts with the light web app).
+History: revision 1 rebuilt the app on the Stitch direction "Bosphorus Express" (commits 2cd53b2, 83e80a6, 59e5d02).
+User decision 2026-11-27 15:47: "Ben Anadolu Editoryal ve Gece Ekspresi'ni beğenmiştim. Bu çok fazla 2000'ler internet
+siteleri gibi duruyor, Facebook'u andırıyor." The coordinator had picked Bosphorus without asking; that was wrong.
 
-Reference files (read-only, never ship them): `mobile/design/stitch-bosphorus-express/`
-- `design-system.md` (tokens), `1-start` ... `6-order` (`.png` screenshot at 390 px, `.html` Stitch export).
-- The HTML is Tailwind/web. It is a picture of the target, not code to copy: rebuild it with React Native components.
+**Revision 2 (this file):** one layout, two themes.
+- **Light theme = Anadolu Editoryal** (warm paper, terracotta, serif headings, hairline-bordered cards).
+- **Dark theme = Gece Ekspresi** (obsidian surfaces, amber accents, borderless tonal cards).
+- The app follows the device setting (light/dark) and the user can override it in Ayarlar: Sistem / Açık / Koyu.
+- On a wide web window the app is shown as a centered phone-width column (no stretched desktop page).
+
+References (read-only, never ship them):
+- `mobile/design/stitch-anadolu-editoryal/` and `mobile/design/stitch-gece-ekspresi/`: `design-system.md` (tokens),
+  `1-start` ... `6-order` (`.png` at 390 px, `.html` Stitch export). Both directions draw the SAME six screens, so the
+  layout below is shared; only the theme differs. The HTML is Tailwind/web: a picture of the target, never code to copy.
 
 ## 1. AI slop: rules that override the Stitch screens
 
-Remove or replace everything below. If a screen and this list disagree, this list wins.
+If a picture and this list disagree, this list wins.
 
-1. **No invented data or features.** Only fields the API returns (see `src/api/types.ts`). Not in the product:
-   order numbers like `#WYL-84920`, voucher codes like `WYL-OTL-904`, an "Aktif Sepet" card on the start screen with a
-   made-up total, "Üyeliksiz arama" badges, live promo validation (there is no endpoint: the code is checked when the
-   order is created), maps, amenity lists, logos, car photos, loyalty, social login.
-   Order id: show `Sipariş #` + the first 8 characters of the id (as today). Voucher: QR from `payload` + description +
-   validity + status, nothing else.
-2. **No fake loading content.** No skeleton card that says "Diğer oteller yükleniyor..." under real results. Show a
-   spinner/skeleton only while a request is really running.
-3. **No broken image alt text on screen.** When a photo is missing or fails, show the designed fallback (icon +
-   "Fotoğraf yok"), never alt text. Use `expo-image` with a placeholder.
-4. **Bus seat legend: never color alone.** Taken seats show a letter K (Kadın) or E (Erkek) and an accessibility label
-   ("Koltuk 7, dolu, kadın yolcu"); the selected seat shows a check mark. Keep exactly the real rules:
-   `GENDER_RULE_TEXT`, `MAX_SEATS` (5), `seatBlockedByGender` from `src/features/bus/seats.ts`.
-5. **One primary action per area.** The cart has one "Siparişi oluştur" button; a guest sees one login prompt.
-6. **Countdown only where it is real.** The 15-minute price lock comes from `quote.expiresAt`, the payment deadline
-   from `order.holdExpiresAt`. Show a live mm:ss timer computed from those instants; never a static "14:42".
-7. **Money and dates.** Money always through `money()` in `src/features/format.ts` (₺7.220,00); dates `dd.MM.yyyy` and
-   24-hour times through `fmtLocal()` (Europe/Istanbul). Prices and times use the mono font with tabular numbers.
-8. **Turkish text with correct characters** (ç ğ ı İ ö ş ü) for every NEW or CHANGED label. Do not churn text you do
-   not touch, and keep the strings that existing tests assert (`__tests__/orders-screen.test.tsx`,
-   `support-screen.test.tsx`, `deeplinks.test.tsx`, `api-sync.test.ts` and the feature tests) unless you update the test
-   in the same change.
-9. **Accessibility.** Every pressable has `accessibilityRole` and `accessibilityLabel` (enforced by
-   `__tests__/a11y-screens.test.tsx`), touch targets at least 44 pt, WCAG AA contrast (check text on `primary`,
-   `secondary-container`, `warning-container`), never color alone for status.
-10. **Light mode only** (`app.json` `userInterfaceStyle: light`), no dark variant in this phase.
-11. **Screen-specific slop in the Bosphorus pictures** (do not copy):
-    - Start: "Misafir" chip, "Üyeliksiz arama" link, "Aktif Sepet ... Tek QR ödeme" card (there is one QR per item,
-      not one per payment) and a bottom bar without an account tab.
-    - Hotel detail: the "Fiyat 15 dakika kilitlendi" banner sits on the detail page in the picture, but the price is
-      locked only after an offer is chosen: the banner belongs to the quote screen. Keep the real flow: offer ->
-      quote screen (countdown + "Rezervasyon yap" / "Sepete ekle"). No buttons on the offer card except choosing it.
-    - Cart: the "Uygula" button next to the promo field (nothing validates it before the order: use a plain field with
-      the hint "Sipariş oluşturulurken uygulanır") and the guest login block (guests never reach the cart; the cart
-      belongs to the signed-in account).
-    - Bus: the sticky total bar covers the passenger form in the picture. A `StickyActionBar` never covers content:
-      the scroll content gets bottom padding equal to the bar height.
-    - Order: the `#WYL-84920` style number and voucher codes (see 1).
+1. **No invented data or features.** Only fields the API returns (`src/api/types.ts`). Not in the product: order numbers
+   like `#WYL-84920`, voucher codes like `WYL-OTL-904`, "Aktif Sepet" cards with made-up totals, live promo validation
+   (no endpoint: the code is checked when the order is created, so no "Uygula" button and no "kod geçersiz" message
+   before the order), maps, amenity lists, logos, car photos, loyalty, social login, "tek biletle" claims (each item
+   gets its own QR voucher). Order id: `Sipariş #` + first 8 characters of the id. Voucher: QR from `payload` +
+   description + validity + status + free-cancellation text, nothing else.
+2. **No fake loading content**; spinner or skeleton only while a request really runs.
+3. **No broken image alt text on screen**: missing or failed photo -> PhotoFallback (icon + "Kapak fotoğrafı yok").
+4. **Bus seats never by color alone**: taken seats show K (Kadın) or E (Erkek), the selected seat a check icon, and an
+   accessibility label ("Koltuk 7, dolu, kadın yolcu"). Keep the real rules (`GENDER_RULE_TEXT`, `MAX_SEATS`,
+   `seatBlockedByGender` in `src/features/bus/seats.ts`).
+5. **One primary action per area.** Guests never reach the cart (no guest block there); the cart has one
+   "Siparişi oluştur".
+6. **Countdowns only where real**: price lock from `quote.expiresAt` (quote screen, NOT the hotel page: the price is
+   locked only after an offer is chosen), payment deadline from `order.holdExpiresAt`; live mm:ss, never a static text.
+7. **Keep the real hotel flow**: offer card -> createQuote -> quote screen (countdown, "Rezervasyon yap", "Sepete ekle").
+   The offer card has one action (choose); no booking buttons on the hotel page.
+8. **Money** via `money()` (₺7.220,00), dates `dd.MM.yyyy`, 24-hour times via `fmtLocal()` (Europe/Istanbul); prices,
+   times and seat numbers in the mono font with tabular numbers.
+9. **Turkish with correct characters** everywhere; keep strings that tests assert unless the test changes with them.
+10. **Accessibility**: every pressable has `accessibilityRole` + `accessibilityLabel` (enforced by
+    `__tests__/a11y-screens.test.tsx`), at least 44 pt, WCAG AA contrast in BOTH themes, status never by color alone.
+11. **A sticky bar never covers content**: scroll content gets bottom padding equal to the bar height.
+12. **Bottom bar keeps 4 items** (Arama, Sepet, Siparişler, Hesap) in both themes; the 3-item Gece picture has no
+    account tab, which the app needs.
 
-## 2. Design tokens (from design-system.md)
+## 2. Themes (`src/theme/`)
 
-`src/theme/tokens.ts` exports plain objects, no runtime theming library:
-- `color`: primary #003772, onPrimary #FFFFFF, primaryContainer #124E96, onPrimaryContainer #ECF0FF, secondary
-  #006C53, secondaryContainer #D8F6EA, onSecondaryContainer #00382A, tertiary #743500, tertiaryContainer #FFEDE5,
-  onTertiaryContainer #522300, success #006C53, successContainer #D8F6EA, warning #8C4A00, warningContainer #FFF0D9,
-  onWarningContainer #4D2600, error #BA1A1A, errorContainer #FFDAD6, onErrorContainer #690005, background/surface
-  #F4F7FA, surfaceLowest #FFFFFF, surfaceLow #EDF1F7, surfaceContainer #E4E9F2, surfaceHigh #DCE2EC, onSurface
-  #191C20, onSurfaceVariant #424751, outline #737782, outlineVariant #C8D0DC.
-- `space`: xs 4, sm 8, md 12, lg 16, xl 20, xxl 24, xxxl 32. `radius`: sm 4, md 8, lg 12, xl 16, full 9999.
-- `font`: display = Wix Madefor Display (700/600), body = Instrument Sans (400/600/700), mono = Spline Sans Mono
-  (500/600). `type` scale exactly as design-system.md (displayLgMobile 26/32, headlineLg 22/28, headlineMd 18/24,
-  titleMd 15/20, bodyLg 15/22, bodyMd 13/18, labelLg 14/18, labelSm 12/16, monoMd 14/18, monoSm 12/16).
-- Fonts via `npx expo install @expo-google-fonts/wix-madefor-display @expo-google-fonts/instrument-sans
-  @expo-google-fonts/spline-sans-mono` (never npm/yarn add) and `useFonts` in the root layout while the splash screen
-  is visible. If fonts fail to load, render with the system font (never block the app).
-- Icons: `@expo/vector-icons` (MaterialCommunityIcons) via `npx expo install @expo/vector-icons`; no emoji icons.
-  Icons are decorative (`accessibilityElementsHidden`); the label is on the pressable.
+One `Theme` type, two values: `lightTheme` (Anadolu) and `darkTheme` (Gece). Same keys in both.
 
-## 3. Components (`src/components/`)
+**color** (from the two design-system.md files):
 
-Keep the existing exports of `src/components/ui.tsx` working (same names and props, restyled with the tokens):
-`colors` (kept as an alias mapped to the new tokens), `Screen`, `Title`, `Muted`, `Card`, `Button` (`primary`,
-`secondary`, `danger`), `Field`, `ErrorBanner`, `TestBanner`, `AsyncView`. Add in `src/components/`:
-- `AppHeader` (cobalt bar: optional back button, title, subtitle in mono, optional right element),
-- `ModeTabs` (Otel / Uçuş / Araç / Otobüs segmented pills with icons; navigates to the existing tabs),
-- `Chip`/`StatusPill` (status with icon + text, tones success/warning/error/neutral),
-- `Price` (mono, tabular), `CountdownBanner` (props: until ISO instant, label; live mm:ss; expired state),
-- `StickyActionBar` (bottom bar with total + primary action, safe-area aware),
-- `PhotoFallback`, `SkeletonCard` (only used while loading).
-`Stepper`, `DateField`, `StarPicker` restyled with the tokens.
-
-## 4. Navigation
-
-- No route files move. The tab navigator keeps its six routes (`hotels`, `flights`, `cars`, `bus`, `orders`,
-  `profile`); a custom `tabBar` (`src/components/BottomBar.tsx`) shows four items:
-  - **Arama**: active on hotels, flights, cars and bus; opens the last used search mode (default hotels).
-  - **Sepet**: count badge; pushes the existing `/cart` stack screen; a guest goes to login with returnTo `/cart`
-    (same as the current header button, which is removed).
-  - **Siparişler** and **Hesap** (profile): the current guest-to-login behaviour (`guestTab`) stays.
-- Every effect in `(tabs)/_layout.tsx` stays (pending order deep link, `takeReturnTo` after login, `needsLogin`
-  redirect). The four search screens keep their routes and query-param restore (`src/features/returnState.ts`, bus
-  `draft.ts`); `ModeTabs` switches between them with `router.replace`.
-- Tab screens draw their own `AppHeader` (search screens: "Waylo" wordmark, a guest sees one "Giriş yap" button).
-  Stack screens (hotel/flight detail, quote, cart, order, support, reviews, notifications, settings, auth) get the
-  cobalt header from the root `Stack` `screenOptions`.
-
-## 5. Screen mapping
-
-| Stitch screen | Route(s) | Notes |
+| key | light (Anadolu) | dark (Gece) |
 |---|---|---|
-| 1 Başlangıç | `(tabs)/hotels` (+ same header/ModeTabs on flights, cars, bus) | search card as in 1-start.png; no "Aktif Sepet" card; results may stay on the same screen (the form collapses into a summary row with "Değiştir"), no new routes |
-| 2 Otel sonuçları | `(tabs)/hotels` results | horizontal split card: cover (or fallback), stars, name, city, score + count only if reviews exist, no price |
-| 3 Otel detay | `hotel/[id]`, `quote/[id]` | gallery (`HotelGallery`), score, address, description, offers, empty state with next date, reviews + hotel reply; quote shows `CountdownBanner` from `expiresAt` |
-| 4 Otobüs koltuk | `(tabs)/bus` seat picker | legend Boş/Seçili/Kadın/Erkek with letters, rule text, seat grid by layout, sticky total + "Sepete ekle", per seat name + Kadın/Erkek |
-| 5 Sepet | `cart` | item rows (vertical, label, price, Kaldır), promo field (no live check), note "Nihai fiyat sipariş oluşturulduğunda kesinleşir.", sticky total + "Siparişi oluştur" |
-| 6 Sipariş detay | `order/[id]` | header with status pill; per item QR voucher card (status pill, validity, free-cancel deadline); flight "Online check-in"; refund preview, "Siparişi iptal et", "Destek talebi aç"; pending: payment `CountdownBanner` from `holdExpiresAt` + pay buttons |
+| primary / onPrimary | #973319 / #FFFFFF | #F59E0B / #1A120B |
+| primaryContainer / onPrimaryContainer | #B84A2E / #FFECE8 | #4D2600 / #FFDCC3 |
+| secondary / onSecondary | #466275 / #FFFFFF | #7BD0FF / #00354A |
+| secondaryContainer / onSecondaryContainer | #C7E3FA / #173345 | #004C69 / #E3F3FF |
+| tertiary / onTertiary | #005E6E / #FFFFFF | #FFB77D / #4D2600 |
+| tertiaryContainer / onTertiaryContainer | #D8F6FF / #003640 | #6E3900 / #FFEDE3 |
+| success / onSuccess | #1B6B44 / #FFFFFF | #4ADE80 / #052E16 |
+| successContainer / onSuccessContainer | #DCF5E7 / #0E3F27 | #14532D / #DCFCE7 |
+| warning / onWarning | #8C5100 / #FFFFFF | #FBBF24 / #1A120B |
+| warningContainer / onWarningContainer | #FFF0D6 / #4D2B00 | #451A03 / #FEF3C7 |
+| error / onError | #BA1A1A / #FFFFFF | #FCA5A5 / #450A0A |
+| errorContainer / onErrorContainer | #FFDAD6 / #690005 | #7F1D1D / #FEE2E2 |
+| background, surface | #FAF7F2 | #0F141B |
+| surfaceLowest / surfaceLow | #FFFFFF / #F5EFE6 | #0B0F15 / #161D26 |
+| surfaceContainer / surfaceHigh | #EDE5D8 / #E5DACB | #1C2531 / #253040 |
+| onSurface / onSurfaceVariant | #241916 / #57423D | #F1F5F9 / #B6C2D1 |
+| outline / outlineVariant | #8B716B / #D9C9BE | #64748B / #2B3748 |
+| backdrop (web, outside the phone column) | #EDE5D8 | #0B0F15 |
+| seatEmptyBg / seatEmptyBorder | #FFFFFF / #D9C9BE | #161D26 / #2B3748 |
+| seatSelectedBg / seatSelectedFg | #973319 / #FFFFFF | #F59E0B / #1A120B |
+| seatFemaleBg / seatFemaleFg | #D8F6FF / #003640 | #6E3900 / #FFEDE3 |
+| seatMaleBg / seatMaleFg | #C7E3FA / #173345 | #004C69 / #E3F3FF |
 
-Screens without a Stitch picture (flights, cars, orders list, profile, settings, support, reviews, notifications,
-login/register/forgot/verify/reset) use the same components and tokens; no new features.
+**font / type**:
+- light: display Crimson Pro 600 (headings), body Lato 400/700, mono Source Code Pro 500/600.
+  displayLgMobile 28/34 (-0.25), headlineLg 24/30, headlineMd 20/26, titleMd Lato 700 16/22, bodyLg Lato 16/24,
+  bodyMd Lato 14/20, labelLg Lato 700 14/20, labelSm Lato 700 12/16, monoMd SCP 600 14/20, monoSm SCP 500 12/16.
+- dark: display/title/label Alegreya Sans 700, body Alegreya 400, mono Source Code Pro.
+  displayLgMobile 28/34, headlineLg 22/28, headlineMd 18/24, titleMd 16/22, bodyLg 16/24, bodyMd 15/21,
+  labelLg 14/20, labelSm 12/16, monoMd 14/20, monoSm 12/16.
+- Packages via `npx expo install @expo-google-fonts/crimson-pro @expo-google-fonts/lato
+  @expo-google-fonts/source-code-pro @expo-google-fonts/alegreya-sans @expo-google-fonts/alegreya`; remove the three
+  Bosphorus font packages (`npm uninstall @expo-google-fonts/wix-madefor-display @expo-google-fonts/instrument-sans
+  @expo-google-fonts/spline-sans-mono`) once nothing imports them. All fonts load behind the splash screen; on error the
+  app continues with system fonts.
 
-## 6. Phases and file ownership (workers never touch another lane's files)
+**shape / surfaces**:
+- light: radius sm 6, md 12, lg 16, xl 20, full 9999; cards = surfaceLowest + 1 px outlineVariant hairline, no shadow.
+- dark: radius sm 8, md 14, lg 20, xl 24, full 9999; cards = surfaceLow, no border (tonal layers); borders only on
+  inputs and seat cells.
+- `space` (4, 8, 12, 16, 20, 24, 32) and `MIN_TOUCH` (44) are theme-independent; page margin 20.
 
-- **Phase 1, lane `mobile-foundation`:** `src/theme/**`, `src/components/**`, `src/app/_layout.tsx` (fonts, stack
-  header), `src/app/(tabs)/_layout.tsx` (tab bar), `src/features/network/NetworkContext.tsx` (OfflineBanner look
-  only), `package.json`/lockfile (`npx expo install` only), new tests for pure helpers in `__tests__/`.
-- **Phase 2 (after phase 1 is merged), four parallel lanes:**
-  - `mobile-hotel`: `src/app/(tabs)/hotels.tsx`, `src/app/hotel/[id].tsx`, `src/app/quote/[id].tsx`,
+**API** (`src/theme/ThemeContext.tsx`): `ThemeProvider` (root layout), `useTheme(): Theme` (falls back to
+`lightTheme` when no provider is mounted, so tests that render screens keep working), `useThemePreference()`
+(`{ preference: 'system' | 'light' | 'dark', setPreference }`, persisted in AsyncStorage under `waylo_theme`; not a
+secret), and `useStyles(factory: (t: Theme) => StyleSheet)` memoised per theme. Pure, tested helper:
+`resolveScheme(preference, systemScheme) -> 'light' | 'dark'`. `app.json`: `userInterfaceStyle: "automatic"`, splash
+with a dark variant (#0F141B) per the SDK 58 expo-splash-screen docs. Status bar text follows the theme.
+
+**Migration rule**: no file may import `color`, `type`, `font` or `radius` from `@/theme/tokens` at the end of revision 2
+(module-level StyleSheets cannot change with the theme). Phase A keeps them as `@deprecated` light aliases so the
+not-yet-migrated files still compile; phase C deletes them and `tsc` proves nothing still uses them.
+
+## 3. Shared layout (both themes)
+
+- **Web frame**: on web, the whole app (headers, screens, bottom bar) lives in a centered column `maxWidth: 480`,
+  full height, `backdrop` color around it, hairline side borders in light. Narrow screens: full width.
+- **Headers**: no colored bar. Surface background. Tab screens: wordmark "Waylo" (display font, a small primary dot or
+  mark) left, guest "Giriş yap" pill (outlined, person icon) right. Stack screens: round outlined back button (44 pt),
+  title in the display font, optional subtitle in mono (dates, "2 gece"). Stack navigator `screenOptions` from the
+  theme: surface background, onSurface tint, display-font title, no shadow.
+- **Mode tiles** (Otel / Uçuş / Araç / Otobüs): four square tiles in a row, icon above label; selected = primary bg.
+- **Search card** (1-start): Şehir; Giriş and Çıkış side by side; a guests row "1 oda · 2 yetişkin · 1 çocuk (6 yaş)"
+  that expands inline into the steppers (oda, yetişkin, çocuk + one age stepper per child); primary "Otelleri ara".
+  Light start screen may show the honest intro "Yolculuğunuzu tek yerden planlayın" + "Üye olmadan otel, uçuş, araç ve
+  otobüs seferlerini arayabilirsiniz."
+- **Hotel results** (2): title "{şehir} otelleri" (or "Oteller"), mono subtitle with dates and guests, line
+  "{n} tesis listeleniyor · Oda fiyatları otel detayında gösterilir"; full-width cards with the cover photo on top
+  (or PhotoFallback), stars ("4 yıldız"), score chip only when reviews exist (`scoreText`), name in the display font,
+  city and country.
+- **Hotel detail** (3): gallery with "1 / N" counter and thumbnails, stars, name, address, description, "Oda teklifleri"
+  (offer cards: room type, rate plan, nights, cancellation rule, mono price, chevron), empty state card with calendar
+  icon and the next-date button, "Değerlendirmeler" with score and review cards, hotel reply in an inset box.
+- **Quote**: countdown banner (warning container, timer icon, "Fiyat 15 dakika kilitlendi", live mm:ss), summary card,
+  promo field, "Rezervasyon yap" (primary) and "Sepete ekle" (secondary).
+- **Bus** (4): trip cards; seat picker = legend chips (Boş, Seçili ✓, Kadın K, Erkek E), rule info box with info
+  icon, a seat map card with header "Ön · Kaptan" and "{2+2 | 2+1} · {n} koltuk" (from the seat map), row numbers and
+  aisle; "Yolcu bilgileri ({n} / 5 koltuk)" with one card per seat (Koltuk 17 + mono price, Ad soyad, Kadın/Erkek
+  toggle); sticky bar "Toplam ({n} koltuk)" + "Sepete ekle".
+- **Cart** (5): title "Sepetim ({n} ürün)"; item cards (vertical icon, label, mono price, "Kaldır"); promo field with the
+  hint "Sipariş oluşturulurken uygulanır"; info note "Nihai fiyat sipariş oluşturulduğunda kesinleşir."; sticky bar
+  "Toplam tutar" + "Siparişi oluştur".
+- **Order** (6): "Sipariş #xxxxxxxx" + status pill; pending: countdown + TEST pay buttons + TestBanner; per item card:
+  "{Tür} · {başlık}", mono validity, status pill "Geçerli", inset panel with the QR and the free-cancellation text;
+  flight items "Online check-in" (secondary color); "Siparişi iptal et" (error style, refund preview first, as today);
+  "Destek talebi aç".
+- **Bottom bar**: 4 items with icon above label. Light: docked, surfaceLowest, hairline top border. Dark: floating
+  rounded bar (radius xl, surfaceContainer, margin 12) like the Gece picture.
+- Other screens (flights, cars, orders list, profile, settings, support, reviews, notifications, auth) use the same
+  components and tokens. **Ayarlar** gets a "Görünüm" section: Sistem / Açık / Koyu (radio rows), applied at once.
+
+## 4. Phases and file ownership
+
+- **Phase A, lane `theme-core`**: `src/theme/**`, `src/components/**`, `src/app/_layout.tsx` (fonts, ThemeProvider,
+  Stack header from theme, status bar, web frame), `src/app/(tabs)/_layout.tsx` (only theme-related lines),
+  `src/features/network/NetworkContext.tsx`, `app.json`, `package.json`/lockfile, tests for pure helpers.
+- **Phase B, four parallel lanes** (same files as revision 1, migrated to `useTheme`/`useStyles` and restyled):
+  - `theme-hotel`: `src/app/(tabs)/hotels.tsx`, `src/app/hotel/[id].tsx`, `src/app/quote/[id].tsx`,
     `src/features/hotels/HotelGallery.tsx`.
-  - `mobile-transport`: `src/app/(tabs)/bus.tsx`, `src/app/(tabs)/flights.tsx`, `src/app/flight/[id].tsx`,
-    `src/app/(tabs)/cars.tsx`.
-  - `mobile-orders`: `src/app/cart.tsx`, `src/app/order/[id].tsx`, `src/app/(tabs)/orders.tsx`.
-  - `mobile-account`: `src/app/(tabs)/profile.tsx`, `src/app/settings.tsx`, `src/app/support/*`,
+  - `theme-transport`: `src/app/(tabs)/bus.tsx`, `src/app/(tabs)/flights.tsx`, `src/app/flight/[id].tsx`,
+    `src/app/(tabs)/cars.tsx` (bus seat colors from the theme `seat*` tokens, no hard-coded colors).
+  - `theme-orders`: `src/app/cart.tsx`, `src/app/order/[id].tsx`, `src/app/(tabs)/orders.tsx`.
+  - `theme-account`: `src/app/(tabs)/profile.tsx`, `src/app/settings.tsx` (+ Görünüm), `src/app/support/*`,
     `src/app/reviews.tsx`, `src/app/notifications.tsx`, `src/app/(auth)/*`, `src/app/verify.tsx`,
-    `src/app/reset-password.tsx`.
-  Each lane may add tests in `__tests__/` and update an existing test only for a string it changed.
+    `src/app/reset-password.tsx`, `src/features/account/AccountUi.tsx`.
+- **Phase C, lane `theme-cleanup`**: delete the deprecated token aliases, fix any remaining import, remove the Bosphorus
+  font packages, prove with grep + tsc that no file imports color/type/font/radius from tokens and no hex color literal
+  remains outside `src/theme/`.
 
-## 7. Done means
+## 5. Done means
 
-- Workers: `cd mobile && npx tsc --noEmit` 0 errors and `npx expo lint` 0 problems; tests written for new pure logic;
-  workers never run jest or start Expo (user rule).
-- Coordinator: jest (all suites, including the a11y walk), then Expo web on the walk stack: each redesigned screen
-  checked in a 390 px browser tab next to its Stitch png, with real data (guest and customer), plus one full purchase.
+- Workers: `cd mobile && npx tsc --noEmit` and `npx expo lint` clean (read the output, not only the exit code); tests
+  written for new pure logic; workers never run jest, Expo or a browser (user rule).
+- Coordinator: jest (all suites, incl. the a11y walk); Expo web at 390 px in light AND dark (Playwright
+  `colorScheme`) next to the Stitch pictures; a 1440 px window shows the centered phone column; the Ayarlar switch
+  changes the theme at once; one full customer purchase.

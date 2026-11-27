@@ -1,0 +1,208 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Anadolu Editoryal: Sepet ve Ödeme</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#973319',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#B84A2E',
+        'on-primary-container': '#FFECE8',
+        'secondary': '#466275',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#C7E3FA',
+        'on-secondary-container': '#173345',
+        'tertiary': '#005E6E',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#D8F6FF',
+        'on-tertiary-container': '#003640',
+        'success': '#1B6B44',
+        'on-success': '#FFFFFF',
+        'success-container': '#DCF5E7',
+        'on-success-container': '#0E3F27',
+        'warning': '#8C5100',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D6',
+        'on-warning-container': '#4D2B00',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#FAF7F2',
+        'on-background': '#241916',
+        'surface': '#FAF7F2',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#F5EFE6',
+        'surface-container': '#EDE5D8',
+        'surface-container-high': '#E5DACB',
+        'on-surface': '#241916',
+        'on-surface-variant': '#57423D',
+        'outline': '#8B716B',
+        'outline-variant': '#D9C9BE',
+      },
+      borderRadius: {
+        'sm': '6px',
+        'DEFAULT': '12px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Crimson Pro"', 'sans-serif'],
+        'headline': ['"Crimson Pro"', 'sans-serif'],
+        'title': ['"Lato"', 'sans-serif'],
+        'body': ['"Lato"', 'sans-serif'],
+        'label': ['"Lato"', 'sans-serif'],
+        'mono': ['"Source Code Pro"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.4px', fontWeight: '600' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.25px', fontWeight: '600' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.1px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0.1px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0.2px', fontWeight: '700' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.3px', fontWeight: '700' }],
+        'mono-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&amp;family=Lato:wght@400;700&amp;family=Source+Code+Pro:wght@500;600&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Contextual Header -->
+    <header class="sticky top-0 z-20 bg-surface border-b border-outline-variant px-lg py-md flex items-center gap-md">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface shrink-0">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+      </button>
+      <div class="min-w-0 flex-1">
+        <h1 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">Sepetim (3 ürün)</h1>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-xl py-xl flex flex-col gap-xl">
+
+      <!-- Guest Login Banner -->
+      <section class="p-lg rounded-lg bg-surface-container-low border border-outline-variant flex items-center justify-between gap-md">
+        <div class="flex flex-col gap-xs">
+          <p data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Misafir oturumu</p>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">
+            Sipariş oluşturmak için giriş yapın; sepetiniz aynı yerde korunur.
+          </p>
+        </div>
+        <button type="button" class="min-h-[44px] px-md rounded-md border border-outline-variant bg-surface-container-lowest text-on-surface font-label text-label-sm shrink-0">
+          Giriş yap
+        </button>
+      </section>
+
+      <!-- Cart Items -->
+      <section aria-label="Sepet kalemleri" class="flex flex-col gap-md">
+        <!-- Hotel Item -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex items-center justify-between gap-md">
+          <div class="min-w-0 flex-1">
+            <p data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Otel · Pera Taş Konak, 04.12.2026 - 06.12.2026</p>
+            <p data-design-text-token="mono-md" class="font-mono text-mono-md text-primary tabular-nums mt-xs">₺4.850,00</p>
+          </div>
+          <button type="button" class="min-h-[44px] px-md rounded-md text-error font-label text-label-sm hover:bg-error-container">
+            Kaldır
+          </button>
+        </article>
+
+        <!-- Flight Item -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex items-center justify-between gap-md">
+          <div class="min-w-0 flex-1">
+            <p data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Uçuş · İstanbul → İzmir, 08.12.2026 09:15</p>
+            <p data-design-text-token="mono-md" class="font-mono text-mono-md text-primary tabular-nums mt-xs">₺1.620,00</p>
+          </div>
+          <button type="button" class="min-h-[44px] px-md rounded-md text-error font-label text-label-sm hover:bg-error-container">
+            Kaldır
+          </button>
+        </article>
+
+        <!-- Bus Item -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex items-center justify-between gap-md">
+          <div class="min-w-0 flex-1">
+            <p data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Otobüs · İstanbul → Ankara, 04.12.2026 22:30</p>
+            <p data-design-text-token="mono-md" class="font-mono text-mono-md text-primary tabular-nums mt-xs">₺750,00</p>
+          </div>
+          <button type="button" class="min-h-[44px] px-md rounded-md text-error font-label text-label-sm hover:bg-error-container">
+            Kaldır
+          </button>
+        </article>
+      </section>
+
+      <!-- Promo Code -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-sm">
+        <label for="promo-ae" data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Promosyon kodu (isteğe bağlı)</label>
+        <div class="flex items-center gap-sm">
+          <input id="promo-ae" type="text" placeholder="Kodunuzu girin" class="flex-1 min-h-[44px] px-md rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-mono-md">
+          <button type="button" class="min-h-[44px] px-lg rounded-md border border-outline-variant bg-surface-container-low text-on-surface font-label text-label-lg">
+            Uygula
+          </button>
+        </div>
+      </section>
+
+      <!-- Price Note -->
+      <div class="flex items-start gap-sm text-on-surface-variant">
+        <span class="material-symbols-outlined text-[18px] shrink-0 mt-0.5" aria-hidden="true">info</span>
+        <p data-design-text-token="body-md" class="font-body text-body-md">
+          Nihai fiyat sipariş oluşturulduğunda kesinleşir.
+        </p>
+      </div>
+
+    </main>
+
+    <!-- Sticky Checkout Bar -->
+    <footer class="sticky bottom-0 z-20 bg-surface-container-lowest border-t border-outline-variant px-xl py-md flex items-center justify-between gap-md">
+      <div class="flex flex-col">
+        <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Toplam tutar</span>
+        <span data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface tabular-nums">₺7.220,00</span>
+      </div>
+      <button data-component-id="button-primary" data-component-type="button" data-component-variant="primary" type="button" class="inline-flex items-center justify-center min-h-[48px] px-xl rounded-md bg-primary text-on-primary font-label">
+        <span data-design-text-token="label-lg" class="text-label-lg">Siparişi oluştur</span>
+      </button>
+    </footer>
+
+  </div>
+
+
+</body></html>

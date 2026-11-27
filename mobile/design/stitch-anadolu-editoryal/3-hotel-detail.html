@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Anadolu Editoryal: Otel Detay</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#973319',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#B84A2E',
+        'on-primary-container': '#FFECE8',
+        'secondary': '#466275',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#C7E3FA',
+        'on-secondary-container': '#173345',
+        'tertiary': '#005E6E',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#D8F6FF',
+        'on-tertiary-container': '#003640',
+        'success': '#1B6B44',
+        'on-success': '#FFFFFF',
+        'success-container': '#DCF5E7',
+        'on-success-container': '#0E3F27',
+        'warning': '#8C5100',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D6',
+        'on-warning-container': '#4D2B00',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#FAF7F2',
+        'on-background': '#241916',
+        'surface': '#FAF7F2',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#F5EFE6',
+        'surface-container': '#EDE5D8',
+        'surface-container-high': '#E5DACB',
+        'on-surface': '#241916',
+        'on-surface-variant': '#57423D',
+        'outline': '#8B716B',
+        'outline-variant': '#D9C9BE',
+      },
+      borderRadius: {
+        'sm': '6px',
+        'DEFAULT': '12px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Crimson Pro"', 'sans-serif'],
+        'headline': ['"Crimson Pro"', 'sans-serif'],
+        'title': ['"Lato"', 'sans-serif'],
+        'body': ['"Lato"', 'sans-serif'],
+        'label': ['"Lato"', 'sans-serif'],
+        'mono': ['"Source Code Pro"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.4px', fontWeight: '600' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.25px', fontWeight: '600' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.1px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0.1px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0.2px', fontWeight: '700' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.3px', fontWeight: '700' }],
+        'mono-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&amp;family=Lato:wght@400;700&amp;family=Source+Code+Pro:wght@500;600&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Contextual Header -->
+    <header class="sticky top-0 z-20 bg-surface border-b border-outline-variant px-lg py-md flex items-center gap-md">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface shrink-0">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+      </button>
+      <div class="min-w-0 flex-1">
+        <h1 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">Pera Taş Konak</h1>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant tabular-nums">
+          04.12.2026 - 06.12.2026 · 2 gece
+        </p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-xl py-xl flex flex-col gap-2xl">
+
+      <!-- Photo Gallery -->
+      <section aria-label="Fotoğraf galerisi" class="flex flex-col gap-sm">
+        <div class="relative rounded-lg overflow-hidden border border-outline-variant">
+          <img src="https://lh3.googleusercontent.com/aida/ALJJyrCJdGT--1QJA9AqTtEWm_ejEYCskjWQ3KA8y1LIJETLqUZ7yvBiB2DtSOzq69b3jL2XXLvpSGUUQQnuyMkHMTtkZ3mPmf8qmQM3KgdWeGjFKdxIfnSxjbOrbvj-KAHgEuiCEAyXUImxUhy8fN_yfWjt3AIybIafL97_RpaMh85PMrnyIA-jqw1elwaXvVegLPM8gfT-1iSMp9dc4Gzi8iGfrDpXoXSPFHLEMrqN8jHZYYkb-pe5LrTc6Z5lmGI" alt="Pera Taş Konak standart oda" class="w-full h-52 object-cover">
+          <span data-design-text-token="mono-sm" class="absolute bottom-sm right-sm px-sm py-xs rounded-full bg-on-surface text-surface font-mono text-mono-sm tabular-nums">
+            1 / 4
+          </span>
+        </div>
+        <div class="grid grid-cols-3 gap-sm">
+          <img src="https://lh3.googleusercontent.com/aida/ALJJyrCb-Ed8MJojKBPLfMz4IMTrbzvJ45ZEnW6FsTQb755V0OQPwKF8DddplWd97Hslvh_cJ4MacJyNR-4RdsZ85kjYnfPW1sCsHwh-jFfqswSHE9WaxaHxBcXyd4c9x65bzU5DID4MsU4Q0CAtLjI7_C5azyDTZ0djsFQ7Kk23_-KpyB6rdkWBteQc756XcU0qAN55nyTwo1StGVXanMKjYSsDNopwNnI11q948GuAtvH40RV7tlGhl3CTcYAD" alt="Otel cephesi" class="w-full h-16 object-cover rounded-md border border-outline-variant">
+          <img src="https://lh3.googleusercontent.com/aida/ALJJyrCnYF2w5IUwoxYkn6E4QfabY1vs-18JCp0BdZnDzcTc0RXfQx0tRH3dujQbO3OxGgM3wlapL8ysgE2PMaLZWjrvDbiCN_WHqRoOfiuC7CyODv3HIG6lto5lukfwUlLBIBr9b1LthNgaZIoa1laXss2JtGcImTpcfRwqZeCMhQzcrs60xsP7UAkCgsGSi-xMkRdzuRCaebQeet0cujQ9S32dGYIWEBdsW-L4FBnNrgck2_Qcn07mUz93FKt7DNHuyCA" alt="Kahvaltı terası" class="w-full h-16 object-cover rounded-md border border-outline-variant">
+          <img src="https://lh3.googleusercontent.com/aida/ALJJyrCvzCGl5Cy6rbaQbM7xSwyOwI8mSJm7qCV4flNxzvLUmnr8ct6F8FD1sb9qKBCSvJ_JnZT7dqoeDgRTKjK-PFtSyu2WwKlyhRNwSFp0XtjA6EeyD-GlQdok70_6ypyJUKt-yTD_LUvDj-Er0xGwAaOJr24IuVYLOM_4cI4MonDw1SK5-0bONqYvf_Ecf83tfFf3vziVu2NCE3dvEURnD-9VnqjFf6hi4CyJPQK7Cgv9VBRFYZtfWk1GFpXeEYo1Z2JS" alt="İç avlu" class="w-full h-16 object-cover rounded-md border border-outline-variant">
+        </div>
+      </section>
+
+      <!-- Hotel Info -->
+      <section class="flex flex-col gap-sm">
+        <div class="flex items-center gap-xs text-primary">
+          <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &#39;FILL&#39; 1;" aria-hidden="true">star</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">5 yıldız</span>
+        </div>
+        <h2 data-design-text-token="headline-lg" class="font-headline text-headline-lg text-on-surface">Pera Taş Konak</h2>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">
+          Asmalı Mescit Mah. Meşrutiyet Cad. No:42, Beyoğlu, İstanbul
+        </p>
+        <p data-design-text-token="body-lg" class="font-body text-body-lg text-on-surface text-pretty">
+          Tarihi taş mimarisi ve sessiz iç avlusuyla Beyoğlu&#39;nun kalbinde konforlu konaklama sunar.
+        </p>
+      </section>
+
+      <!-- Price Lock Banner -->
+      <section class="p-md rounded-md bg-warning-container text-on-warning-container flex items-center gap-sm" role="status">
+        <span class="material-symbols-outlined text-[20px] shrink-0" aria-hidden="true">lock_clock</span>
+        <p data-design-text-token="label-sm" class="font-label text-label-sm tabular-nums">
+          Seçilen teklifin fiyatı 15 dakika kilitlendi · 14:42 kaldı
+        </p>
+      </section>
+
+      <!-- Room Offers -->
+      <section class="flex flex-col gap-md">
+        <h3 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">Oda Teklifleri</h3>
+
+        <!-- Selected Room Offer -->
+        <article data-component-id="card-action" data-component-type="card" data-component-variant="action" class="bg-surface-container-lowest border-2 border-primary rounded-lg p-lg flex flex-col gap-md">
+          <header class="flex items-start justify-between gap-md">
+            <div>
+              <h4 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Standart oda</h4>
+              <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Kahvaltı dahil, esnek iptal · 2 gece</p>
+            </div>
+            <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums shrink-0">₺4.850,00</span>
+          </header>
+          <div class="flex items-center gap-xs text-success">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">check_circle</span>
+            <p data-design-text-token="body-md" class="font-body text-body-md">Ücretsiz iptal: 02.12.2026 00:00&#39;a kadar</p>
+          </div>
+          <footer class="pt-sm border-t border-outline-variant grid grid-cols-2 gap-sm">
+            <button type="button" class="min-h-[44px] px-md rounded-md border border-outline-variant bg-surface-container-lowest text-on-surface font-label text-label-lg">
+              Sepete ekle
+            </button>
+            <button type="button" class="min-h-[44px] px-md rounded-md bg-primary text-on-primary font-label text-label-lg">
+              Rezervasyon yap
+            </button>
+          </footer>
+        </article>
+
+        <!-- Second Offer (Non-refundable) -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-sm">
+          <header class="flex items-start justify-between gap-md">
+            <div>
+              <h4 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Standart oda</h4>
+              <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Sadece oda · 2 gece</p>
+            </div>
+            <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums shrink-0">₺4.120,00</span>
+          </header>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">İade edilmez</p>
+        </article>
+
+        <!-- Empty State for Unavailable Room Type -->
+        <div class="p-lg rounded-lg bg-surface-container-low border border-outline-variant flex flex-col gap-xs">
+          <div class="flex items-center gap-xs text-on-surface">
+            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">event_busy</span>
+            <p data-design-text-token="title-md" class="font-title text-title-md">Bu tarihlerde uygun oda yok</p>
+          </div>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant tabular-nums">
+            Aile odası için en yakın uygun tarih: 11.12.2026 - 13.12.2026
+          </p>
+        </div>
+      </section>
+
+      <!-- Reviews -->
+      <section class="flex flex-col gap-md">
+        <div class="flex items-baseline justify-between">
+          <h3 data-design-text-token="headline-md" class="font-headline text-headline-md text-on-surface">Değerlendirmeler</h3>
+          <span data-design-text-token="label-lg" class="font-label text-label-lg text-primary tabular-nums">4,6 / 5</span>
+        </div>
+
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-sm">
+          <div class="flex items-center justify-between">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface tabular-nums">Puan: 5 / 5</span>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">18.11.2026</span>
+          </div>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface">
+            Konumu çok merkezi, odalar tertemizdi. Sabah kahvaltısı özenliydi.
+          </p>
+          <div class="p-md rounded-md bg-surface-container-low border-l-2 border-secondary">
+            <p data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface">Otel yanıtı</p>
+            <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">
+              Nazik değerlendirmeniz için teşekkür ederiz, sizi yeniden ağırlamaktan mutluluk duyarız.
+            </p>
+          </div>
+        </article>
+
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg flex flex-col gap-sm">
+          <div class="flex items-center justify-between">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface tabular-nums">Puan: 4 / 5</span>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">09.11.2026</span>
+          </div>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface">
+            Giriş işlemi çok hızlıydı, geç saatte bile sessiz bir uyku çektik.
+          </p>
+        </article>
+      </section>
+
+    </main>
+  </div>
+
+
+</body></html>
