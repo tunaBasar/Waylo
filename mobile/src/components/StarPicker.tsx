@@ -1,11 +1,14 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { color, space } from '@/theme/tokens';
 
 export function StarPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 8 }}>
+    <View style={{ flexDirection: 'row', gap: space.xs }}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Pressable key={n} accessibilityRole="button" accessibilityLabel={`${n} puan`} onPress={() => onChange(n)}>
-          <Text style={{ fontSize: 28, color: n <= value ? '#f5a623' : '#c5c9d0' }}>★</Text>
+        <Pressable key={n} accessibilityRole="button" accessibilityLabel={`${n} puan`} accessibilityState={{ selected: n <= value }} onPress={() => onChange(n)}
+          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <MaterialCommunityIcons name={n <= value ? 'star' : 'star-outline'} size={30} color={n <= value ? color.warning : color.outline} accessibilityElementsHidden importantForAccessibility="no" />
         </Pressable>
       ))}
     </View>

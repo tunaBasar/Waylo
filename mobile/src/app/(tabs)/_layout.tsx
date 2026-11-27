@@ -1,15 +1,11 @@
 import { Redirect, Tabs, usePathname, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, Text } from 'react-native';
 import { useAuth } from '@/features/auth/AuthContext';
 import { needsLogin, peekReturnTo, setReturnTo, takeReturnTo } from '@/features/auth/gate';
 import { useCart } from '@/features/cart/CartContext';
 import { peekPendingOrderLink } from '@/features/deeplinks';
-
-function TabGlyph({ glyph }: { glyph: string }) {
-  return <Text accessibilityElementsHidden importantForAccessibility="no">{glyph}</Text>;
-}
-const icon = (glyph: string) => function TabIcon() { return <TabGlyph glyph={glyph} />; };
+import { BottomBar } from '@/components/BottomBar';
+import { color, font, type } from '@/theme/tokens';
 
 export default function TabsLayout() {
   const router = useRouter();
@@ -32,22 +28,24 @@ export default function TabsLayout() {
   }, [user, router]);
 
   const goLogin = (back: string) => { setReturnTo(back); router.navigate('/(auth)/login'); };
-  const cartButton = () => (
-    <Pressable accessibilityRole="button" accessibilityLabel="Sepet" onPress={() => (user ? router.push('/cart') : goLogin('/cart'))} style={{ paddingHorizontal: 14 }}>
-      <Text>{`Sepet${items.length ? ` (${items.length})` : ''}`}</Text>
-    </Pressable>
-  );
+  const openCart = () => (user ? router.push('/cart') : goLogin('/cart'));
   const guestTab = (back: string) => ({ tabPress: (e: { preventDefault: () => void }) => { if (!user) { e.preventDefault(); goLogin(back); } } });
   // Opening an account tab directly (deep link) as a guest: go to login first.
   if (!user && needsLogin(pathname)) { setReturnTo(pathname); return <Redirect href="/(auth)/login" />; }
   return (
-    <Tabs screenOptions={{ headerRight: cartButton }}>
-      <Tabs.Screen name="hotels" options={{ title: 'Oteller', tabBarIcon: icon('🏨') }} />
-      <Tabs.Screen name="flights" options={{ title: 'Ucuslar', tabBarIcon: icon('✈️') }} />
-      <Tabs.Screen name="cars" options={{ title: 'Arac', tabBarIcon: icon('🚗') }} />
-      <Tabs.Screen name="bus" options={{ title: 'Otobus', tabBarIcon: icon('🚌') }} />
-      <Tabs.Screen name="orders" options={{ title: 'Siparisler', tabBarIcon: icon('🧾') }} listeners={guestTab('/orders')} />
-      <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('👤') }} listeners={guestTab('/profile')} />
+    <Tabs
+      tabBar={(p) => <BottomBar {...p} cartCount={items.length} onCart={openCart} />}
+      screenOptions={{
+        headerStyle: { backgroundColor: color.primary },
+        headerTintColor: color.onPrimary,
+        headerTitleStyle: { fontFamily: font.displaySemi, fontSize: type.headlineMd.fontSize },
+      }}>
+      <Tabs.Screen name="hotels" options={{ title: 'Oteller' }} />
+      <Tabs.Screen name="flights" options={{ title: 'Ucuslar' }} />
+      <Tabs.Screen name="cars" options={{ title: 'Arac' }} />
+      <Tabs.Screen name="bus" options={{ title: 'Otobus' }} />
+      <Tabs.Screen name="orders" options={{ title: 'Siparisler' }} listeners={guestTab('/orders')} />
+      <Tabs.Screen name="profile" options={{ title: 'Profil' }} listeners={guestTab('/profile')} />
     </Tabs>
   );
 }

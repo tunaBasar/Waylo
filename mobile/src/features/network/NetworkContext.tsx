@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Platform, Text } from 'react-native';
+import { Platform, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { color, space, type } from '@/theme/tokens';
 import NetInfo from '@react-native-community/netinfo';
 
 const Ctx = createContext(true);
@@ -26,9 +28,12 @@ export function OfflineBanner() {
   const online = useOnline();
   if (online) return null;
   return (
-    <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="offline-banner"
-      style={{ backgroundColor: '#3c4043', color: '#fff', padding: 8, textAlign: 'center', fontWeight: '600' }}>
-      Cevrimdisisiniz. Odeme ve siparis islemleri baglanti gelince yapilabilir.
-    </Text>
+    <View accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="offline-banner"
+      style={{ backgroundColor: color.warningContainer, flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, paddingHorizontal: space.lg }}>
+      <MaterialCommunityIcons name="wifi-off" size={18} color={color.onWarningContainer} accessibilityElementsHidden importantForAccessibility="no" />
+      <Text style={[type.labelLg, { color: color.onWarningContainer, flex: 1 }]}>
+        Cevrimdisisiniz. Odeme ve siparis islemleri baglanti gelince yapilabilir.
+      </Text>
+    </View>
   );
 }

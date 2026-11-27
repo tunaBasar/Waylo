@@ -1,7 +1,7 @@
 import { createElement, useState } from 'react';
 import { Platform, Pressable, Text, View, StyleSheet } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { colors } from '@/components/ui';
+import { color, radius, space, type } from '@/theme/tokens';
 import { fmtDate, fmtTime, isoDate } from '@/features/dates';
 
 const p2 = (n: number) => String(n).padStart(2, '0');
@@ -18,12 +18,12 @@ export function DateField({ label, value, onChange, mode = 'date', minimumDate }
   if (Platform.OS === 'web') {
     const v = mode === 'date' ? isoDate(value) : `${isoDate(value)}T${p2(value.getHours())}:${p2(value.getMinutes())}`;
     return (
-      <View style={{ gap: 4 }}>
+      <View style={{ gap: space.xs }}>
         <Text style={s.label}>{label}</Text>
         {createElement('input', {
           type: mode === 'date' ? 'date' : 'datetime-local', value: v, 'aria-label': label,
           min: minimumDate ? isoDate(minimumDate) : undefined,
-          style: { padding: 10, borderRadius: 8, border: '1px solid #d0d5dd', fontSize: 14 },
+          style: { padding: 10, minHeight: 44, boxSizing: 'border-box', borderRadius: radius.md, border: `1px solid ${color.outlineVariant}`, fontSize: 15, color: color.onSurface, backgroundColor: color.surfaceLowest },
           onChange: (e: { target: { value: string } }) => {
             const t = e.target.value;
             if (!t) return;
@@ -48,10 +48,10 @@ export function DateField({ label, value, onChange, mode = 'date', minimumDate }
   };
 
   return (
-    <View style={{ gap: 4 }}>
+    <View style={{ gap: space.xs }}>
       <Text style={s.label}>{label}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setShow('date')} style={s.input}>
-        <Text>{mode === 'date' ? fmtDate(value) : `${fmtDate(value)} ${fmtTime(value)}`}</Text>
+        <Text style={[type.bodyLg, { color: color.onSurface }]}>{mode === 'date' ? fmtDate(value) : `${fmtDate(value)} ${fmtTime(value)}`}</Text>
       </Pressable>
       {show && (
         <DateTimePicker value={value} mode={show} minimumDate={minimumDate} is24Hour onChange={handle(show)} />
@@ -61,6 +61,6 @@ export function DateField({ label, value, onChange, mode = 'date', minimumDate }
 }
 
 const s = StyleSheet.create({
-  label: { fontSize: 12, color: colors.muted },
-  input: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#d0d5dd', paddingHorizontal: 12, paddingVertical: 12 },
+  label: { ...type.labelSm, color: color.onSurfaceVariant },
+  input: { minHeight: 44, justifyContent: 'center', backgroundColor: color.surfaceLowest, borderRadius: radius.md, borderWidth: 1, borderColor: color.outlineVariant, paddingHorizontal: space.md, paddingVertical: space.sm },
 });
