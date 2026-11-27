@@ -18,7 +18,15 @@ import com.waylo.flightservice.repository.FlightRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.time.Clock;
+import java.util.ArrayList;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -33,6 +41,8 @@ import java.util.regex.Pattern;
 public class FlightServiceImpl implements FlightService {
 
     private static final Pattern FLIGHT_NUMBER_PATTERN = Pattern.compile("^[A-Z0-9]{2}[0-9]{1,4}[A-Z]?$");
+    static final int MAX_PAGE_SIZE = 200;
+    private static final ZoneId ISTANBUL = ZoneId.of("Europe/Istanbul");
     private static final Duration MAX_DURATION = Duration.ofHours(20);
 
     private final FlightRepository flightRepository;
@@ -124,10 +134,26 @@ public class FlightServiceImpl implements FlightService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FlightResponse> getAll() {
-        return flightRepository.findAllByOrderByDepartureTimeAsc().stream()
-                .map(flightMapper::toResponse)
-                .toList();
+    public Page<FlightResponse> list(LocalDate from, LocalDate to, FlightStatus status, boolean upcoming,
+                                     String flightNumber, int page, int size) {
+        int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        Pageable pageable = PageRequest.of(Math.max(0, page), safeSize, Sort.by("departureTime").ascending());
+        Instant start = from == null ? null : from.atStartOfDay(ISTANBUL).toInstant();
+        Instant end = to == null ? null : to.plusDays(1).atStartOfDay(ISTANBUL).toInstant();
+        Instant now = upcoming ? clock.instant() : null;
+        // Stored numbers are upper case A-Z/0-9 (normalise + FLIGHT_NUMBER_PATTERN), so this needle has no LIKE wildcards.
+        String needle = flightNumber == null ? "" : flightNumber.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+
+        Specification<Flight> spec = (root, query, cb) -> {
+            List<Predicate> ps = new ArrayList<>();
+            if (start != null) ps.add(cb.greaterThanOrEqualTo(root.get("departureTime"), start));
+            if (end != null) ps.add(cb.lessThan(root.get("departureTime"), end));
+            if (now != null) ps.add(cb.greaterThanOrEqualTo(root.get("departureTime"), now));
+            if (status != null) ps.add(cb.equal(root.get("status"), status));
+            if (!needle.isEmpty()) ps.add(cb.like(root.<String>get("flightNumber"), "%" + needle + "%"));
+            return cb.and(ps.toArray(new Predicate[0]));
+        };
+        return flightRepository.findAll(spec, pageable).map(flightMapper::toResponse);
     }
 
     // --- search ---

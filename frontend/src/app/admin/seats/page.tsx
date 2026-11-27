@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { SEAT_TYPES, adminApi, type SeatType } from '@/lib/admin';
 import type { Flight } from '@/lib/types';
+import { formatDate } from '@/lib/utils';
+import { FLIGHT_MAX_PAGE_SIZE, filterFlightsByNumber, flightPickerHint } from '@/lib/flight-paging';
 import { Button, Card, Field, PageHeader, inputClass } from '@/components/partner/ui';
 
 export default function AdminSeatsPage() {
   const toast = useToast();
   const [flights, setFlights] = useState<Flight[]>([]);
+  const [flightTotal, setFlightTotal] = useState(0);
+  const [flightsError, setFlightsError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [flightNumber, setFlightNumber] = useState('');
+  const [flightFilter, setFlightFilter] = useState('');
   const [seatType, setSeatType] = useState<SeatType>('ECONOMY');
   const [price, setPrice] = useState('');
   const [fromRow, setFromRow] = useState('1');
@@ -18,11 +24,19 @@ export default function AdminSeatsPage() {
   const [saving, setSaving] = useState(false);
   const [available, setAvailable] = useState<number | null>(null);
 
+  // The server filters by flight number (a page holds at most 200 of ~500 upcoming flights), debounced while typing.
   useEffect(() => {
     let cancelled = false;
-    adminApi.flights().then(r => { if (!cancelled) setFlights(r.data ?? []); }).catch(() => { if (!cancelled) toast.error('Ucuslar yuklenemedi'); });
-    return () => { cancelled = true; };
-  }, [toast]);
+    const timer = setTimeout(() => {
+      adminApi.flights({ upcoming: true, size: FLIGHT_MAX_PAGE_SIZE, flightNumber: flightFilter })
+        .then(r => { if (!cancelled) { setFlights(r.data); setFlightTotal(r.total); setFlightsError(null); } })
+        .catch(e => { if (!cancelled) setFlightsError(e instanceof Error ? e.message : 'Ucuslar yuklenemedi'); });
+    }, flightFilter ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [flightFilter, reloadKey]);
+
+  const pickerFlights = filterFlightsByNumber(flights, flightFilter);
+  const pickerHint = flightPickerHint(flightTotal, flights.length);
 
   const rows = Number(toRow) - Number(fromRow) + 1;
   const cleanLetters = letters.toUpperCase().replace(/[^A-Z]/g, '');
@@ -46,11 +60,15 @@ export default function AdminSeatsPage() {
       <PageHeader title="Koltuklar" subtitle="Bir ucus icin toplu koltuk olusturun." />
       <Card className="p-4">
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Ucus">
+          <Field label="Ucus no ara" hint={pickerHint ?? undefined}>
+            <input className={inputClass} value={flightFilter} onChange={e => setFlightFilter(e.target.value)} placeholder="Ornek: WD1" />
+          </Field>
+          <Field label="Ucus" error={flightsError}>
             <select className={inputClass} value={flightNumber} onChange={e => { setFlightNumber(e.target.value); setAvailable(null); }}>
-              <option value="">Ucus secin</option>
-              {flights.map(f => <option key={f.id} value={f.flightNumber}>{f.flightNumber} {f.departureAirportCode}-{f.arrivalAirportCode}</option>)}
+              <option value="">{flightFilter && pickerFlights.length === 0 && !flightsError ? 'Eslesen yaklasan ucus yok' : 'Ucus secin'}</option>
+              {pickerFlights.map(f => <option key={f.id} value={f.flightNumber}>{f.flightNumber} {f.departureAirportCode}-{f.arrivalAirportCode} {formatDate(f.departureTime)}</option>)}
             </select>
+            {flightsError && <button type="button" className="mt-1 text-xs font-medium text-primary underline" onClick={() => setReloadKey(k => k + 1)}>Tekrar dene</button>}
           </Field>
           <Field label="Koltuk tipi">
             <select className={inputClass} value={seatType} onChange={e => setSeatType(e.target.value as SeatType)}>

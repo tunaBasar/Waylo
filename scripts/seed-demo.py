@@ -444,7 +444,14 @@ def seed_flights(admin):
                                                'timezone': tz, 'latitude': lat, 'longitude': lon}, admin)
     today = datetime.datetime.now(TZ).date()
     old_last = {}  # route digit -> last local departure date of old-style flights WD<route><day-of-year>
-    for f in as_list(call('GET', '/api/flights', token=admin)[1].get('data')):
+    all_flights, fpage = [], 0
+    while True:  # /api/flights is paged (max size 200)
+        chunk = as_list(call('GET', f'/api/flights?size=200&page={fpage}', token=admin)[1].get('data'))
+        all_flights += chunk
+        if len(chunk) < 200:
+            break
+        fpage += 1
+    for f in all_flights:
         m = re.fullmatch(r'WD(\d)(\d{3})', f.get('flightNumber') or '')
         if m and f.get('departureTime'):
             try:

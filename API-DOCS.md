@@ -163,7 +163,19 @@ ISO 8601 UTC format: `"2026-10-11T12:00:00Z"`
 
 #### `GET /api/flights/{id}` - Get Flight by ID
 #### `GET /api/flights/number/{flightNumber}` - Get Flight by Number
-#### `GET /api/flights` - List All Flights
+#### `GET /api/flights` - List Flights (paged)
+
+Bounded list, sorted by departure time ascending (2026-11-27). The body stays `ApiResponse<List<FlightResponse>>`;
+the number of matching rows is in the `X-Total-Count` response header (exposed to browsers by the gateway CORS config).
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | int | 0 | Page number (negative values become 0) |
+| `size` | int | 50 | Page size, clamped to 1..200 |
+| `from` / `to` | ISO date | - | Departure day range, inclusive, Europe/Istanbul days |
+| `status` | `SCHEDULED` \| `CANCELLED` | all | Status filter |
+| `upcoming` | boolean | false | Only departures from now on |
+| `flightNumber` | string | - | Contains filter, case-insensitive; only letters and digits are used |
 
 #### `GET /api/flights/search` - Search Flights
 

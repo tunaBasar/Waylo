@@ -529,6 +529,15 @@ except Exception:
 '
 }
 
+# Paged list endpoints (GET /api/flights): the total is the X-Total-Count header, the body holds one page only.
+count_header() {
+  local path="$1" code total
+  code=$(curl -s -o /dev/null -D /tmp/waylo-count-headers.$$ -w '%{http_code}' "$BASE$path" -H "Authorization: Bearer $TOKEN" || true)
+  total=$(tr -d '\r' < /tmp/waylo-count-headers.$$ 2>/dev/null | awk -F': *' 'tolower($1)=="x-total-count"{print $2}')
+  rm -f /tmp/waylo-count-headers.$$
+  if [ "$code" = 200 ] && [[ "$total" =~ ^[0-9]+$ ]]; then echo "$total"; else echo "N/A (HTTP $code)"; fi
+}
+
 login
 ROOM_TOTAL=0
 ROOM_STATUS=200
@@ -559,7 +568,7 @@ if [ "$SEAT_TOTAL" = "0" ] && [ "$SEAT_STATUS" != "200" ]; then SEAT_TOTAL="N/A 
 
 echo ""
 echo "Airports:       $(count_endpoint "/api/airports" "len(data)")"
-echo "Flights:        $(count_endpoint "/api/flights" "len(data)")"
+echo "Flights:        $(count_header "/api/flights?size=1")"
 echo "Seats:          $SEAT_TOTAL"
 echo "Hotels:         $(count_endpoint "/api/hotels" "len(data)")"
 echo "Rooms:          $ROOM_TOTAL"

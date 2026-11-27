@@ -18,7 +18,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
@@ -247,20 +258,120 @@ class FlightServiceImplTest {
         assertThat(service.getByFlightNumber("wa100")).isEqualTo(response);
     }
 
-    // ===================== getAll =====================
+    // ===================== list =====================
+
+    @SuppressWarnings("unchecked")
+    private Specification<Flight> captureSpec(ArgumentCaptor<Pageable> pageable) {
+        ArgumentCaptor<Specification<Flight>> spec = ArgumentCaptor.forClass(Specification.class);
+        verify(flightRepository).findAll(spec.capture(), pageable.capture());
+        return spec.getValue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubEmptyPage() {
+        when(flightRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+    }
 
     @Test
-    void getAll_sortedByDepartureTimeAsc() {
+    void list_pagesSortedByDepartureAscAndMapsContent() {
         Flight f1 = buildFlight("WA1", FlightStatus.SCHEDULED,
                 Instant.parse("2026-12-01T10:00:00Z"), Instant.parse("2026-12-01T12:00:00Z"));
-        Flight f2 = buildFlight("WA2", FlightStatus.SCHEDULED,
-                Instant.parse("2026-12-01T08:00:00Z"), Instant.parse("2026-12-01T10:00:00Z"));
-        when(flightRepository.findAllByOrderByDepartureTimeAsc()).thenReturn(List.of(f1, f2));
-        when(flightMapper.toResponse(any(Flight.class))).thenReturn(mock(FlightResponse.class));
+        FlightResponse r = mock(FlightResponse.class);
+        when(flightRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(f1), PageRequest.of(2, 50), 101));
+        when(flightMapper.toResponse(f1)).thenReturn(r);
 
-        List<FlightResponse> result = service.getAll();
+        Page<FlightResponse> result = service.list(null, null, null, false, null, 2, 50);
 
-        verify(flightRepository).findAllByOrderByDepartureTimeAsc();
+        assertThat(result.getContent()).containsExactly(r);
+        assertThat(result.getTotalElements()).isEqualTo(101);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        captureSpec(p);
+        assertThat(p.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(p.getValue().getPageSize()).isEqualTo(50);
+        assertThat(p.getValue().getSort().getOrderFor("departureTime").isAscending()).isTrue();
+    }
+
+    @Test
+    void list_sizeAboveMaxIsClampedTo200() {
+        stubEmptyPage();
+        service.list(null, null, null, false, null, 0, 5000);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        captureSpec(p);
+        assertThat(p.getValue().getPageSize()).isEqualTo(200);
+    }
+
+    @Test
+    void list_nonPositiveSizeAndNegativePageAreNormalised() {
+        stubEmptyPage();
+        service.list(null, null, null, false, null, -3, 0);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        captureSpec(p);
+        assertThat(p.getValue().getPageNumber()).isZero();
+        assertThat(p.getValue().getPageSize()).isEqualTo(1);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CriteriaBuilder runSpec(Specification<Flight> spec) {
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Root<Flight> root = mock(Root.class);
+        Path<Object> path = mock(Path.class);
+        // lenient: a spec with no active filter never reads an attribute, which is exactly what some tests assert.
+        lenient().when(root.get(anyString())).thenReturn(path);
+        spec.toPredicate(root, mock(CriteriaQuery.class), cb);
+        return cb;
+    }
+
+    @Test
+    void list_upcomingFiltersDepartureFromNow() {
+        stubEmptyPage();
+        service.list(null, null, null, true, null, 0, 50);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        CriteriaBuilder cb = runSpec(captureSpec(p));
+        verify(cb).greaterThanOrEqualTo(any(Expression.class), eq(FIXED_NOW));
+        verify(cb, never()).equal(any(Expression.class), any(Object.class));
+    }
+
+    @Test
+    void list_dateRangeUsesIstanbulDaysInclusive() {
+        stubEmptyPage();
+        service.list(LocalDate.parse("2026-12-01"), LocalDate.parse("2026-12-02"), null, false, null, 0, 50);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        CriteriaBuilder cb = runSpec(captureSpec(p));
+        // Istanbul is UTC+3: 2026-12-01 00:00 local = 2026-11-30T21:00Z, end exclusive 2026-12-03 00:00 local
+        verify(cb).greaterThanOrEqualTo(any(Expression.class), eq(Instant.parse("2026-11-30T21:00:00Z")));
+        verify(cb).lessThan(any(Expression.class), eq(Instant.parse("2026-12-02T21:00:00Z")));
+    }
+
+    @Test
+    void list_statusFilterAddsEquality() {
+        stubEmptyPage();
+        service.list(null, null, FlightStatus.CANCELLED, false, null, 0, 50);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        CriteriaBuilder cb = runSpec(captureSpec(p));
+        verify(cb).equal(any(Expression.class), eq(FlightStatus.CANCELLED));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void list_flightNumberFilterIsContainsUpperCasedAndStripped() {
+        stubEmptyPage();
+        service.list(null, null, null, true, " wd-1%_ ", 0, 200);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        CriteriaBuilder cb = runSpec(captureSpec(p));
+        // Only letters and digits are kept, so user input can never inject LIKE wildcards.
+        verify(cb).like(any(Expression.class), eq("%WD1%"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void list_blankOrSymbolOnlyFlightNumberAddsNoFilter() {
+        stubEmptyPage();
+        service.list(null, null, null, false, "  -%  ", 0, 50);
+        ArgumentCaptor<Pageable> p = ArgumentCaptor.forClass(Pageable.class);
+        CriteriaBuilder cb = runSpec(captureSpec(p));
+        verify(cb, never()).like(any(Expression.class), anyString());
     }
 
     // ===================== search =====================
@@ -542,7 +653,7 @@ class FlightServiceImplTest {
                 .hasMessage("Cancel the flight before deleting it")
                 .extracting("ruleCode").isEqualTo("FLIGHT_NOT_CANCELLED");
 
-        verify(flightRepository, never()).delete(any());
+        verify(flightRepository, never()).delete(any(Flight.class));
     }
 
     @Test

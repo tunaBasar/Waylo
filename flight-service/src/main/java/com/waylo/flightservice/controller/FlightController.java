@@ -1,10 +1,12 @@
 package com.waylo.flightservice.controller;
 
+import com.waylo.flightservice.domain.FlightStatus;
 import com.waylo.flightservice.dto.ApiResponse;
 import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
 import com.waylo.flightservice.service.FlightService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,9 +51,25 @@ public class FlightController {
         return ResponseEntity.ok(ApiResponse.of(flightService.getByFlightNumber(flightNumber)));
     }
 
+    /**
+     * Bounded list. Params: page (default 0), size (default 50, values above 200 are clamped to 200),
+     * from/to (ISO dates, inclusive Europe/Istanbul days), status, upcoming (default false), flightNumber (contains,
+     * case-insensitive; only letters and digits count).
+     * Total matching rows are returned in the X-Total-Count header; the body stays a plain list.
+     */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<FlightResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.of(flightService.getAll()));
+    public ResponseEntity<ApiResponse<List<FlightResponse>>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) FlightStatus status,
+            @RequestParam(defaultValue = "false") boolean upcoming,
+            @RequestParam(required = false) String flightNumber) {
+        Page<FlightResponse> result = flightService.list(from, to, status, upcoming, flightNumber, page, size);
+        return ResponseEntity.ok()
+                .header("X-Total-Count", String.valueOf(result.getTotalElements()))
+                .body(ApiResponse.of(result.getContent()));
     }
 
     @GetMapping("/search")

@@ -5,6 +5,25 @@ import type { Amount, BankAccountStatus, PartnerPayout, PartnerPayoutBalance, Pa
 
 const enc = encodeURIComponent;
 
+export interface FlightListParams { page?: number; size?: number; upcoming?: boolean; status?: string; from?: string; to?: string; flightNumber?: string }
+export interface FlightPage { data: Flight[]; total: number }
+
+/** One page of flights; total comes from X-Total-Count and falls back to the page length when the header is absent. */
+async function flightsWithTotal(p: FlightListParams): Promise<FlightPage> {
+  const q = new URLSearchParams();
+  if (p.page) q.set('page', String(p.page));
+  if (p.size) q.set('size', String(p.size));
+  if (p.upcoming) q.set('upcoming', 'true');
+  if (p.status) q.set('status', p.status);
+  if (p.from) q.set('from', p.from);
+  if (p.to) q.set('to', p.to);
+  if (p.flightNumber?.trim()) q.set('flightNumber', p.flightNumber.trim());
+  const qs = q.toString();
+  const { body, total } = await api.getWithTotal<Flight>(`/api/flights${qs ? `?${qs}` : ''}`);
+  const data = body?.data ?? [];
+  return { data, total: total ?? data.length };
+}
+
 export type OrgStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 /** createdAt and owner are not in the auth-service OrganizationResponse yet: shown only when the API sends them. */
 export interface AdminOrganization {
@@ -194,7 +213,8 @@ export const adminApi = {
   updateAirport: (id: string, b: AirportRequest) => api.put<Airport>(`/api/airports/${enc(id)}`, b),
   deleteAirport: (id: string) => api.del(`/api/airports/${enc(id)}`),
 
-  flights: () => api.get<Flight[]>('/api/flights'),
+  /** One bounded page of flights (backend default size 50, max 200; filters run on the server) plus X-Total-Count. */
+  flights: (p: FlightListParams = {}) => flightsWithTotal(p),
   createFlight: (b: FlightRequest) => api.post<Flight>('/api/flights', b),
   updateFlight: (id: string, b: FlightRequest) => api.put<Flight>(`/api/flights/${enc(id)}`, b),
   cancelFlight: (id: string) => api.post<Flight>(`/api/flights/${enc(id)}/cancel`, {}),
