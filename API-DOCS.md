@@ -2136,3 +2136,41 @@ decision covers the content and the photo set (HOTEL-PUBLICATION-CONTRACT.md sec
   that way are skipped by the cascade. Photos not attached to any request keep using the per-photo queue (16.5).
 - UI: the partner submit panel lists PENDING photos as a checklist (all checked); the admin request detail shows the
   photos with thumbnails and a per-photo reject.
+
+### 16.10 Inventory automation (2026-11-27, INVENTORY-AUTOMATION-CONTRACT.md)
+
+Rules and timetables open future dates automatically; hand-made entries always win. Every generator is idempotent,
+never creates past departures and runs after a save, on "apply" and daily (03:10 hotel, 03:20 bus, 03:30 flight,
+Europe/Istanbul; `waylo.automation.enabled`, `waylo.automation.cron`). Runs return
+`{created, updated, skippedExisting, skippedManual, skippedPast}` (hotel adds `inventoryCreated`, `ratesCreated`,
+`skippedUnpriced`).
+
+**Hotel (hotel-service V14)** - guard `requireRoomManage` (partner managers, admin):
+- `GET /api/hotels/{hotelId}/automation` -> `{inventoryRules, rateRules, coverage: [{roomTypeId, inventoryUntil, ratesUntil}]}`
+- `PUT /api/hotels/{hotelId}/automation/inventory-rules/{roomTypeId}` `{defaultAllotment, horizonDays 30-730, active, expectedVersion?}`
+- `POST /api/hotels/{hotelId}/automation/rate-rules` (201), `PUT .../rate-rules/{ruleId}`, `DELETE .../rate-rules/{ruleId}` (204, generated prices stay)
+  body `{roomTypeId, ratePlanId, name, validFrom?, validTo? (both null = default rule), currency, baseOccupancy, baseAmount, weekendBaseAmount?, extraPersonAmount, reducedPersonAmount, active}`
+- `POST /api/hotels/{hotelId}/automation/apply`, `POST .../automation/reset {roomTypeId?, from >= today, to, max 730 days}`
+- Price per occupancy o with base b: `base + (o-b)*extra` above, `base - (b-o)*reduced` below; weekend base on Friday and Saturday nights; a season beats the default rule.
+- `daily_inventory.source` / `daily_rates.source`: `MANUAL` (PUT /inventory, PUT /rates) or `RULE`; both appear in the inventory/rate responses.
+- Errors: `OCCUPANCY_RULE`, `CURRENCY_MISMATCH`, `RULE_OVERLAP`, `INVALID_DATE_RANGE` (422), `ROOM_TYPE_INACTIVE`, `RATE_PLAN_INACTIVE`, 409 on a stale `expectedVersion`.
+
+**Bus (bus-service V4)** - under `/api/bus-partner/organizations/{organizationId}`, guard `requireBusManager`:
+- `GET /trip-schedules` (with `nextDepartures`, `generatedCount`), `POST /trip-schedules` (201), `PUT /trip-schedules/{id}`,
+  `POST /trip-schedules/{id}/activate`, `POST /trip-schedules/{id}/deactivate`, `POST /trip-schedules/apply`
+- body `{busId, code, currency, weekdays: ["MONDAY",...], departureTime "HH:mm", validFrom, validTo?, horizonDays 1-120, stops: [{terminalId, arrivalOffsetMinutes, departureOffsetMinutes}], fares: [{fromSeq, toSeq, price}]}`
+- Departures go through the normal trip rules; an existing departure of the code (also CANCELLED) is never recreated; a departure earlier than now + 60 min is skipped. `TripResponse.scheduleId`.
+- Errors: `SCHEDULE_CODE_TAKEN`, `INVALID_SCHEDULE`, plus `INVALID_STOPS`, `INVALID_FARES`, `INVALID_TERMINAL`, `BUS_INACTIVE`.
+
+**Flight (flight-service V3)** - reads public, writes admin-only (`AdminWriteFilter`):
+- `GET /api/flights/schedules` (with `nextFlights`), `POST /api/flights/schedules` (201), `PUT /api/flights/schedules/{id}`,
+  `POST /api/flights/schedules/{id}/activate`, `POST /api/flights/schedules/{id}/deactivate`, `POST /api/flights/schedules/apply`
+- body `{code ^[A-Z]{2}[0-9]{1,3}$, airline, departureAirportCode, arrivalAirportCode, weekdays, departureTime, durationMinutes 20-1200, validFrom, validTo?, horizonDays 1-120, cabins: [{seatType, price, fromRow, toRow, letters}]}`
+- Flight number = code + yy + day of year (WD1 on 2026-11-27 = WD126331). Departures earlier than now + 3 h are skipped.
+- `FlightCreatedEvent.cabins` (null for hand-made flights): flight-seat-inventory creates the missing seats (idempotent by eventId, existing seat numbers skipped).
+- Errors: `SCHEDULE_CODE_TAKEN`, `INVALID_SCHEDULE`, `INVALID_CABINS`, `SAME_AIRPORT`, unknown airport (404).
+
+**Web:** partner `/partner/automation` ("Otomatik takvim"), the calendar marks hand-typed days "Elle"; partner
+`/partner/bus/trips` "Haftalik sefer planlari"; admin `/admin/flight-schedules` ("Ucus Planlari").
+**Demo data:** `scripts/seed-demo.py` and `scripts/seed-bus-partner.py` create rules/schedules instead of rows.
+**Live test:** `scripts/test-schedules.py` (bus + flight schedules, RLS, seats from the event, cleanup).
