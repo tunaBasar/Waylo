@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppHeader } from '@/components/AppHeader';
+import { StatusPill, type Tone } from '@/components/StatusPill';
+import { Price } from '@/components/Price';
+import { color, radius, space, type } from '@/theme/tokens';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import type { Order } from '@/api';
 import { ordersApi } from '@/features/orders/api';
 import { loadOrdersSnapshot, saveOrdersSnapshot } from '@/features/orders/cache';
 import { useAsync } from '@/features/useAsync';
-import { AsyncView, Card, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Card, Muted, Screen } from '@/components/ui';
 import { money, orderStatusInfo } from '@/features/format';
 import { sortOrdersForDisplay } from '@/features/orders/sort';
 import { orderSummary } from '@/features/orders/summary';
+
+const STATUS_TONE: Record<string, Tone> = { PENDING: 'warning', CONFIRMED: 'success', CANCELLED: 'neutral', EXPIRED: 'error' };
 
 function OrderList({ orders }: { orders: Order[] }) {
   const router = useRouter();
@@ -19,12 +25,14 @@ function OrderList({ orders }: { orders: Order[] }) {
       <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Siparis ${o.id.slice(0, 8)}, ${status}, ${money(o.totalAmount, o.currency)}`}
         onPress={() => router.push(`/order/${o.id}`)}>
         <Card>
-          <Text style={{ fontWeight: '700' }}>{`#${o.id.slice(0, 8)}`}</Text>
-          {sum.title ? <Text>{sum.title}</Text> : null}
+          <View style={s.top}>
+            <Text style={[type.monoMd, { color: color.onSurface }]}>{`#${o.id.slice(0, 8)}`}</Text>
+            <StatusPill tone={STATUS_TONE[o.status] ?? 'neutral'} text={status} />
+          </View>
+          {sum.title ? <Text style={[type.titleMd, { color: color.onSurface }]} numberOfLines={2}>{sum.title}</Text> : null}
           {sum.count ? <Muted>{sum.count}</Muted> : null}
-          <Muted>{status}</Muted>
           {o.status === 'EXPIRED' ? <Muted>Ödeme süresi doldu, ödeme yapılamaz.</Muted> : null}
-          <Text>{money(o.totalAmount, o.currency)}</Text>
+          <Price amount={o.totalAmount} currency={o.currency} />
         </Card>
       </Pressable>
     );
@@ -46,11 +54,13 @@ export default function Orders() {
   }, [state.offline]);
 
   return (
-    <Screen>
-      <Title>Siparislerim</Title>
+    <View style={s.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader title="Siparişlerim" />
+      <Screen>
       {state.offline && cached ? (
         <>
-          <Text accessibilityRole="alert" style={{ backgroundColor: '#fff3cd', color: '#664d03', padding: 8, borderRadius: 8 }}>
+          <Text accessibilityRole="alert" style={[type.bodyMd, { backgroundColor: color.warningContainer, color: color.onWarningContainer, padding: space.md, borderRadius: radius.md, overflow: 'hidden' }]}>
             {`Cevrimdisi: ${new Date(cached.savedAt).toLocaleString('tr-TR')} tarihli kayitli liste gosteriliyor. Durumlar guncel olmayabilir.`}
           </Text>
           <OrderList orders={cached.orders} />
@@ -60,6 +70,12 @@ export default function Orders() {
           {(orders) => <OrderList orders={orders} />}
         </AsyncView>
       )}
-    </Screen>
+      </Screen>
+    </View>
   );
 }
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.surface },
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+});

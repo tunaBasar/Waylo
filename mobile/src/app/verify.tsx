@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Text } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { api } from '@/api';
-import { Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Screen } from '@/components/ui';
+import { AuthShell, Hint, Section, SuccessNote } from '@/features/account/AccountUi';
 
 /** Email verification deep link: waylo://verify?token=... or https://<host>/verify?token=... */
 export default function Verify() {
@@ -22,13 +23,14 @@ export default function Verify() {
   const s = token ? state : { status: 'error' as const, message: 'Dogrulama tokeni bulunamadi' };
   return (
     <Screen>
-      <Title>E-posta dogrulama</Title>
+      <AuthShell title="E-posta dogrulama">
       {s.status === 'loading' ? (
-        <Card><ActivityIndicator accessibilityLabel="Dogrulaniyor" /><Muted>E-posta dogrulaniyor...</Muted></Card>
+        <Section><ActivityIndicator accessibilityLabel="Dogrulaniyor" /><Hint>E-posta dogrulaniyor...</Hint></Section>
       ) : s.status === 'success' ? (
-        <Card><Text accessibilityRole="alert" accessibilityLiveRegion="polite">{s.message}</Text></Card>
+        <SuccessNote text={s.message} />
       ) : <ErrorBanner message={s.message} />}
       {s.status !== 'loading' ? <Button kind="secondary" title="Uygulamaya don" onPress={() => router.replace('/')} /> : null}
+      </AuthShell>
     </Screen>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { AuthShell, Hint, LinkText } from '@/features/account/AccountUi';
 
 export default function Login() {
   const { login } = useAuth();
@@ -18,14 +19,15 @@ export default function Login() {
   }
   return (
     <Screen>
-      <Title>Waylo&apos;ya giris</Title>
-      <Muted>Waylo · Otel, ucus ve arac kiralama tek yerde</Muted>
+      <AuthShell title="Waylo'ya giriş">
+      <Hint>Otel, uçuş ve araç kiralama tek yerde</Hint>
       <ErrorBanner message={error} />
       <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
       <Field label="Sifre" value={password} onChangeText={setPassword} secureTextEntry />
       <Button title={busy ? 'Giris yapiliyor...' : 'Giris yap'} onPress={submit} disabled={busy || !email || !password} />
-      <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabin yok mu? Kayit ol">Hesabin yok mu? Kayit ol</Link>
-      <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Sifremi unuttum">Sifremi unuttum</Link>
+      <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabin yok mu? Kayit ol"><LinkText>Hesabin yok mu? Kayit ol</LinkText></Link>
+      <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Sifremi unuttum"><LinkText>Sifremi unuttum</LinkText></Link>
+      </AuthShell>
     </Screen>
   );
 }

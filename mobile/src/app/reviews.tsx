@@ -3,7 +3,8 @@ import { Text } from 'react-native';
 import { ApiError } from '@/api';
 import { reviewsApi, reviewErrorMessage, REVIEW_WHEN_HINT, validateReview, MAX_REVIEW_TEXT, type ReviewableItem } from '@/features/reviews/api';
 import { useAsync } from '@/features/useAsync';
-import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { accountStyles, Hint, Section } from '@/features/account/AccountUi';
 import { StarPicker } from '@/components/StarPicker';
 
 function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void }) {
@@ -20,14 +21,14 @@ function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void
     finally { setBusy(false); }
   }
   return (
-    <Card>
-      <Text style={{ fontWeight: '700' }}>{item.hotelName}</Text>
-      <Muted>{item.description}</Muted>
+    <Section>
+      <Text style={accountStyles.strong}>{item.hotelName}</Text>
+      <Hint>{item.description}</Hint>
       <StarPicker value={score} onChange={setScore} />
       <Field label="Yorumunuz (istege bagli)" value={text} onChangeText={setText} multiline maxLength={MAX_REVIEW_TEXT} autoCapitalize="sentences" />
       <ErrorBanner message={error} />
       <Button title={busy ? 'Gonderiliyor...' : 'Yorumu gonder'} disabled={busy} onPress={submit} />
-    </Card>
+    </Section>
   );
 }
 
@@ -35,8 +36,7 @@ export default function Reviews() {
   const state = useAsync(() => reviewsApi.reviewable(), []);
   return (
     <Screen>
-      <Title>Yorum yazabilecegim konaklamalar</Title>
-      <Muted>{REVIEW_WHEN_HINT}</Muted>
+      <Hint>{REVIEW_WHEN_HINT}</Hint>
       <AsyncView<ReviewableItem[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Yorum yazilacak konaklama yok.">
         {(list) => list.map((i) => <ReviewForm key={i.orderItemId} item={i} onDone={state.reload} />)}
       </AsyncView>

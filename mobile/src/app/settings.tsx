@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { api, ApiError } from '@/api';
-import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { Hint, Section } from '@/features/account/AccountUi';
 
 export default function Settings() {
   const { clearSession, logout } = useAuth();
@@ -38,14 +39,12 @@ export default function Settings() {
   }
   return (
     <Screen>
-      <Title>Ayarlar</Title>
-      <Muted>Adinizi ve sifrenizi Profil sekmesinden degistirebilirsiniz.</Muted>
+      <Hint>Adinizi ve sifrenizi Profil sekmesinden degistirebilirsiniz.</Hint>
       <Button kind="secondary" title="Cikis yap" onPress={() => { void logout(); }} />
-      <Card>
-        <Muted>E-posta adresini degistir</Muted>
+      <Section title="E-posta adresini degistir">
         {pendingEmail ? (
           <>
-            <Muted>Yeni gelen kutunuzu kontrol edin: {pendingEmail} adresine dogrulama linki gonderdik. Onaylayana kadar mevcut adresinizle giris yapabilirsiniz; onaydan sonra yeniden giris yapmaniz gerekir.</Muted>
+            <Hint>Yeni gelen kutunuzu kontrol edin: {pendingEmail} adresine dogrulama linki gonderdik. Onaylayana kadar mevcut adresinizle giris yapabilirsiniz; onaydan sonra yeniden giris yapmaniz gerekir.</Hint>
             <Button kind="secondary" title="Baska bir adres gir" onPress={() => setPendingEmail(null)} />
           </>
         ) : (
@@ -56,9 +55,9 @@ export default function Settings() {
             <Button title="Dogrulama linki gonder" disabled={emailBusy || !newEmail.trim() || !emailPassword} onPress={requestEmailChange} />
           </>
         )}
-      </Card>
-      <Card>
-        <Muted>Tehlikeli bolge: hesabi silmek geri alinamaz.</Muted>
+      </Section>
+      <Section>
+        <Hint>Tehlikeli bolge: hesabi silmek geri alinamaz.</Hint>
         {!confirming ? <Button kind="danger" title="Hesabimi sil" onPress={() => setConfirming(true)} /> : (
           <>
             <Field label="Sifreniz" value={password} onChangeText={setPassword} secureTextEntry />
@@ -67,7 +66,7 @@ export default function Settings() {
             <Button kind="secondary" title="Vazgec" onPress={() => { setConfirming(false); setPassword(''); }} />
           </>
         )}
-      </Card>
+      </Section>
     </Screen>
   );
 }

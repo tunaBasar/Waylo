@@ -3,7 +3,7 @@ import Orders from '../src/app/(tabs)/orders';
 import { ordersApi } from '../src/features/orders/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }), useFocusEffect: jest.fn() }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }), useFocusEffect: jest.fn(), Stack: { Screen: () => null } }));
 jest.mock('expo-secure-store', () => ({}));
 
 describe('Orders screen', () => {

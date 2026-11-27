@@ -34,6 +34,12 @@ export function reviewErrorMessage(err: { status?: number; code?: string | null;
 
 export const scoreLabel = (s: number | null | undefined) => (s == null ? null : s.toFixed(1));
 
+/** '4,6 / 5 (328 değerlendirme)' with a Turkish decimal comma, or null when there are no reviews or no average. */
+export function scoreText(average: number | null | undefined, count: number | null | undefined): string | null {
+  if (average == null || !count || count <= 0) return null;
+  return `${average.toFixed(1).replace('.', ',')} / 5 (${count} değerlendirme)`;
+}
+
 export const reviewsApi = {
   list: (hotelId: string, page = 0, size = 10) =>
     api.get<HotelReviewPage>(`/api/hotels/${encodeURIComponent(hotelId)}/reviews?page=${page}&size=${size}`),

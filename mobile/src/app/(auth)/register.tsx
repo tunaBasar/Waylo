@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { AuthShell, Hint, LinkText } from '@/features/account/AccountUi';
 
 export default function Register() {
   const { register } = useAuth();
@@ -20,21 +21,23 @@ export default function Register() {
   if (sentTo) {
     return (
       <Screen>
-        <Title>E-postani dogrula</Title>
-        <Muted>{`${sentTo} adresine dogrulama baglantisi gonderildi. Dogruladiktan sonra giris yapabilirsin.`}</Muted>
-        <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girise don">Girise don</Link>
+        <AuthShell title="E-postani dogrula">
+        <Hint>{`${sentTo} adresine dogrulama baglantisi gonderildi. Dogruladiktan sonra giris yapabilirsin.`}</Hint>
+        <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girise don"><LinkText>Girise don</LinkText></Link>
+        </AuthShell>
       </Screen>
     );
   }
   return (
     <Screen>
-      <Title>Kayit ol</Title>
+      <AuthShell title="Kayit ol">
       <ErrorBanner message={error} />
       <Field label="Ad" value={f.firstName} onChangeText={set('firstName')} autoCapitalize="words" />
       <Field label="Soyad" value={f.lastName} onChangeText={set('lastName')} autoCapitalize="words" />
       <Field label="E-posta" value={f.email} onChangeText={set('email')} keyboardType="email-address" />
       <Field label="Sifre" value={f.password} onChangeText={set('password')} secureTextEntry />
       <Button title={busy ? 'Kaydediliyor...' : 'Kayit ol'} onPress={submit} disabled={busy || !f.firstName || !f.lastName || !f.email || !f.password} />
+      </AuthShell>
     </Screen>
   );
 }

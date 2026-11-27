@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useAsync } from '@/features/useAsync';
 import { canClose, canReply, ROLE_LABEL, STATUS_LABEL, supportApi, supportErrorMessage, validateMessage, type SupportCase } from '@/features/support/api';
-import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { StatusPill } from '@/components/StatusPill';
+import { accountStyles, Hint } from '@/features/account/AccountUi';
+import { color, radius, space, type } from '@/theme/tokens';
 
 export default function SupportThread() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,14 +35,14 @@ export default function SupportThread() {
       <AsyncView<SupportCase> state={state} emptyText="Talep bulunamadı.">
         {(c) => (
           <>
-            <Title>{c.subject}</Title>
-            <Muted>{`Durum: ${STATUS_LABEL[c.status]}`}</Muted>
+            <Text accessibilityRole="header" style={[type.headlineLg, { color: color.onSurface }]}>{c.subject}</Text>
+            <StatusPill tone={c.status === 'CLOSED' ? 'neutral' : c.status === 'ANSWERED' ? 'success' : 'warning'} text={`Durum: ${STATUS_LABEL[c.status]}`} />
             {(c.messages ?? []).map((m) => (
-              <Card key={m.id}>
-                <Text style={{ fontWeight: '700' }}>{ROLE_LABEL[m.authorRole]}</Text>
-                <Text>{m.body}</Text>
-                <Muted>{new Date(m.createdAt).toLocaleString('tr-TR')}</Muted>
-              </Card>
+              <View key={m.id} style={{ alignSelf: m.authorRole === 'CUSTOMER' ? 'flex-end' : 'flex-start', maxWidth: '88%', gap: space.xs, padding: space.md, borderRadius: radius.lg, backgroundColor: m.authorRole === 'CUSTOMER' ? color.primaryContainer : m.authorRole === 'ADMIN' ? color.secondaryContainer : color.surfaceLowest, borderWidth: m.authorRole === 'PARTNER' ? 1 : 0, borderColor: color.outlineVariant }}>
+                <Text style={[type.labelSm, { color: m.authorRole === 'CUSTOMER' ? color.onPrimaryContainer : color.onSurfaceVariant }]}>{ROLE_LABEL[m.authorRole]}</Text>
+                <Text style={[type.bodyLg, { color: m.authorRole === 'CUSTOMER' ? color.onPrimary : color.onSurface }]}>{m.body}</Text>
+                <Text style={[accountStyles.meta, m.authorRole === 'CUSTOMER' && { color: color.onPrimaryContainer }]}>{new Date(m.createdAt).toLocaleString('tr-TR')}</Text>
+              </View>
             ))}
             <ErrorBanner message={msg} />
             {canReply(c.status, 'CUSTOMER') ? (
@@ -47,7 +50,7 @@ export default function SupportThread() {
                 <Field label="Yanıtınız" value={body} onChangeText={setBody} multiline autoCapitalize="sentences" />
                 <Button title={busy ? 'Gönderiliyor...' : 'Yanıtla'} disabled={busy} onPress={reply} />
               </>
-            ) : <Muted>Bu talep kapatıldı.</Muted>}
+            ) : <Hint>Bu talep kapatıldı.</Hint>}
             {canClose(c.status, 'CUSTOMER') ? <Button kind="secondary" title="Talebi kapat" disabled={busy} onPress={close} /> : null}
           </>
         )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Button, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { AuthShell, Hint } from '@/features/account/AccountUi';
 
 export default function Forgot() {
   const { forgotPassword } = useAuth();
@@ -17,14 +18,15 @@ export default function Forgot() {
   }
   return (
     <Screen>
-      <Title>Sifremi unuttum</Title>
+      <AuthShell title="Sifremi unuttum">
       <ErrorBanner message={error} />
-      {done ? <Muted>Hesap varsa sifre sifirlama baglantisi e-postana gonderildi.</Muted> : (
+      {done ? <Hint>Hesap varsa sifre sifirlama baglantisi e-postana gonderildi.</Hint> : (
         <>
           <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" />
           <Button title={busy ? 'Gonderiliyor...' : 'Baglanti gonder'} onPress={submit} disabled={busy || !email} />
         </>
       )}
+      </AuthShell>
     </Screen>
   );
 }

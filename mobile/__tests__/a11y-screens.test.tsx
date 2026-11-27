@@ -8,6 +8,7 @@ jest.mock('expo-router', () => {
   return {
     useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
     useFocusEffect: jest.fn(),
+    Stack: { Screen: () => null },
     useLocalSearchParams: () => ({ id: 'o1', token: 't1' }),
     // Pass the caller's props through so a missing label on a real <Link> is caught.
     Link: ({ href: _href, ...props }: { href: string }) => <Text onPress={() => {}} {...props} />,

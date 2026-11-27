@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import type { Order } from '@/api';
 import { ordersApi } from '@/features/orders/api';
 import { useAsync } from '@/features/useAsync';
 import { supportApi, supportErrorMessage, validateNewCase } from '@/features/support/api';
-import { AsyncView, Button, Card, colors, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { accountStyles, Icon, Section } from '@/features/account/AccountUi';
+import { color, MIN_TOUCH, type } from '@/theme/tokens';
 
 export default function NewSupportCase() {
   const router = useRouter();
@@ -32,26 +34,25 @@ export default function NewSupportCase() {
 
   return (
     <Screen>
-      <Title>Destek talebi aç</Title>
       <AsyncView<Order> state={order} emptyText="Sipariş bulunamadı.">
         {(o) => (
           <>
-            <Muted>{`Sipariş #${o.id.slice(0, 8)}`}</Muted>
+            <Text style={accountStyles.meta}>{`Sipariş #${o.id.slice(0, 8)}`}</Text>
             {(o.items ?? []).length > 0 ? (
-              <Card>
-                <Text style={{ fontWeight: '700' }}>Kalem (isteğe bağlı)</Text>
+              <Section title="Kalem (isteğe bağlı)">
                 {(o.items ?? []).map((i) => {
                   const selected = itemId === i.id;
                   return (
                     <Pressable key={i.id} accessibilityRole="radio" accessibilityState={{ selected }}
                       accessibilityLabel={`Kalem: ${i.description}`} onPress={() => setItemId(selected ? null : i.id)}>
-                      <Text style={{ color: selected ? colors.primary : colors.text, fontWeight: selected ? '700' : '400' }}>
-                        {`${selected ? '● ' : '○ '}${i.description}`}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: MIN_TOUCH }}>
+                        <Icon name={selected ? 'radiobox-marked' : 'radiobox-blank'} tint={selected ? color.primary : color.outline} />
+                        <Text style={[type.bodyLg, { flex: 1, color: selected ? color.primary : color.onSurface }]}>{i.description}</Text>
+                      </View>
                     </Pressable>
                   );
                 })}
-              </Card>
+              </Section>
             ) : null}
             <Field label="Konu" value={subject} onChangeText={setSubject} autoCapitalize="sentences" maxLength={150} />
             <ErrorBanner message={errs?.subject ?? null} />

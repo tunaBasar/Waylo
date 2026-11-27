@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { Text } from 'react-native';
 import { api } from '@/api';
-import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, ErrorBanner, Field, Screen } from '@/components/ui';
+import { AuthShell, Hint, SuccessNote } from '@/features/account/AccountUi';
 
 // Same rule and wording as the web reset page.
 const PASSWORD_HINT = 'Sifre 10-128 karakter olmali, en az bir harf ve bir rakam icermeli ve e-posta ile ayni olmamali';
@@ -30,18 +30,19 @@ export default function ResetPassword() {
 
   return (
     <Screen>
-      <Title>Yeni sifre belirle</Title>
+      <AuthShell title="Yeni sifre belirle">
       <ErrorBanner message={error} />
       {done ? (
-        <Card><Text accessibilityRole="alert" accessibilityLiveRegion="polite">Sifreniz guncellendi. Yeni sifrenizle giris yapabilirsiniz.</Text></Card>
+        <SuccessNote text="Sifreniz guncellendi. Yeni sifrenizle giris yapabilirsiniz." />
       ) : token ? (
         <>
-          <Muted>{PASSWORD_HINT}</Muted>
+          <Hint>{PASSWORD_HINT}</Hint>
           <Field label="Yeni sifre" value={password} onChangeText={setPassword} secureTextEntry />
           <Field label="Yeni sifre (tekrar)" value={confirm} onChangeText={setConfirm} secureTextEntry />
           <Button title={busy ? 'Kaydediliyor...' : 'Sifreyi guncelle'} onPress={submit} disabled={busy || !password || !confirm} />
         </>
       ) : null}
+      </AuthShell>
     </Screen>
   );
 }

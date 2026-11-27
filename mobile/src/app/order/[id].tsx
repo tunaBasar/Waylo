@@ -1,23 +1,31 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { ApiError, type CancellationPreview, type Order, type OrderItem, type Voucher } from '@/api';
 import { checkoutErrorMessage, ordersApi, paySandbox } from '@/features/orders/api';
 import { useAsync } from '@/features/useAsync';
 import { useOnline } from '@/features/network/NetworkContext';
 import { orderLinkOpened } from '@/features/deeplinks';
-import { AsyncView, Button, Card, colors, ErrorBanner, Muted, Screen, TestBanner, Title } from '@/components/ui';
+import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, TestBanner } from '@/components/ui';
+import { AppHeader } from '@/components/AppHeader';
+import { CountdownBanner } from '@/components/CountdownBanner';
+import { Price } from '@/components/Price';
+import { StatusPill, type Tone } from '@/components/StatusPill';
+import { color, space, type } from '@/theme/tokens';
 import { canOfferCancel } from '@/features/orders/actions';
 import { checkinApi, checkinWindow, type OrderCheckin } from '@/features/checkin/api';
-import { displayItemText, fmtLocal, money, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText, voucherStatusText } from '@/features/format';
+import { displayItemText, fmtLocal, ORDER_STATUS_TR, orderStatusInfo, orderPolicyText, refundText, voucherStatusText } from '@/features/format';
+
+const VOUCHER_TONE: Record<string, Tone> = { ACTIVE: 'success', REDEEMED: 'neutral', VOID: 'error', NO_SHOW: 'warning' };
+const ORDER_TONE: Record<string, Tone> = { PENDING: 'warning', CONFIRMED: 'success', CANCELLED: 'neutral', EXPIRED: 'error' };
 
 function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: OrderCheckin | undefined; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
   if (!item.flight) return null;
-  if (checkin) return <Text style={{ fontWeight: '700', color: colors.ok }}>{checkin.seatNumber ?? item.flight.seatNumber ? `Check-in yapildi, koltuk ${checkin.seatNumber ?? item.flight.seatNumber}` : 'Check-in yapildi'}</Text>;
+  if (checkin) return <Text style={[type.labelLg, { color: color.success }]}>{checkin.seatNumber ?? item.flight.seatNumber ? `Check-in yapildi, koltuk ${checkin.seatNumber ?? item.flight.seatNumber}` : 'Check-in yapildi'}</Text>;
   const win = checkinWindow(item.flight.departureAt ?? '', now, item.flight.supplier, !!item.cancelOutcome);
   async function run() {
     setBusy(true); setMsg(null);
@@ -34,17 +42,20 @@ function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: Or
   );
 }
 
-function Vouchers({ orderId, checkedInItemIds }: { orderId: string; checkedInItemIds: Set<string> }) {
+function Vouchers({ orderId, checkedInItemIds, freeCancel }: { orderId: string; checkedInItemIds: Set<string>; freeCancel: Record<string, string> }) {
   const state = useAsync(() => ordersApi.vouchers(orderId), [orderId]);
   return (
     <AsyncView<Voucher[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Kupon henuz olusmadi.">
       {(list) => list.map((v) => (
         <Card key={v.voucherId}>
-          <Text style={{ fontWeight: '700' }}>{displayItemText(v.description)}</Text>
-          <Muted>{`${voucherStatusText(v.status)} · Gecerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Muted>
-          {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={{ fontWeight: '700' }}>Binis karti (QR)</Text> : null}
-          {v.payload ? <QRCode value={v.payload} size={200} /> : null}
-          {v.payload ? <Text selectable style={{ fontSize: 11 }}>{v.payload}</Text> : null}
+          <View style={st.top}>
+            <Text style={[type.titleMd, { color: color.onSurface, flex: 1 }]}>{displayItemText(v.description)}</Text>
+            <StatusPill tone={VOUCHER_TONE[v.status] ?? 'neutral'} text={voucherStatusText(v.status)} />
+          </View>
+          {v.payload ? <View style={st.qr}><QRCode value={v.payload} size={200} /></View> : null}
+          <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{`Geçerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Text>
+          {v.orderItemId && freeCancel[v.orderItemId] ? <Muted>{freeCancel[v.orderItemId]}</Muted> : null}
+          {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={[type.labelLg, { color: color.success }]}>Binis karti (QR)</Text> : null}
         </Card>
       ))}
     </AsyncView>
@@ -89,15 +100,18 @@ export default function OrderDetail() {
   }
 
   return (
+    <View style={st.root}>
+    <Stack.Screen options={{ headerShown: false }} />
+    <AppHeader title={`Sipariş #${(id ?? '').slice(0, 8)}`} onBack={() => router.back()}
+      right={state.data ? <StatusPill tone={ORDER_TONE[state.data.status] ?? 'neutral'} text={orderStatusInfo(state.data.status).label} /> : undefined} />
     <Screen>
       <AsyncView<Order> state={state} emptyText="Siparis bulunamadi.">
         {(o) => (
           <>
-            <Title>{`Siparis #${o.id.slice(0, 8)}`}</Title>
+            {o.status === 'PENDING' && o.holdExpiresAt ? <CountdownBanner until={o.holdExpiresAt} label="Ödeme için kalan süre" /> : null}
             <Card>
-              <Text style={{ fontWeight: '700' }}>{orderStatusInfo(o.status).label}</Text>
               {orderStatusInfo(o.status).note ? <Muted>{orderStatusInfo(o.status).note}</Muted> : null}
-              <Text>{money(o.totalAmount, o.currency)}</Text>
+              <Price amount={o.totalAmount} currency={o.currency} />
               {(o.items ?? []).map((i) => (
                 <View key={i.id} style={{ gap: 4 }}>
                   <Muted>{`${displayItemText(i.description)} · ${orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)}`}</Muted>
@@ -109,7 +123,7 @@ export default function OrderDetail() {
                   ) : null}
                 </View>
               ))}
-              {o.status === 'PENDING' && o.holdExpiresAt ? <Muted>{`Odeme son zamani: ${new Date(o.holdExpiresAt).toLocaleString('tr-TR')}`}</Muted> : null}
+              {o.status === 'PENDING' && o.holdExpiresAt ? <Muted>{`Odeme son zamani: ${fmtLocal(o.holdExpiresAt)}`}</Muted> : null}
             </Card>
             <ErrorBanner message={msg} />
             {o.status === 'PENDING' && (
@@ -120,7 +134,7 @@ export default function OrderDetail() {
               </>
             )}
             <Button kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
-            {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} />}
+            {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} freeCancel={Object.fromEntries((o.items ?? []).map((i) => [i.id, orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)]))} />}
             {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && canOfferCancel(o, vouchers.data) && (
               <Button kind="secondary" title="Siparisi iptal et" disabled={busy} onPress={loadPreview} />
             )}
@@ -128,7 +142,7 @@ export default function OrderDetail() {
               <Card>
                 {preview.cancellable ? (
                   <>
-                    <Text style={{ fontWeight: '700' }}>{o.status === 'PENDING' ? 'Odeme yapilmadi, tutar cekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
+                    <Text style={[type.titleMd, { color: color.onSurface }]}>{o.status === 'PENDING' ? 'Odeme yapilmadi, tutar cekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
                     <Button kind="danger" title="Iptali onayla" disabled={busy || !online} onPress={confirmCancel} />
                   </>
                 ) : <Text>{`Bu siparis iptal edilemez (${preview.blockedReason}).`}</Text>}
@@ -139,5 +153,12 @@ export default function OrderDetail() {
         )}
       </AsyncView>
     </Screen>
+    </View>
   );
 }
+
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.surface },
+  top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
+  qr: { alignItems: 'center', paddingVertical: space.md },
+});

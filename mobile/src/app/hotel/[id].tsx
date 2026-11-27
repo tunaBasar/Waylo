@@ -1,24 +1,29 @@
 import { useAuth } from '@/features/auth/AuthContext';
 import { setReturnTo } from '@/features/auth/gate';
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Availability } from '@/api';
 import { getHotelOrNotPublic, hotelsApi, type HotelResult } from '@/features/hotels/api';
 import { useAsync } from '@/features/useAsync';
 import { HotelGallery } from '@/features/hotels/HotelGallery';
-import { AsyncView, Button, Card, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
+import { AsyncView, Button, ErrorBanner, Muted, Screen, Title } from '@/components/ui';
+import { Price } from '@/components/Price';
+import { StatusPill } from '@/components/StatusPill';
+import { fmtDate, parseIsoDate } from '@/features/dates';
+import { color, MIN_TOUCH, radius, space, type } from '@/theme/tokens';
 import { money, offerPolicyText } from '@/features/format';
-import { reviewsApi, scoreLabel, type HotelReviewPage } from '@/features/reviews/api';
+import { reviewsApi, scoreText, type HotelReviewPage } from '@/features/reviews/api';
 import { ApiError } from '@/api';
 import { checkoutErrorMessage } from '@/features/orders/api';
 
 export function emptyReasonText(r: Availability['emptyReason']): string {
-  if (!r) return 'Bu tarihlerde musait oda yok.';
+  if (!r) return 'Bu tarihlerde uygun oda yok.';
   const d = r.date ? ` (${r.date})` : '';
-  if (r.code === 'NO_STOCK') return `Bu tarihlerde oda kalmadi${d}.`;
-  if (r.code === 'NO_PRICE_FOR_OCCUPANCY') return `Bu kisi sayisi icin fiyat tanimli degil${d}.`;
-  return 'Bu grup icin uygun oda tipi yok.';
+  if (r.code === 'NO_STOCK') return `Bu tarihlerde oda kalmadı${d}.`;
+  if (r.code === 'NO_PRICE_FOR_OCCUPANCY') return `Bu kişi sayısı için fiyat tanımlı değil${d}.`;
+  return 'Bu grup için uygun oda tipi yok.';
 }
 
 export function shiftedStay(checkIn: string, checkOut: string, next: string): { checkIn: string; checkOut: string } {
@@ -53,51 +58,85 @@ export default function HotelDetail() {
       const q = await hotelsApi.createQuote({ hotelId: p.id, roomTypeId, ratePlanId, ...stay });
       router.push(`/quote/${q.quoteId}`);
     } catch (e) {
-      setError(e instanceof ApiError ? checkoutErrorMessage(e) : 'Teklif olusturulamadi');
+      setError(e instanceof ApiError ? checkoutErrorMessage(e) : 'Teklif oluşturulamadı');
     } finally { setBusy(null); }
   }
 
   return (
     <Screen>
-      <AsyncView<HotelResult> state={hotel} emptyText="Otel bulunamadi.">
-        {(r) => r.kind === 'notPublic' ? (<><Title>Bu otel şu anda yayında değil</Title><Muted>Otel yayından kaldırılmış veya henüz yayına alınmamış olabilir.</Muted><Button title="Geri dön" kind="secondary" onPress={() => router.back()} /></>) : ((h) => (<><Title>{h.name}</Title><Muted>{`${h.address}, ${h.city}`}</Muted>{h.description ? <Text>{h.description}</Text> : null}{h.reviewCount && h.averageScore != null ? <Text style={{ fontWeight: '700' }}>{`${scoreLabel(h.averageScore)} / 5 (${h.reviewCount} yorum)`}</Text> : null}</>))(r.hotel)}
+      <AsyncView<HotelResult> state={hotel} emptyText="Otel bulunamadı.">
+        {(r) => r.kind === 'notPublic' ? (<><Title>Bu otel şu anda yayında değil</Title><Muted>Otel yayından kaldırılmış veya henüz yayına alınmamış olabilir.</Muted><Button title="Geri dön" kind="secondary" onPress={() => router.back()} /></>) : ((h) => (
+          <>
+            {photos.data && photos.data.length > 0 ? <HotelGallery hotelId={p.id} photos={photos.data} /> : null}
+            <View style={{ gap: space.xs }}>
+              <View accessible accessibilityLabel={`${h.starRating} yıldız`} style={{ flexDirection: 'row' }}>
+                {Array.from({ length: Math.max(0, Math.min(5, Math.round(h.starRating))) }, (_, i) => (
+                  <MaterialCommunityIcons key={i} name="star" size={16} color={color.warning} accessibilityElementsHidden importantForAccessibility="no" />
+                ))}
+              </View>
+              <Title>{h.name}</Title>
+              <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${h.address}, ${h.city}`}</Text>
+              {scoreText(h.averageScore, h.reviewCount) ? <Text style={[type.monoMd, { color: color.onSurface }]}>{scoreText(h.averageScore, h.reviewCount)}</Text> : null}
+            </View>
+            {h.description ? <Text style={[type.bodyLg, { color: color.onSurface }]}>{h.description}</Text> : null}
+          </>
+        ))(r.hotel)}
       </AsyncView>
       {notPublic ? null : (<>
-      {photos.data && photos.data.length > 0 ? <HotelGallery hotelId={p.id} photos={photos.data} /> : null}
       <ErrorBanner message={error} />
-      <AsyncView<Availability> state={avail} isEmpty={() => false} emptyText="Bu tarihlerde musait oda yok.">
+      <Text accessibilityRole="header" style={[type.headlineMd, { color: color.onSurface }]}>Odalar</Text>
+      <AsyncView<Availability> state={avail} isEmpty={() => false} emptyText="Bu tarihlerde uygun oda yok.">
         {(a) => a.offers.length === 0 ? (
-          <Card>
-            <Text>{emptyReasonText(a.emptyReason)}</Text>
+          <View style={s.card}>
+            <Text style={[type.titleMd, { color: color.onSurface }]}>Bu tarihlerde uygun oda yok</Text>
+            <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{emptyReasonText(a.emptyReason)}</Text>
             {a.nextAvailableCheckIn ? (
-              <Button title={`Su tarihleri goster: ${a.nextAvailableCheckIn}`} onPress={() => router.setParams(shiftedStay(p.checkIn, p.checkOut, a.nextAvailableCheckIn!))} />
+              <Button title={`Şu tarihleri göster: ${(() => { const d = parseIsoDate(a.nextAvailableCheckIn); return d ? fmtDate(d) : a.nextAvailableCheckIn; })()}`} onPress={() => { if (a.nextAvailableCheckIn) router.setParams(shiftedStay(p.checkIn, p.checkOut, a.nextAvailableCheckIn)); }} />
             ) : null}
-          </Card>
+          </View>
         ) : a.offers.map((o) => {
           const key = `${o.roomTypeId}:${o.ratePlanId}`;
+          const policy = offerPolicyText(o.cancellationPolicy, o.freeCancellationDaysBefore, p.checkIn);
           return (
-            <Card key={key}>
-              <Text style={{ fontWeight: '700' }}>{o.roomTypeName}</Text>
-              <Muted>{`${o.ratePlanName} · ${o.mealPlan} · ${o.nights} gece`}</Muted>
-              <Muted>{offerPolicyText(o.cancellationPolicy, o.freeCancellationDaysBefore, p.checkIn)}</Muted>
-              <Text style={{ fontWeight: '700' }}>{money(o.totalAmount, o.currency)}</Text>
-              <Button title={busy === key ? 'Teklif aliniyor...' : 'Teklif al'} disabled={busy !== null} onPress={() => pick(o.roomTypeId, o.ratePlanId, key)} />
-            </Card>
+            <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${busy === key ? 'Teklif alınıyor' : 'Teklif al'}: ${o.roomTypeName}, ${money(o.totalAmount, o.currency)}`}
+              accessibilityState={{ disabled: busy !== null }} disabled={busy !== null} onPress={() => pick(o.roomTypeId, o.ratePlanId, key)}
+              style={[s.card, busy !== null && { opacity: 0.6 }]}>
+              <Text style={[type.titleMd, { color: color.onSurface }]}>{o.roomTypeName}</Text>
+              <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${o.ratePlanName} · ${o.mealPlan} · ${o.nights} gece`}</Text>
+              <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{policy}</Text>
+              <View style={s.offerFoot}>
+                <Price amount={o.totalAmount} currency={o.currency} />
+                <MaterialCommunityIcons name={busy === key ? 'loading' : 'chevron-right'} size={24} color={color.primary} accessibilityElementsHidden importantForAccessibility="no" />
+              </View>
+            </Pressable>
           );
         })}
       </AsyncView>
-      <Title>Yorumlar</Title>
-      <AsyncView<HotelReviewPage> state={reviews} isEmpty={(r) => r.items.length === 0} emptyText="Henuz yorum yok.">
+      <Text accessibilityRole="header" style={[type.headlineMd, { color: color.onSurface }]}>Yorumlar</Text>
+      <AsyncView<HotelReviewPage> state={reviews} isEmpty={(r) => r.items.length === 0} emptyText="Henüz yorum yok.">
         {(r) => r.items.map((v) => (
-          <Card key={v.id}>
-            <Text style={{ fontWeight: '700' }}>{`${v.score} / 5`}</Text>
-            {v.text ? <Text>{v.text}</Text> : null}
-            {v.partnerResponse ? <Muted>{`Otel yaniti: ${v.partnerResponse}`}</Muted> : null}
-            <Muted>{new Date(v.createdAt).toLocaleDateString('tr-TR')}</Muted>
-          </Card>
+          <View key={v.id} style={s.card}>
+            <View style={s.offerFoot}>
+              <StatusPill tone="neutral" text={`${v.score} / 5`} />
+              <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{fmtDate(new Date(v.createdAt))}</Text>
+            </View>
+            {v.text ? <Text style={[type.bodyLg, { color: color.onSurface }]}>{v.text}</Text> : null}
+            {v.partnerResponse ? (
+              <View style={s.reply}>
+                <Text style={[type.labelSm, { color: color.onSurfaceVariant }]}>Otel yanıtı</Text>
+                <Text style={[type.bodyMd, { color: color.onSurface }]}>{v.partnerResponse}</Text>
+              </View>
+            ) : null}
+          </View>
         ))}
       </AsyncView>
       </>)}
     </Screen>
   );
 }
+
+const s = StyleSheet.create({
+  card: { backgroundColor: color.surfaceLowest, borderRadius: radius.lg, padding: space.lg, gap: space.sm, borderWidth: 1, borderColor: color.outlineVariant, minHeight: MIN_TOUCH },
+  offerFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reply: { backgroundColor: color.surfaceLow, borderRadius: radius.md, padding: space.md, gap: space.xs },
+});
