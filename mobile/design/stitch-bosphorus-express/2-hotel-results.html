@@ -1,0 +1,191 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Bosphorus Express: Otel Sonuçları</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#003772',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#124E96',
+        'on-primary-container': '#ECF0FF',
+        'secondary': '#006C53',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#D8F6EA',
+        'on-secondary-container': '#00382A',
+        'tertiary': '#743500',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#FFEDE5',
+        'on-tertiary-container': '#522300',
+        'success': '#006C53',
+        'on-success': '#FFFFFF',
+        'success-container': '#D8F6EA',
+        'on-success-container': '#00382A',
+        'warning': '#8C4A00',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D9',
+        'on-warning-container': '#4D2600',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#F4F7FA',
+        'on-background': '#191C20',
+        'surface': '#F4F7FA',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#EDF1F7',
+        'surface-container': '#E4E9F2',
+        'surface-container-high': '#DCE2EC',
+        'on-surface': '#191C20',
+        'on-surface-variant': '#424751',
+        'outline': '#737782',
+        'outline-variant': '#C8D0DC',
+      },
+      borderRadius: {
+        'sm': '4px',
+        'DEFAULT': '8px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Wix Madefor Display"', 'sans-serif'],
+        'headline': ['"Wix Madefor Display"', 'sans-serif'],
+        'title': ['"Instrument Sans"', 'sans-serif'],
+        'body': ['"Instrument Sans"', 'sans-serif'],
+        'label': ['"Instrument Sans"', 'sans-serif'],
+        'mono': ['"Spline Sans Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['34px', { lineHeight: '40px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'display-lg-mobile': ['26px', { lineHeight: '32px', letterSpacing: '-0.4px', fontWeight: '700' }],
+        'headline-lg': ['22px', { lineHeight: '28px', letterSpacing: '-0.3px', fontWeight: '700' }],
+        'headline-md': ['18px', { lineHeight: '24px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'title-md': ['15px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['15px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['13px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '18px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-md': ['14px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '90ms',
+        'surface-enter': '180ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&amp;family=Spline+Sans+Mono:wght@500;600&amp;family=Wix+Madefor+Display:wght@600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Compact Top Bar -->
+    <header class="sticky top-0 z-20 bg-primary text-on-primary px-lg py-md flex items-center gap-md">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md bg-primary-container text-on-primary shrink-0">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+      </button>
+      <div class="min-w-0 flex-1">
+        <h1 data-design-text-token="headline-md" class="font-display text-headline-md">İstanbul</h1>
+        <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">
+          04.12.2026 - 06.12.2026 · 1 oda, 2 yetişkin
+        </p>
+      </div>
+    </header>
+
+    <!-- Main Content: Compact Horizontal Split Cards -->
+    <main class="flex-1 px-lg py-lg flex flex-col gap-md">
+
+      <!-- Card 1 -->
+      <article data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-stretch gap-md">
+        <img src="https://lh3.googleusercontent.com/aida/ALJJyrAgaG99Hg_JSfYv8lLbACpEsweV-j5BRWilWsxc4YkSuEDsbeg8UCOIhgyozK5Li3om3XkK5C2iCi1mXW04d1wFJ-aXaDZlRoG-xjwccOS4OHaZb67HLtaG8M9KZoihJWjKD7NuUx7O8gSDUrv4uxdqTNyo3VlDXNcqhzx3zAStFQL3ynWD_K7NyD6tkpjuF-95ENbatGD3uKot4koGChB3ZArh9sNeAh3fsxylRUGGNi689isDihGZHtYN_h8nlA" alt="Boğaz İskele Otel" class="w-24 h-24 rounded-md object-cover shrink-0">
+        <div class="flex flex-col justify-between flex-1 min-w-0">
+          <div>
+            <div class="flex items-center gap-xs text-primary">
+              <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &#39;FILL&#39; 1;" aria-hidden="true">star</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm">4 yıldız</span>
+            </div>
+            <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Boğaz İskele Otel</h2>
+            <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">İstanbul, Türkiye</p>
+          </div>
+          <p data-design-text-token="label-sm" class="font-label text-label-sm text-secondary tabular-nums">4,6 / 5 (328 değerlendirme)</p>
+        </div>
+      </article>
+
+      <!-- Card 2 -->
+      <article data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-stretch gap-md">
+        <img src="https://lh3.googleusercontent.com/aida/ALJJyrCb-Ed8MJojKBPLfMz4IMTrbzvJ45ZEnW6FsTQb755V0OQPwKF8DddplWd97Hslvh_cJ4MacJyNR-4RdsZ85kjYnfPW1sCsHwh-jFfqswSHE9WaxaHxBcXyd4c9x65bzU5DID4MsU4Q0CAtLjI7_C5azyDTZ0djsFQ7Kk23_-KpyB6rdkWBteQc756XcU0qAN55nyTwo1StGVXanMKjYSsDNopwNnI11q948GuAtvH40RV7tlGhl3CTcYAD" alt="Pera Taş Konak" class="w-24 h-24 rounded-md object-cover shrink-0">
+        <div class="flex flex-col justify-between flex-1 min-w-0">
+          <div>
+            <div class="flex items-center gap-xs text-primary">
+              <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &#39;FILL&#39; 1;" aria-hidden="true">star</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm">5 yıldız</span>
+            </div>
+            <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Pera Taş Konak</h2>
+            <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">İstanbul, Türkiye</p>
+          </div>
+          <p data-design-text-token="label-sm" class="font-label text-label-sm text-secondary tabular-nums">4,8 / 5 (194 değerlendirme)</p>
+        </div>
+      </article>
+
+      <!-- Card 3: Missing Photo Fallback & No Reviews -->
+      <article data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-stretch gap-md">
+        <div class="w-24 h-24 rounded-md bg-surface-container-low border border-outline-variant flex flex-col items-center justify-center text-on-surface-variant shrink-0">
+          <span class="material-symbols-outlined text-[24px]" aria-hidden="true">apartment</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-center">Fotoğraf yok</span>
+        </div>
+        <div class="flex flex-col justify-between flex-1 min-w-0">
+          <div>
+            <div class="flex items-center gap-xs text-primary">
+              <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &#39;FILL&#39; 1;" aria-hidden="true">star</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm">3 yıldız</span>
+            </div>
+            <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Karaköy Han Apart</h2>
+            <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">İstanbul, Türkiye</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Loading State Card -->
+      <div role="status" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-center gap-md">
+        <div class="w-24 h-20 rounded-md bg-surface-container animate-pulse shrink-0"></div>
+        <div class="flex-1 flex flex-col gap-sm">
+          <div class="h-4 w-3/4 rounded-sm bg-surface-container animate-pulse"></div>
+          <div class="h-3 w-1/2 rounded-sm bg-surface-container-low animate-pulse"></div>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Diğer oteller yükleniyor...</span>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+
+</body></html>

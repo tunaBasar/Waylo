@@ -1,0 +1,222 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Bosphorus Express: Otobüs Koltuk</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#003772',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#124E96',
+        'on-primary-container': '#ECF0FF',
+        'secondary': '#006C53',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#D8F6EA',
+        'on-secondary-container': '#00382A',
+        'tertiary': '#743500',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#FFEDE5',
+        'on-tertiary-container': '#522300',
+        'success': '#006C53',
+        'on-success': '#FFFFFF',
+        'success-container': '#D8F6EA',
+        'on-success-container': '#00382A',
+        'warning': '#8C4A00',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D9',
+        'on-warning-container': '#4D2600',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#F4F7FA',
+        'on-background': '#191C20',
+        'surface': '#F4F7FA',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#EDF1F7',
+        'surface-container': '#E4E9F2',
+        'surface-container-high': '#DCE2EC',
+        'on-surface': '#191C20',
+        'on-surface-variant': '#424751',
+        'outline': '#737782',
+        'outline-variant': '#C8D0DC',
+      },
+      borderRadius: {
+        'sm': '4px',
+        'DEFAULT': '8px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Wix Madefor Display"', 'sans-serif'],
+        'headline': ['"Wix Madefor Display"', 'sans-serif'],
+        'title': ['"Instrument Sans"', 'sans-serif'],
+        'body': ['"Instrument Sans"', 'sans-serif'],
+        'label': ['"Instrument Sans"', 'sans-serif'],
+        'mono': ['"Spline Sans Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['34px', { lineHeight: '40px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'display-lg-mobile': ['26px', { lineHeight: '32px', letterSpacing: '-0.4px', fontWeight: '700' }],
+        'headline-lg': ['22px', { lineHeight: '28px', letterSpacing: '-0.3px', fontWeight: '700' }],
+        'headline-md': ['18px', { lineHeight: '24px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'title-md': ['15px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['15px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['13px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '18px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-md': ['14px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '90ms',
+        'surface-enter': '180ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&amp;family=Spline+Sans+Mono:wght@500;600&amp;family=Wix+Madefor+Display:wght@600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <header class="sticky top-0 z-20 bg-primary text-on-primary px-lg py-md flex items-center gap-md">
+      <button type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md bg-primary-container text-on-primary shrink-0">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+      </button>
+      <div class="min-w-0 flex-1">
+        <h1 data-design-text-token="headline-md" class="font-display text-headline-md">İstanbul → Ankara</h1>
+        <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">
+          Waylo Otobüs İşletmesi · 22:30 - 05:00 · ₺750,00
+        </p>
+      </div>
+    </header>
+
+    <main class="flex-1 px-lg py-lg flex flex-col gap-md">
+
+      <!-- Compact Legend -->
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm grid grid-cols-4 gap-xs text-center">
+        <div class="flex flex-col items-center gap-xs">
+          <span class="w-6 h-6 rounded-sm border border-outline-variant bg-surface-container-lowest text-[11px] font-mono flex items-center justify-center">1</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Boş</span>
+        </div>
+        <div class="flex flex-col items-center gap-xs">
+          <span class="w-6 h-6 rounded-sm bg-primary text-on-primary text-[11px] font-mono flex items-center justify-center">✓</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Seçili</span>
+        </div>
+        <div class="flex flex-col items-center gap-xs">
+          <span class="w-6 h-6 rounded-sm bg-tertiary-container text-on-tertiary-container border border-tertiary text-[11px] font-label flex items-center justify-center">K</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Kadın</span>
+        </div>
+        <div class="flex flex-col items-center gap-xs">
+          <span class="w-6 h-6 rounded-sm bg-secondary-container text-on-secondary-container border border-secondary text-[11px] font-label flex items-center justify-center">E</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm">Erkek</span>
+        </div>
+      </div>
+
+      <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant px-xs">
+        Yabancı bir karşı cins yolcunun yanına oturulamaz. En fazla 5 koltuk seçilebilir.
+      </p>
+
+      <!-- 2+2 48-seat layout -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md">
+        <div id="be-seat-grid" class="flex flex-col gap-xs"></div>
+      </section>
+
+      <!-- Passenger row -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex flex-col gap-sm">
+        <div class="flex items-center justify-between">
+          <span data-design-text-token="title-md" class="font-title text-title-md text-primary">Koltuk 14 (1 / 5)</span>
+          <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">₺750,00</span>
+        </div>
+        <input type="text" value="Deniz Kaya" aria-label="Yolcu adı soyadı" class="min-h-[44px] px-md rounded-md bg-surface border border-outline-variant text-on-surface font-body text-body-lg">
+        <div class="grid grid-cols-2 gap-sm">
+          <button type="button" aria-pressed="true" class="min-h-[44px] rounded-md bg-tertiary-container text-on-tertiary-container border border-tertiary font-label text-label-lg">Kadın</button>
+          <button type="button" aria-pressed="false" class="min-h-[44px] rounded-md bg-surface border border-outline-variant text-on-surface font-label text-label-lg">Erkek</button>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="sticky bottom-0 z-20 bg-surface-container-lowest border-t border-outline-variant px-lg py-md flex items-center justify-between">
+      <div>
+        <span data-design-text-token="label-sm" class="block font-label text-label-sm text-on-surface-variant">1 koltuk</span>
+        <span data-design-text-token="headline-md" class="font-display text-headline-md text-on-surface tabular-nums">₺750,00</span>
+      </div>
+      <button type="button" class="min-h-[44px] px-xl rounded-md bg-primary text-on-primary font-label text-label-lg">Sepete ekle</button>
+    </footer>
+
+  </div>
+  <script>
+    (function () {
+      const takenK = new Set([1, 2, 6, 10, 13, 21, 22, 33]);
+      const takenE = new Set([3, 4, 7, 8, 15, 19, 27, 28, 36]);
+      const selected = new Set([14]);
+      const grid = document.getElementById('be-seat-grid');
+      for (let r = 0; r < 12; r++) {
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-[1fr_1fr_18px_1fr_1fr] gap-xs items-center';
+        const base = r * 4 + 1;
+        [base, base + 1, null, base + 2, base + 3].forEach((num) => {
+          if (num === null) {
+            const sp = document.createElement('div');
+            sp.className = 'text-center font-mono text-[11px] text-on-surface-variant';
+            sp.textContent = r + 1;
+            row.appendChild(sp);
+            return;
+          }
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'min-h-[44px] rounded-sm font-mono text-mono-sm flex flex-col items-center justify-center ';
+          if (selected.has(num)) {
+            btn.className += 'bg-primary text-on-primary font-bold';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">✓</span>';
+          } else if (takenK.has(num)) {
+            btn.disabled = true;
+            btn.className += 'bg-tertiary-container text-on-tertiary-container border border-tertiary';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">K</span>';
+          } else if (takenE.has(num)) {
+            btn.disabled = true;
+            btn.className += 'bg-secondary-container text-on-secondary-container border border-secondary';
+            btn.innerHTML = '<span>' + num + '</span><span class="text-[10px]">E</span>';
+          } else {
+            btn.className += 'bg-surface border border-outline-variant text-on-surface';
+            btn.textContent = num;
+          }
+          row.appendChild(btn);
+        });
+        grid.appendChild(row);
+      }
+    })();
+  </script>
+
+
+</body></html>

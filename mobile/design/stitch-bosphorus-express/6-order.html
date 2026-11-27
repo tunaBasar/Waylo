@@ -1,0 +1,196 @@
+<!DOCTYPE html><html lang="tr"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waylo — Bosphorus Express: Sipariş Detay</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'primary': '#003772',
+        'on-primary': '#FFFFFF',
+        'primary-container': '#124E96',
+        'on-primary-container': '#ECF0FF',
+        'secondary': '#006C53',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#D8F6EA',
+        'on-secondary-container': '#00382A',
+        'tertiary': '#743500',
+        'on-tertiary': '#FFFFFF',
+        'tertiary-container': '#FFEDE5',
+        'on-tertiary-container': '#522300',
+        'success': '#006C53',
+        'on-success': '#FFFFFF',
+        'success-container': '#D8F6EA',
+        'on-success-container': '#00382A',
+        'warning': '#8C4A00',
+        'on-warning': '#FFFFFF',
+        'warning-container': '#FFF0D9',
+        'on-warning-container': '#4D2600',
+        'error': '#BA1A1A',
+        'on-error': '#FFFFFF',
+        'error-container': '#FFDAD6',
+        'on-error-container': '#690005',
+        'background': '#F4F7FA',
+        'on-background': '#191C20',
+        'surface': '#F4F7FA',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-container-low': '#EDF1F7',
+        'surface-container': '#E4E9F2',
+        'surface-container-high': '#DCE2EC',
+        'on-surface': '#191C20',
+        'on-surface-variant': '#424751',
+        'outline': '#737782',
+        'outline-variant': '#C8D0DC',
+      },
+      borderRadius: {
+        'sm': '4px',
+        'DEFAULT': '8px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        'full': '9999px',
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      fontFamily: {
+        'display': ['"Wix Madefor Display"', 'sans-serif'],
+        'headline': ['"Wix Madefor Display"', 'sans-serif'],
+        'title': ['"Instrument Sans"', 'sans-serif'],
+        'body': ['"Instrument Sans"', 'sans-serif'],
+        'label': ['"Instrument Sans"', 'sans-serif'],
+        'mono': ['"Spline Sans Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['34px', { lineHeight: '40px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'display-lg-mobile': ['26px', { lineHeight: '32px', letterSpacing: '-0.4px', fontWeight: '700' }],
+        'headline-lg': ['22px', { lineHeight: '28px', letterSpacing: '-0.3px', fontWeight: '700' }],
+        'headline-md': ['18px', { lineHeight: '24px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'title-md': ['15px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '700' }],
+        'body-lg': ['15px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['13px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '18px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-md': ['14px', { lineHeight: '18px', letterSpacing: '0px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '90ms',
+        'surface-enter': '180ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&amp;family=Spline+Sans+Mono:wght@500;600&amp;family=Wix+Madefor+Display:wght@600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col border-x border-outline-variant" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <header class="sticky top-0 z-20 bg-primary text-on-primary px-lg py-md flex items-center justify-between">
+      <div class="flex items-center gap-sm">
+        <button type="button" aria-label="Geri dön" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md bg-primary-container text-on-primary">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
+        </button>
+        <div>
+          <h1 data-design-text-token="headline-md" class="font-display text-headline-md">#WYL-84920</h1>
+          <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">₺7.220,00</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center gap-xs px-sm py-xs rounded-sm bg-success-container text-on-success-container">
+        <span class="material-symbols-outlined text-[14px]" aria-hidden="true">verified</span>
+        <span data-design-text-token="label-sm" class="font-label text-label-sm">Onaylandı</span>
+      </span>
+    </header>
+
+    <main class="flex-1 px-lg py-lg flex flex-col gap-md">
+
+      <!-- Hotel Voucher -->
+      <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-center gap-md">
+        <svg class="w-16 h-16 bg-surface p-xs rounded-sm border border-outline-variant shrink-0" viewBox="0 0 25 25" aria-label="Otel QR">
+          <rect width="25" height="25" fill="#FFFFFF"></rect>
+          <path d="M2 2h7v7H2zm1 1v5h5V3zm1 1h3v3H4zm12-2h7v7h-7zm1 1v5h5V3zm1 1h3v3h-3zM2 16h7v7H2zm1 1v5h5v-5zm1 1h3v3H4zm7-14h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4 2h2v2h-2zm-6 2h2v2h-2zm4 2h2v2h-2zm2 2h4v2h-4zm4 2h2v4h-2z" fill="#191C20"></path>
+        </svg>
+        <div class="min-w-0 flex-1 flex flex-col gap-xs">
+          <div class="flex items-center justify-between gap-xs">
+            <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Otel · Boğaz İskele Otel</h2>
+            <span class="px-xs py-0.5 rounded-sm bg-success-container text-on-success-container font-label text-label-sm">Geçerli</span>
+          </div>
+          <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">04.12.2026 14:00 - 06.12.2026 12:00</p>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Ücretsiz iptal: 02.12.2026 00:00&#39;a kadar</p>
+        </div>
+      </article>
+
+      <!-- Flight Voucher -->
+      <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex flex-col gap-sm">
+        <div class="flex items-center gap-md">
+          <svg class="w-16 h-16 bg-surface p-xs rounded-sm border border-outline-variant shrink-0" viewBox="0 0 25 25" aria-label="Uçuş QR">
+            <rect width="25" height="25" fill="#FFFFFF"></rect>
+            <path d="M2 2h7v7H2zm1 1v5h5V3zm1 1h3v3H4zm12-2h7v7h-7zm1 1v5h5V3zm1 1h3v3h-3zM2 16h7v7H2zm1 1v5h5v-5zm1 1h3v3H4zm9-14h2v4h-2zm-2 4h2v2h-2zm4 2h4v2h-4zm-4 2h2v4h-2zm4 2h2v2h-2zm2 2h3v2h-3z" fill="#191C20"></path>
+          </svg>
+          <div class="min-w-0 flex-1 flex flex-col gap-xs">
+            <div class="flex items-center justify-between gap-xs">
+              <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Uçuş · İstanbul → İzmir</h2>
+              <span class="px-xs py-0.5 rounded-sm bg-success-container text-on-success-container font-label text-label-sm">Geçerli</span>
+            </div>
+            <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">08.12.2026 09:15 - 10:30</p>
+            <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Ücretsiz iptal: 06.12.2026 09:15&#39;e kadar</p>
+          </div>
+        </div>
+        <button type="button" class="w-full min-h-[44px] rounded-md bg-secondary text-on-secondary font-label text-label-lg">Online check-in</button>
+      </article>
+
+      <!-- Bus Voucher -->
+      <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex items-center gap-md">
+        <svg class="w-16 h-16 bg-surface p-xs rounded-sm border border-outline-variant shrink-0" viewBox="0 0 25 25" aria-label="Otobüs QR">
+          <rect width="25" height="25" fill="#FFFFFF"></rect>
+          <path d="M2 2h7v7H2zm1 1v5h5V3zm1 1h3v3H4zm12-2h7v7h-7zm1 1v5h5V3zm1 1h3v3h-3zM2 16h7v7H2zm1 1v5h5v-5zm1 1h3v3H4zm10-14h2v2h-2zm-3 3h3v2h-3zm5 2h2v3h-2zm-3 3h2v2h-2zm-2 2h2v3h-2z" fill="#191C20"></path>
+        </svg>
+        <div class="min-w-0 flex-1 flex flex-col gap-xs">
+          <div class="flex items-center justify-between gap-xs">
+            <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Otobüs · İstanbul → Ankara</h2>
+            <span class="px-xs py-0.5 rounded-sm bg-success-container text-on-success-container font-label text-label-sm">Geçerli</span>
+          </div>
+          <p data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">04.12.2026 20:30 - 23:30</p>
+          <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Ücretsiz iptal: 04.12.2026 16:30&#39;a kadar</p>
+        </div>
+      </article>
+
+      <!-- Actions -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-md flex flex-col gap-sm">
+        <div class="flex items-center justify-between">
+          <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">İade tutarı</span>
+          <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">₺6.470,00</span>
+        </div>
+        <div class="grid grid-cols-2 gap-sm">
+          <button type="button" class="min-h-[44px] rounded-md border border-error text-error font-label text-label-sm">Siparişi iptal et</button>
+          <button type="button" class="min-h-[44px] rounded-md border border-outline-variant bg-surface text-on-surface font-label text-label-sm">Destek talebi aç</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+
+</body></html>
