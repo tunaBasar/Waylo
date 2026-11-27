@@ -2,6 +2,8 @@ package com.waylo.hotelservice.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -48,6 +50,10 @@ public class DailyRate {
     @JdbcTypeCode(SqlTypes.CHAR)
     private String currency;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", nullable = false, length = 10)
+    private RowSource source = RowSource.MANUAL;
+
     @Version
     @Column(name = "version")
     private Long version;
@@ -87,6 +93,9 @@ public class DailyRate {
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+
+    public RowSource getSource() { return source; }
+    public void setSource(RowSource source) { this.source = source; }
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }

@@ -41,7 +41,8 @@ class InventoryControllerTest {
         return new DailyInventoryResponse(
                 id, hotelId, UUID.randomUUID(),
                 LocalDate.of(2026, 12, 25), 100, 0, 5, 3,
-                92, false, 0L, java.time.Instant.now()
+                92, false, 0L, java.time.Instant.now(),
+                com.waylo.hotelservice.domain.RowSource.MANUAL
         );
     }
 

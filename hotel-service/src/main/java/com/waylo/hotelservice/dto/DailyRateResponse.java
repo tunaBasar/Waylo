@@ -1,5 +1,7 @@
 package com.waylo.hotelservice.dto;
 
+import com.waylo.hotelservice.domain.RowSource;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,5 +17,6 @@ public record DailyRateResponse(
         BigDecimal amount,
         String currency,
         Long version,
-        Instant updatedAt
+        Instant updatedAt,
+        RowSource source
 ) {}

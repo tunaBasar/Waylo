@@ -105,6 +105,7 @@ const hotelNav: NavItem[] = [
   { href: '/partner/room-types', label: 'Oda tipleri', icon: 'bed' },
   { href: '/partner/rate-plans', label: 'Fiyat planlari', icon: 'sell' },
   { href: '/partner/calendar', label: 'Takvim', icon: 'calendar_month' },
+  { href: '/partner/automation', label: 'Otomatik takvim', icon: 'autorenew' },
   { href: '/partner/orders', label: 'Siparisler', icon: 'receipt_long' },
   { href: '/partner/earnings', label: 'Kazanclar', icon: 'payments' },
   { href: '/partner/support', label: 'Destek', icon: 'support_agent' },

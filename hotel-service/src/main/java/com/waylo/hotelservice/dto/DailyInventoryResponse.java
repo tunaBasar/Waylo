@@ -1,5 +1,7 @@
 package com.waylo.hotelservice.dto;
 
+import com.waylo.hotelservice.domain.RowSource;
+
 import java.time.LocalDate;
 import java.time.Instant;
 import java.util.UUID;
@@ -16,5 +18,6 @@ public record DailyInventoryResponse(
         int available,
         boolean stopSell,
         Long version,
-        Instant updatedAt
+        Instant updatedAt,
+        RowSource source
 ) {}

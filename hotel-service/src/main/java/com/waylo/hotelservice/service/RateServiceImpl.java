@@ -4,6 +4,7 @@ import com.waylo.hotelservice.domain.DailyRate;
 import com.waylo.hotelservice.domain.Hotel;
 import com.waylo.hotelservice.domain.HotelRoomType;
 import com.waylo.hotelservice.domain.RatePlan;
+import com.waylo.hotelservice.domain.RowSource;
 import com.waylo.hotelservice.dto.DailyRateResponse;
 import com.waylo.hotelservice.dto.HotelCurrencyResponse;
 import com.waylo.hotelservice.dto.RateUpdateItem;
@@ -235,6 +236,7 @@ public class RateServiceImpl implements RateService {
                 entity.setAmount(item.amount());
                 entity.setOccupancy(item.occupancy());
                 entity.setCurrency(item.currency());
+                entity.setSource(RowSource.MANUAL);
             } else {
                 // New row
                 entity = new DailyRate();
@@ -245,6 +247,7 @@ public class RateServiceImpl implements RateService {
                 entity.setOccupancy(item.occupancy());
                 entity.setAmount(item.amount());
                 entity.setCurrency(item.currency());
+                entity.setSource(RowSource.MANUAL);
                 // Do NOT set version for new rows - it starts at 0 by default
 
                 if (item.expectedVersion() != null) {
@@ -275,7 +278,8 @@ public class RateServiceImpl implements RateService {
                 entity.getAmount(),
                 entity.getCurrency(),
                 entity.getVersion(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getSource()
         );
     }
 

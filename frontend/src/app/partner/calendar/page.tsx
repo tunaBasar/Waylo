@@ -67,6 +67,11 @@ interface Edits {
 
 const NO_EDITS: Edits = { allotment: {}, stopSell: {}, amount: {} };
 
+/** Small marker on cells a partner typed by hand: automation rules never overwrite them. */
+function ManualMark() {
+  return <span className="ml-1 rounded bg-surface-container px-1 text-[9px] font-semibold text-on-surface-variant">Elle</span>;
+}
+
 
 export default function CalendarPage() {
   const toast = useToast();
@@ -450,7 +455,7 @@ export default function CalendarPage() {
                         setEdits(x => ({ ...x, allotment: { ...x.allotment, [d]: v } }));
                       }} />
                     {err ? <div className="text-[10px] text-error mt-0.5 leading-tight">{err}</div>
-                      : row ? <div className="text-[10px] text-outline mt-0.5 text-center">{row.available} bos</div> : null}
+                      : row ? <div className="text-[10px] text-outline mt-0.5 text-center">{row.available} bos{row.source === 'MANUAL' && <ManualMark />}</div> : null}
                   </td>
                 );
               })}
@@ -511,7 +516,8 @@ export default function CalendarPage() {
                           const v = e.target.value.replace(/[^\d.,]/g, '');
                           setEdits(x => ({ ...x, amount: { ...x.amount, [key]: v } }));
                         }} />
-                      {err && <div className="text-[10px] text-error mt-0.5 leading-tight">{err}</div>}
+                      {err ? <div className="text-[10px] text-error mt-0.5 leading-tight">{err}</div>
+                        : rateByKey.get(key)?.source === 'MANUAL' ? <div className="text-[10px] text-outline mt-0.5 text-center"><ManualMark /></div> : null}
                     </td>
                   );
                 })}
@@ -524,6 +530,9 @@ export default function CalendarPage() {
       <p className="text-xs text-on-surface-variant">
         Bos hucreler henuz tanimlanmamis gunlerdir. Bir gunu satisa acmak icin kontenjan ve en az bir fiyat girin.
         Fiyat silme bu ekranda henuz yok. Fiyatlar 1.250 veya 1250,50 seklinde yazilabilir.
+      </p>
+      <p className="text-xs text-on-surface-variant" data-testid="calendar-manual-legend">
+        <ManualMark /> Elle girilen gunler otomatik kurallarla degismez.
       </p>
     </div>
   );

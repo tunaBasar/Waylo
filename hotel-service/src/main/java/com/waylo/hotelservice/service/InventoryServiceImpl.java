@@ -2,6 +2,7 @@ package com.waylo.hotelservice.service;
 
 import com.waylo.hotelservice.domain.DailyInventory;
 import com.waylo.hotelservice.domain.InventoryAdjustment;
+import com.waylo.hotelservice.domain.RowSource;
 import com.waylo.hotelservice.dto.DailyInventoryResponse;
 import com.waylo.hotelservice.dto.InventoryUpdateItem;
 import com.waylo.hotelservice.dto.InventoryUpdateRequest;
@@ -184,6 +185,7 @@ public class InventoryServiceImpl implements InventoryService {
                 row.setHeld(0);
                 row.setConfirmed(0);
                 row.setStopSell(item.stopSell() != null && item.stopSell());
+                row.setSource(RowSource.MANUAL);
 
                 validateInventoryConstraints(row);
                 changed = true;
@@ -213,6 +215,11 @@ public class InventoryServiceImpl implements InventoryService {
                 }
 
                 validateInventoryConstraints(row);
+
+                if (row.getSource() != RowSource.MANUAL) {
+                    row.setSource(RowSource.MANUAL);
+                    changed = true;
+                }
 
                 // Check if anything actually changed
                 if (row.getAllotment() != oldAllotment
@@ -321,7 +328,8 @@ public class InventoryServiceImpl implements InventoryService {
                 row.getAvailable(),
                 row.isStopSell(),
                 row.getVersion(),
-                row.getUpdatedAt()
+                row.getUpdatedAt(),
+                row.getSource()
         );
     }
 }

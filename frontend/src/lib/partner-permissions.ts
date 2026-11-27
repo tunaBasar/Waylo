@@ -2,7 +2,7 @@ import type { Membership } from './partner';
 
 type NavLike = { href: string };
 
-const MANAGE_ONLY_HREFS = ['/partner/room-types', '/partner/rate-plans', '/partner/calendar'];
+const MANAGE_ONLY_HREFS = ['/partner/room-types', '/partner/rate-plans', '/partner/calendar', '/partner/automation'];
 const TEAM_HREF = '/partner/team';
 
 /** HOTEL_MANAGE / ROOM_MANAGE holders: organization owner, or owner/manager granted on this very hotel. */

@@ -45,7 +45,7 @@ class RateControllerTest {
         return new DailyRateResponse(
                 UUID.randomUUID(), HOTEL_ID, ROOM_TYPE_ID, RATE_PLAN_ID,
                 LocalDate.of(2026, 10, 20), 2, new BigDecimal("120.50"), "USD", 1L,
-                Instant.now()
+                Instant.now(), com.waylo.hotelservice.domain.RowSource.MANUAL
         );
     }
 

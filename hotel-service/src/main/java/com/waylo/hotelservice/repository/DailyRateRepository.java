@@ -46,4 +46,8 @@ public interface DailyRateRepository extends JpaRepository<DailyRate, UUID> {
             @Param("ratePlanIds") Collection<UUID> ratePlanIds,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    /** Rows of [roomTypeId, last stay_date] per room type (any source). */
+    @Query("SELECT r.roomTypeId, MAX(r.stayDate) FROM DailyRate r WHERE r.hotelId = :hotelId GROUP BY r.roomTypeId")
+    List<Object[]> findLastStayDates(@Param("hotelId") UUID hotelId);
 }

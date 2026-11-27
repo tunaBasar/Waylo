@@ -60,4 +60,8 @@ public interface DailyInventoryRepository extends JpaRepository<DailyInventory, 
                                            @Param("roomTypeId") UUID roomTypeId,
                                            @Param("from") LocalDate from,
                                            @Param("to") LocalDate to);
+
+    /** Rows of [roomTypeId, last stay_date] per room type (any source). */
+    @Query("SELECT d.roomTypeId, MAX(d.stayDate) FROM DailyInventory d WHERE d.hotelId = :hotelId GROUP BY d.roomTypeId")
+    List<Object[]> findLastStayDates(@Param("hotelId") UUID hotelId);
 }
