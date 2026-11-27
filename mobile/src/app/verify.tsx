@@ -15,21 +15,21 @@ export default function Verify() {
     if (!token) return;
     let alive = true;
     api.publicGet<unknown>(`/api/auth/verify?token=${encodeURIComponent(token)}`)
-      .then(() => { if (alive) setState({ status: 'success', message: 'E-posta adresiniz dogrulandi. Giris yapabilirsiniz.' }); })
-      .catch((e: unknown) => { if (alive) setState({ status: 'error', message: e instanceof Error ? e.message : 'Dogrulama sirasinda bir hata olustu' }); });
+      .then(() => { if (alive) setState({ status: 'success', message: 'E-posta adresiniz doğrulandı. Giriş yapabilirsiniz.' }); })
+      .catch((e: unknown) => { if (alive) setState({ status: 'error', message: e instanceof Error ? e.message : 'Doğrulama sırasında bir hata oluştu' }); });
     return () => { alive = false; };
   }, [token]);
 
-  const s = token ? state : { status: 'error' as const, message: 'Dogrulama tokeni bulunamadi' };
+  const s = token ? state : { status: 'error' as const, message: 'Doğrulama tokeni bulunamadı' };
   return (
     <Screen>
-      <AuthShell title="E-posta dogrulama">
+      <AuthShell title="E-posta doğrulama">
       {s.status === 'loading' ? (
-        <Section><ActivityIndicator accessibilityLabel="Dogrulaniyor" /><Hint>E-posta dogrulaniyor...</Hint></Section>
+        <Section><ActivityIndicator accessibilityLabel="Doğrulanıyor" /><Hint>E-posta doğrulanıyor...</Hint></Section>
       ) : s.status === 'success' ? (
         <SuccessNote text={s.message} />
       ) : <ErrorBanner message={s.message} />}
-      {s.status !== 'loading' ? <Button kind="secondary" title="Uygulamaya don" onPress={() => router.replace('/')} /> : null}
+      {s.status !== 'loading' ? <Button kind="secondary" title="Uygulamaya dön" onPress={() => router.replace('/')} /> : null}
       </AuthShell>
     </Screen>
   );

@@ -26,8 +26,8 @@ export default function ProfileScreen() {
     const err = validateName(first, last);
     if (err) { setNameMsg({ ok: false, text: err }); return; }
     setBusy(true); setNameMsg(null);
-    try { await profileApi.update(first, last); await refreshProfile(); setNameMsg({ ok: true, text: 'Profil guncellendi.' }); }
-    catch (e) { setNameMsg({ ok: false, text: e instanceof Error ? e.message : 'Guncellenemedi' }); }
+    try { await profileApi.update(first, last); await refreshProfile(); setNameMsg({ ok: true, text: 'Profil güncellendi.' }); }
+    catch (e) { setNameMsg({ ok: false, text: e instanceof Error ? e.message : 'Güncellenemedi' }); }
     finally { setBusy(false); }
   }
   async function savePassword() {
@@ -38,8 +38,8 @@ export default function ProfileScreen() {
       const d = await profileApi.changePassword(cur, next);
       if (d?.token && d.refreshToken) await applyAuth(d);
       setCur(''); setNext(''); setConf('');
-      setPwMsg({ ok: true, text: 'Sifre guncellendi. Diger oturumlar kapatildi.' });
-    } catch (e) { setPwMsg({ ok: false, text: e instanceof Error ? e.message : 'Sifre guncellenemedi' }); }
+      setPwMsg({ ok: true, text: 'Şifre güncellendi. Diğer oturumlar kapatıldı.' });
+    } catch (e) { setPwMsg({ ok: false, text: e instanceof Error ? e.message : 'Şifre güncellenemedi' }); }
     finally { setBusy(false); }
   }
 
@@ -52,11 +52,11 @@ export default function ProfileScreen() {
           <Section>
             <Text style={accountStyles.strong}>{`${user.firstName} ${user.lastName}`}</Text>
             <Text style={accountStyles.meta}>{user.email}</Text>
-            <StatusPill tone={user.emailVerified ? 'success' : 'warning'} text={user.emailVerified ? 'E-posta dogrulandi' : 'E-posta dogrulanmadi'} />
+            <StatusPill tone={user.emailVerified ? 'success' : 'warning'} text={user.emailVerified ? 'E-posta doğrulandı' : 'E-posta doğrulanmadı'} />
           </Section>
         ) : null}
         <Section>
-          <NavRow icon="star-outline" label="Yorum yazabilecegim konaklamalar" onPress={() => router.push('/reviews')} />
+          <NavRow icon="star-outline" label="Yorum yazabileceğim konaklamalar" onPress={() => router.push('/reviews')} />
           <NavRow icon="bell-outline" label="Bildirimler" onPress={() => router.push('/notifications')} />
           <NavRow icon="lifebuoy" label="Destek taleplerim" onPress={() => router.push('/support' as Href)} />
           <NavRow icon="cog-outline" label="Ayarlar" onPress={() => router.push('/settings')} last />
@@ -67,15 +67,15 @@ export default function ProfileScreen() {
           {nameMsg && (nameMsg.ok ? <SuccessNote text={nameMsg.text} /> : <ErrorBanner message={nameMsg.text} />)}
           <Button title="Kaydet" disabled={busy} onPress={saveName} />
         </Section>
-        <Section title="Sifre degistir">
+        <Section title="Şifre değiştir">
           <Hint>{PASSWORD_HINT}</Hint>
-          <Field label="Mevcut sifre" value={cur} onChangeText={setCur} secureTextEntry />
-          <Field label="Yeni sifre" value={next} onChangeText={setNext} secureTextEntry />
-          <Field label="Yeni sifre (tekrar)" value={conf} onChangeText={setConf} secureTextEntry />
+          <Field label="Mevcut şifre" value={cur} onChangeText={setCur} secureTextEntry />
+          <Field label="Yeni şifre" value={next} onChangeText={setNext} secureTextEntry />
+          <Field label="Yeni şifre (tekrar)" value={conf} onChangeText={setConf} secureTextEntry />
           {pwMsg && (pwMsg.ok ? <SuccessNote text={pwMsg.text} /> : <ErrorBanner message={pwMsg.text} />)}
-          <Button title="Sifreyi guncelle" disabled={busy} onPress={savePassword} />
+          <Button title="Şifreyi güncelle" disabled={busy} onPress={savePassword} />
         </Section>
-        <Button kind="danger" title="Cikis yap" onPress={() => { void logout(); }} />
+        <Button kind="danger" title="Çıkış yap" onPress={() => { void logout(); }} />
       </Screen>
     </View>
   );

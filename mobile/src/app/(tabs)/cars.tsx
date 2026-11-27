@@ -15,7 +15,7 @@ import { Price } from '@/components/Price';
 import { color, MIN_TOUCH, radius, space, type } from '@/theme/tokens';
 import { DateField } from '@/components/DateField';
 import { addDays, isoLocalDateTime, validateRentalTimes } from '@/features/dates';
-import { carErrorMessage, defaultPickup, PICKUP_LEAD_TEXT, pickupLeadError } from '@/features/cars/lead';
+import { carErrorMessage, defaultPickup, PICKUP_LEAD_HINT, pickupLeadError } from '@/features/cars/lead';
 import { buildCarsReturn, parseCarsReturn } from '@/features/returnState';
 
 type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; returnAt: string; driverAge: number };
@@ -43,7 +43,7 @@ export default function Cars() {
   function search() {
     const err = pickupLeadError(pAt, Date.now()) ?? validateRentalTimes(pAt, rAt);
     const ageN = parseInt(age, 10) || 0;
-    setFormError(err ?? (ageN < 18 ? 'Sürücü yaşı en az 18 olmali.' : null));
+    setFormError(err ?? (ageN < 18 ? 'Sürücü yaşı en az 18 olmalı.' : null));
     if (err || ageN < 18) return;
     if (!pickup || !returnId) return;
     setQ({ pickupBranchId: pickup, returnBranchId: returnId, pickupAt: isoLocalDateTime(pAt), returnAt: isoLocalDateTime(rAt), driverAge: ageN });
@@ -73,7 +73,7 @@ export default function Cars() {
           </AsyncView>
           <DateField label="Alış" mode="datetime" value={pAt} minimumDate={new Date()} onChange={(d) => { setPAt(d); if (rAt <= d) setRAt(addDays(d, 1)); }} />
           <DateField label="Teslim" mode="datetime" value={rAt} minimumDate={pAt} onChange={setRAt} />
-          <Muted>{PICKUP_LEAD_TEXT}</Muted>
+          {formError ? null : <Muted>{PICKUP_LEAD_HINT}</Muted>}
           <Field label="Sürücü yaşı" value={age} onChangeText={setAge} keyboardType="number-pad" />
           <ErrorBanner message={formError} />
           <Button title="Ara" disabled={!pickup || !returnId} onPress={search} />

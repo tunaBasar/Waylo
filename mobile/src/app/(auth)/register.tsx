@@ -15,28 +15,28 @@ export default function Register() {
   async function submit() {
     setBusy(true); setError(null);
     try { const r = await register({ ...f, email: f.email.trim() }); setSentTo(r.email); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Kayit basarisiz'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Kayıt başarısız'); }
     finally { setBusy(false); }
   }
   if (sentTo) {
     return (
       <Screen>
-        <AuthShell title="E-postani dogrula">
-        <Hint>{`${sentTo} adresine dogrulama baglantisi gonderildi. Dogruladiktan sonra giris yapabilirsin.`}</Hint>
-        <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girise don"><LinkText>Girise don</LinkText></Link>
+        <AuthShell title="E-postanı doğrula">
+        <Hint>{`${sentTo} adresine doğrulama bağlantısı gönderildi. Doğruladıktan sonra giriş yapabilirsin.`}</Hint>
+        <Link href="/(auth)/login" accessibilityRole="link" accessibilityLabel="Girişe dön"><LinkText>Girişe dön</LinkText></Link>
         </AuthShell>
       </Screen>
     );
   }
   return (
     <Screen>
-      <AuthShell title="Kayit ol">
+      <AuthShell title="Kayıt ol">
       <ErrorBanner message={error} />
       <Field label="Ad" value={f.firstName} onChangeText={set('firstName')} autoCapitalize="words" />
       <Field label="Soyad" value={f.lastName} onChangeText={set('lastName')} autoCapitalize="words" />
       <Field label="E-posta" value={f.email} onChangeText={set('email')} keyboardType="email-address" />
-      <Field label="Sifre" value={f.password} onChangeText={set('password')} secureTextEntry />
-      <Button title={busy ? 'Kaydediliyor...' : 'Kayit ol'} onPress={submit} disabled={busy || !f.firstName || !f.lastName || !f.email || !f.password} />
+      <Field label="Şifre" value={f.password} onChangeText={set('password')} secureTextEntry />
+      <Button title={busy ? 'Kaydediliyor...' : 'Kayıt ol'} onPress={submit} disabled={busy || !f.firstName || !f.lastName || !f.email || !f.password} />
       </AuthShell>
     </Screen>
   );

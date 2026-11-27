@@ -13,17 +13,17 @@ export default function Forgot() {
   async function submit() {
     setBusy(true); setError(null);
     try { await forgotPassword(email.trim()); setDone(true); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Istek gonderilemedi'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'İstek gönderilemedi'); }
     finally { setBusy(false); }
   }
   return (
     <Screen>
-      <AuthShell title="Sifremi unuttum">
+      <AuthShell title="Şifremi unuttum">
       <ErrorBanner message={error} />
-      {done ? <Hint>Hesap varsa sifre sifirlama baglantisi e-postana gonderildi.</Hint> : (
+      {done ? <Hint>Hesap varsa şifre sıfırlama bağlantısı e-postana gönderildi.</Hint> : (
         <>
           <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" />
-          <Button title={busy ? 'Gonderiliyor...' : 'Baglanti gonder'} onPress={submit} disabled={busy || !email} />
+          <Button title={busy ? 'Gönderiliyor...' : 'Bağlantı gönder'} onPress={submit} disabled={busy || !email} />
         </>
       )}
       </AuthShell>

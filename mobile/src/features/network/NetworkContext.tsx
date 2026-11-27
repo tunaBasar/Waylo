@@ -32,7 +32,7 @@ export function OfflineBanner() {
       style={{ backgroundColor: color.warningContainer, flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, paddingHorizontal: space.lg }}>
       <MaterialCommunityIcons name="wifi-off" size={18} color={color.onWarningContainer} accessibilityElementsHidden importantForAccessibility="no" />
       <Text style={[type.labelLg, { color: color.onWarningContainer, flex: 1 }]}>
-        Cevrimdisisiniz. Odeme ve siparis islemleri baglanti gelince yapilabilir.
+        Çevrimdışısınız. Ödeme ve sipariş işlemleri bağlantı gelince yapılabilir.
       </Text>
     </View>
   );

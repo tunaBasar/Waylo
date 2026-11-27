@@ -41,10 +41,10 @@ export default function TabsLayout() {
         headerTitleStyle: { fontFamily: font.displaySemi, fontSize: type.headlineMd.fontSize },
       }}>
       <Tabs.Screen name="hotels" options={{ title: 'Oteller' }} />
-      <Tabs.Screen name="flights" options={{ title: 'Ucuslar' }} />
-      <Tabs.Screen name="cars" options={{ title: 'Arac' }} />
-      <Tabs.Screen name="bus" options={{ title: 'Otobus' }} />
-      <Tabs.Screen name="orders" options={{ title: 'Siparisler' }} listeners={guestTab('/orders')} />
+      <Tabs.Screen name="flights" options={{ title: 'Uçuşlar' }} />
+      <Tabs.Screen name="cars" options={{ title: 'Araç' }} />
+      <Tabs.Screen name="bus" options={{ title: 'Otobüs' }} />
+      <Tabs.Screen name="orders" options={{ title: 'Siparişler' }} listeners={guestTab('/orders')} />
       <Tabs.Screen name="profile" options={{ title: 'Profil' }} listeners={guestTab('/profile')} />
     </Tabs>
   );

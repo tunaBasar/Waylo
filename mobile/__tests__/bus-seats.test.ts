@@ -38,7 +38,7 @@ describe('bus seat helpers', () => {
       .toEqual({ tripId: 't', fromSeq: 0, toSeq: 2, passengers: [{ seatNo: 4, name: 'Ayse Y', gender: 'FEMALE' }] });
   });
   it('error texts', () => {
-    expect(busErrorMessage(new ApiError('x', 409, 'SEAT_TAKEN'), 'f')).toMatch(/az once satildi/);
+    expect(busErrorMessage(new ApiError('x', 409, 'SEAT_TAKEN'), 'f')).toMatch(/az önce satıldı/);
     expect(busErrorMessage(new ApiError('x', 409, 'SEAT_GENDER_CONFLICT'), 'f')).toMatch(/cinsiyet/);
     expect(busErrorMessage(new ApiError('server text', 400, 'OTHER'), 'f')).toBe('server text');
     expect(busErrorMessage('boom', 'fallback')).toBe('fallback');

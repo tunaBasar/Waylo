@@ -44,17 +44,17 @@ export function Field({ label, onFocus, onBlur, style, ...p }: { label: string }
 export const ErrorBanner = ({ message }: { message: string | null }) =>
   message ? <Text accessibilityRole="alert" style={s.errorBanner}>{message}</Text> : null;
 
-export const TestBanner = () => <Text style={s.testBanner}>TEST ODEME: gercek para cekilmez.</Text>;
+export const TestBanner = () => <Text style={s.testBanner}>TEST ÖDEME: gerçek para çekilmez.</Text>;
 
 /** Renders loading / offline / error / empty states, otherwise children(data). */
 export function AsyncView<T>({ state, isEmpty, emptyText, children }: {
   state: AsyncState<T>; isEmpty?: (d: T) => boolean; emptyText: string; children: (d: T) => ReactNode;
 }) {
-  if (state.loading) return <View style={s.center}><ActivityIndicator color={color.primary} accessibilityLabel="Yukleniyor" /><Muted>Yukleniyor...</Muted></View>;
+  if (state.loading) return <View style={s.center}><ActivityIndicator color={color.primary} accessibilityLabel="Yükleniyor" /><Muted>Yükleniyor...</Muted></View>;
   if (state.error) {
     return (
       <View style={s.center}>
-        <ErrorBanner message={state.offline ? 'Cevrimdisisiniz. Fiyat ve musaitlik icin internet baglantisi gerekir.' : state.error} />
+        <ErrorBanner message={state.offline ? 'Çevrimdışısınız. Fiyat ve müsaitlik için internet bağlantısı gerekir.' : state.error} />
         <Button title="Tekrar dene" kind="secondary" onPress={state.reload} />
       </View>
     );

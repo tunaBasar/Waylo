@@ -1,6 +1,6 @@
 import { ApiError, type Gender, type SeatLayout, type SeatState } from '@/api';
 
-export const GENDER_LABEL: Record<Gender, string> = { FEMALE: 'Kadin', MALE: 'Erkek' };
+export const GENDER_LABEL: Record<Gender, string> = { FEMALE: 'Kadın', MALE: 'Erkek' };
 export const MAX_SEATS = 5;
 
 /** Seats per row for a layout. */
@@ -35,17 +35,17 @@ export function seatBlockedByGender(layout: SeatLayout, seats: SeatState[], seat
   return !!other && !other.available && other.occupantGender !== null && other.occupantGender !== gender;
 }
 
-export const GENDER_RULE_TEXT = 'Yan yana farkli cinsiyetten tanimadigi yolcu oturamaz.';
+export const GENDER_RULE_TEXT = 'Yan yana farklı cinsiyetten tanımadığı yolcu oturamaz.';
 
 const ERROR_TEXT: Record<string, string> = {
-  BUS_SALES_DISABLED: 'Otobus bileti satisi henuz acik degil.',
-  SEAT_TAKEN: 'Secilen koltuk az once satildi. Baska koltuk secin.',
-  SEAT_GENDER_CONFLICT: 'Yan koltukta farkli cinsiyetten yolcu var. Baska koltuk secin.',
-  SALES_CLOSED: 'Bu sefer icin bilet satisi kapandi.',
-  PARTNER_NOT_SELLABLE: 'Bu firmanin seferi su an satisa kapali.',
-  INVALID_SEAT: 'Gecersiz koltuk.',
-  SEGMENT_NOT_OFFERED: 'Bu guzergah icin fiyat yok.',
-  ADMIN_CANNOT_PURCHASE: 'Platform yoneticisi hesabi ile satin alma yapilamaz.',
+  BUS_SALES_DISABLED: 'Otobüs bileti satışı henüz açık değil.',
+  SEAT_TAKEN: 'Seçilen koltuk az önce satıldı. Başka koltuk seçin.',
+  SEAT_GENDER_CONFLICT: 'Yan koltukta farklı cinsiyetten yolcu var. Başka koltuk seçin.',
+  SALES_CLOSED: 'Bu sefer için bilet satışı kapandı.',
+  PARTNER_NOT_SELLABLE: 'Bu firmanın seferi şu an satışa kapalı.',
+  INVALID_SEAT: 'Geçersiz koltuk.',
+  SEGMENT_NOT_OFFERED: 'Bu güzergah için fiyat yok.',
+  ADMIN_CANNOT_PURCHASE: 'Platform yöneticisi hesabı ile satın alma yapılamaz.',
 };
 
 export function busErrorMessage(err: unknown, fallback: string): string {

@@ -22,7 +22,7 @@ function OrderList({ orders }: { orders: Order[] }) {
     const status = orderStatusInfo(o.status).label;
     const sum = orderSummary(o);
     return (
-      <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Siparis ${o.id.slice(0, 8)}, ${status}, ${money(o.totalAmount, o.currency)}`}
+      <Pressable key={o.id} accessibilityRole="button" accessibilityLabel={`Sipariş ${o.id.slice(0, 8)}, ${status}, ${money(o.totalAmount, o.currency)}`}
         onPress={() => router.push(`/order/${o.id}`)}>
         <Card>
           <View style={s.top}>
@@ -61,12 +61,12 @@ export default function Orders() {
       {state.offline && cached ? (
         <>
           <Text accessibilityRole="alert" style={[type.bodyMd, { backgroundColor: color.warningContainer, color: color.onWarningContainer, padding: space.md, borderRadius: radius.md, overflow: 'hidden' }]}>
-            {`Cevrimdisi: ${new Date(cached.savedAt).toLocaleString('tr-TR')} tarihli kayitli liste gosteriliyor. Durumlar guncel olmayabilir.`}
+            {`Çevrimdışı: ${new Date(cached.savedAt).toLocaleString('tr-TR')} tarihli kayıtlı liste gösteriliyor. Durumlar güncel olmayabilir.`}
           </Text>
           <OrderList orders={cached.orders} />
         </>
       ) : (
-        <AsyncView<Order[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Henuz siparisiniz yok.">
+        <AsyncView<Order[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Henüz siparişiniz yok.">
           {(orders) => <OrderList orders={orders} />}
         </AsyncView>
       )}

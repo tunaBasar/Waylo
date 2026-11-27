@@ -6,7 +6,7 @@ describe('car pickup lead time', () => {
   it('rejects under 2 hours, accepts exactly 2 hours', () => {
     expect(pickupLeadError(new Date(NOW.getTime() + MIN_PICKUP_LEAD_MS - 60000), NOW.getTime())).toBe(PICKUP_LEAD_TEXT);
     expect(pickupLeadError(new Date(NOW.getTime() + MIN_PICKUP_LEAD_MS), NOW.getTime())).toBeNull();
-    expect(pickupLeadError(new Date('x'), NOW.getTime())).toMatch(/Gecersiz/);
+    expect(pickupLeadError(new Date('x'), NOW.getTime())).toMatch(/Geçersiz/);
   });
   it('default pickup is never in the past', () => {
     const d = defaultPickup(NOW);

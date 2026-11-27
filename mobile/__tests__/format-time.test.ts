@@ -28,8 +28,8 @@ describe('fmtLocal', () => {
 
 describe('voucherStatusText', () => {
   it('shows Turkish labels and keeps unknown codes', () => {
-    expect(voucherStatusText('ACTIVE')).toBe('Gecerli');
-    expect(voucherStatusText('REDEEMED')).toBe('Kullanildi');
+    expect(voucherStatusText('ACTIVE')).toBe('Geçerli');
+    expect(voucherStatusText('REDEEMED')).toBe('Kullanıldı');
     expect(voucherStatusText('SOMETHING_NEW')).toBe('SOMETHING_NEW');
   });
 });

@@ -7,7 +7,7 @@ describe('orderSummary', () => {
     expect(orderSummary({ items: [item('HOTEL', 'Kaya Tas Konak · Standart · 28.11.2026-30.11.2026, 2 gece, 1 oda')] }))
       .toEqual({ title: 'Otel · Kaya Tas Konak · Standart · 28.11.2026-30.11.2026, 2 gece, 1 oda', count: null });
     expect(orderSummary({ items: [item('FLIGHT', 'TK100'), item('CAR', 'Fiat'), item('BUS', 'x')] }))
-      .toEqual({ title: 'Ucus · TK100', count: '3 kalem' });
+      .toEqual({ title: 'Uçuş · TK100', count: '3 kalem' });
   });
   it('no items: nothing extra', () => {
     expect(orderSummary({})).toEqual({ title: null, count: null });

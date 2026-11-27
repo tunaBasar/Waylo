@@ -29,7 +29,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], enabled = tru
         if (!alive) return;
         setData(null);
         if (e instanceof ApiError && e.isNetwork) setOffline(true);
-        setError(e instanceof Error ? e.message : 'Bir hata olustu');
+        setError(e instanceof Error ? e.message : 'Bir hata oluştu');
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

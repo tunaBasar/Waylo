@@ -54,17 +54,17 @@ describe('deep links open the right screens', () => {
     const spy = jest.spyOn(api, 'publicGet').mockResolvedValue(undefined);
     const r = await renderRouter({ index: () => <Text>home</Text>, verify: Verify }, { initialUrl: '/verify?token=abc%2B1' });
     expect(r.getPathname()).toBe('/verify');
-    await waitFor(() => expect(screen.getByText(/dogrulandi/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/doğrulandı/)).toBeTruthy());
     expect(spy).toHaveBeenCalledWith('/api/auth/verify?token=abc%2B1');
   });
 
   it('/reset-password?token= shows the form; without a token shows an error', async () => {
     await renderRouter({ index: () => <Text>home</Text>, 'reset-password': ResetPassword }, { initialUrl: '/reset-password?token=xyz' });
-    expect(screen.getByLabelText('Yeni sifre')).toBeTruthy();
+    expect(screen.getByLabelText('Yeni şifre')).toBeTruthy();
   });
 
   it('/reset-password without token is rejected', async () => {
     await renderRouter({ index: () => <Text>home</Text>, 'reset-password': ResetPassword }, { initialUrl: '/reset-password' });
-    expect(screen.getByText('Gecersiz sifirlama linki')).toBeTruthy();
+    expect(screen.getByText('Geçersiz sıfırlama linki')).toBeTruthy();
   });
 });

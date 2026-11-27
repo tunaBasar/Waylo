@@ -14,7 +14,7 @@ export default function Login() {
   async function submit() {
     setBusy(true); setError(null);
     try { await login(email.trim(), password); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Giris basarisiz'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Giriş başarısız'); }
     finally { setBusy(false); }
   }
   return (
@@ -23,10 +23,10 @@ export default function Login() {
       <Hint>Otel, uçuş ve araç kiralama tek yerde</Hint>
       <ErrorBanner message={error} />
       <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
-      <Field label="Sifre" value={password} onChangeText={setPassword} secureTextEntry />
-      <Button title={busy ? 'Giris yapiliyor...' : 'Giris yap'} onPress={submit} disabled={busy || !email || !password} />
-      <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabin yok mu? Kayit ol"><LinkText>Hesabin yok mu? Kayit ol</LinkText></Link>
-      <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Sifremi unuttum"><LinkText>Sifremi unuttum</LinkText></Link>
+      <Field label="Şifre" value={password} onChangeText={setPassword} secureTextEntry />
+      <Button title={busy ? 'Giriş yapılıyor...' : 'Giriş yap'} onPress={submit} disabled={busy || !email || !password} />
+      <Link href="/(auth)/register" accessibilityRole="link" accessibilityLabel="Hesabın yok mu? Kayıt ol"><LinkText>Hesabın yok mu? Kayıt ol</LinkText></Link>
+      <Link href="/(auth)/forgot" accessibilityRole="link" accessibilityLabel="Şifremi unuttum"><LinkText>Şifremi unuttum</LinkText></Link>
       </AuthShell>
     </Screen>
   );

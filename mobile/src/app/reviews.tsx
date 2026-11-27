@@ -25,9 +25,9 @@ function ReviewForm({ item, onDone }: { item: ReviewableItem; onDone: () => void
       <Text style={accountStyles.strong}>{item.hotelName}</Text>
       <Hint>{item.description}</Hint>
       <StarPicker value={score} onChange={setScore} />
-      <Field label="Yorumunuz (istege bagli)" value={text} onChangeText={setText} multiline maxLength={MAX_REVIEW_TEXT} autoCapitalize="sentences" />
+      <Field label="Yorumunuz (isteğe bağlı)" value={text} onChangeText={setText} multiline maxLength={MAX_REVIEW_TEXT} autoCapitalize="sentences" />
       <ErrorBanner message={error} />
-      <Button title={busy ? 'Gonderiliyor...' : 'Yorumu gonder'} disabled={busy} onPress={submit} />
+      <Button title={busy ? 'Gönderiliyor...' : 'Yorumu gönder'} disabled={busy} onPress={submit} />
     </Section>
   );
 }
@@ -37,7 +37,7 @@ export default function Reviews() {
   return (
     <Screen>
       <Hint>{REVIEW_WHEN_HINT}</Hint>
-      <AsyncView<ReviewableItem[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Yorum yazilacak konaklama yok.">
+      <AsyncView<ReviewableItem[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Yorum yazılacak konaklama yok.">
         {(list) => list.map((i) => <ReviewForm key={i.orderItemId} item={i} onDone={state.reload} />)}
       </AsyncView>
     </Screen>

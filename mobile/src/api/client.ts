@@ -32,7 +32,7 @@ export interface ApiClient {
 }
 
 /** Gateway 502/503/504 without a backend message (a service is down or restarting): never show the English reason phrase. */
-export const SERVICE_UNAVAILABLE_MESSAGE = 'Servis su an yanit vermiyor (yeniden basliyor olabilir). Biraz sonra tekrar deneyin.';
+export const SERVICE_UNAVAILABLE_MESSAGE = 'Servis şu an yanıt vermiyor (yeniden başlıyor olabilir). Biraz sonra tekrar deneyin.';
 
 async function toError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => null)) as { message?: string; error?: string; code?: string } | null;
@@ -59,7 +59,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch {
-      throw new ApiError('Sunucuya baglanilamiyor. Baglantinizi kontrol edin.', 0, 'NETWORK');
+      throw new ApiError('Sunucuya bağlanılamıyor. Bağlantınızı kontrol edin.', 0, 'NETWORK');
     }
   }
 
@@ -92,7 +92,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     const text = await res.text();
     if (!text) return undefined as T;
     const env = JSON.parse(text) as ApiEnvelope<T>;
-    if (env.success === false) throw new ApiError(env.message || 'Islem basarisiz', res.status, env.code ?? null);
+    if (env.success === false) throw new ApiError(env.message || 'İşlem başarısız', res.status, env.code ?? null);
     return env.data;
   }
 

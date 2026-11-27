@@ -6,7 +6,8 @@ import { ApiError } from '@/api';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useCart } from '@/features/cart/CartContext';
 import { checkoutErrorMessage, ordersApi } from '@/features/orders/api';
-import { Button, Card, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, Card, ErrorBanner, Field, Muted, Screen } from '@/components/ui';
+import { EmptyNote } from '@/features/account/AccountUi';
 import { Price } from '@/components/Price';
 import { StickyActionBar } from '@/components/StickyActionBar';
 import { useOnline } from '@/features/network/NetworkContext';
@@ -32,11 +33,11 @@ export default function CartScreen() {
       cart.clear();
       router.replace(`/order/${o.id}`);
     } catch (e) {
-      setError(e instanceof ApiError ? checkoutErrorMessage(e) : 'Sepet satin alinamadi');
+      setError(e instanceof ApiError ? checkoutErrorMessage(e) : 'Sepet satın alınamadı');
     } finally { setBusy(false); }
   }
 
-  if (cart.items.length === 0) return <Screen><Title>Sepet</Title><Muted>Sepetiniz bos. Otel, ucus veya arac ekleyin.</Muted></Screen>;
+  if (cart.items.length === 0) return <Screen><EmptyNote icon="cart-outline" text="Sepetiniz boş." /><Muted>Otel, uçuş, araç veya otobüs ekleyin.</Muted></Screen>;
 
   // A total is shown only when every item has a price in one currency.
   const first = cart.items[0];
@@ -48,7 +49,6 @@ export default function CartScreen() {
   return (
     <View style={s.root}>
       <Screen>
-        <Title>Sepet</Title>
         {cart.items.map((i) => (
           <Card key={i.id}>
             <View style={s.row}>
@@ -69,7 +69,7 @@ export default function CartScreen() {
         <Muted>Sipariş oluşturulurken uygulanır</Muted>
         <Muted>Nihai fiyat sipariş oluşturulduğunda kesinleşir.</Muted>
         <ErrorBanner message={error} />
-        {!online ? <Muted>Siparis olusturmak icin internet baglantisi gerekir.</Muted> : null}
+        {!online ? <Muted>Sipariş oluşturmak için internet bağlantısı gerekir.</Muted> : null}
         {sum == null ? <Button title={actionLabel} onPress={buy} disabled={disabled} /> : null}
       </Screen>
       {sum != null && currency ? <StickyActionBar amount={sum} currency={currency} actionLabel={actionLabel} onAction={buy} disabled={disabled} /> : null}

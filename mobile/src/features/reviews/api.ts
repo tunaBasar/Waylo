@@ -10,7 +10,7 @@ export const MAX_REVIEW_TEXT = 2000;
 
 /** Returns an error message or null. Score is an integer 1..5. */
 export function validateReview(score: number, text: string): string | null {
-  if (!Number.isInteger(score) || score < 1 || score > 5) return 'Puan 1 ile 5 arasinda olmali.';
+  if (!Number.isInteger(score) || score < 1 || score > 5) return 'Puan 1 ile 5 arasında olmalı.';
   if (text.trim().length > MAX_REVIEW_TEXT) return `Yorum en fazla ${MAX_REVIEW_TEXT} karakter olabilir.`;
   return null;
 }

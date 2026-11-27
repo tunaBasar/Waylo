@@ -26,7 +26,7 @@ function Routes() {
   const { user, loading } = useAuth();
   usePendingOrderLink(!!user);
   // The stored session is restored first: deciding earlier would send a signed-in visitor to login.
-  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator accessibilityLabel="Yukleniyor" /></View>;
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator accessibilityLabel="Yükleniyor" /></View>;
   return (
     <Stack screenOptions={{
       headerShown: true,
@@ -38,11 +38,11 @@ function Routes() {
       {/* open to guests: the catalog is served anonymously */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="hotel/[id]" options={{ title: 'Otel' }} />
-      <Stack.Screen name="flight/[id]" options={{ title: 'Ucus teklifi' }} />
+      <Stack.Screen name="flight/[id]" options={{ title: 'Uçuş teklifi' }} />
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="quote/[id]" options={{ title: 'Teklif' }} />
         <Stack.Screen name="cart" options={{ title: 'Sepet' }} />
-        <Stack.Screen name="order/[id]" options={{ title: 'Siparis' }} />
+        <Stack.Screen name="order/[id]" options={{ title: 'Sipariş' }} />
         <Stack.Screen name="reviews" options={{ title: 'Yorumlar' }} />
         <Stack.Screen name="notifications" options={{ title: 'Bildirimler' }} />
         <Stack.Screen name="settings" options={{ title: 'Ayarlar' }} />
@@ -51,13 +51,13 @@ function Routes() {
         <Stack.Screen name="support/[id]" options={{ title: 'Destek talebi' }} />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
-        <Stack.Screen name="(auth)/login" options={{ title: 'Giris' }} />
-        <Stack.Screen name="(auth)/register" options={{ title: 'Kayit ol' }} />
-        <Stack.Screen name="(auth)/forgot" options={{ title: 'Sifremi unuttum' }} />
+        <Stack.Screen name="(auth)/login" options={{ title: 'Giriş' }} />
+        <Stack.Screen name="(auth)/register" options={{ title: 'Kayıt ol' }} />
+        <Stack.Screen name="(auth)/forgot" options={{ title: 'Şifremi unuttum' }} />
       </Stack.Protected>
       {/* Email links work signed in or out. */}
-      <Stack.Screen name="verify" options={{ title: 'E-posta dogrulama' }} />
-      <Stack.Screen name="reset-password" options={{ title: 'Sifre sifirlama' }} />
+      <Stack.Screen name="verify" options={{ title: 'E-posta doğrulama' }} />
+      <Stack.Screen name="reset-password" options={{ title: 'Şifre sıfırlama' }} />
     </Stack>
   );
 }

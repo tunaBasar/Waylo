@@ -13,7 +13,7 @@ describe('Orders screen', () => {
   it('shows the empty state when the API returns no orders', async () => {
     jest.spyOn(ordersApi, 'list').mockResolvedValue([]);
     await render(<Orders />);
-    await waitFor(() => expect(screen.getByText('Henuz siparisiniz yok.')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Henüz siparişiniz yok.')).toBeTruthy());
   });
 
   it('renders orders from the API, status from backend', async () => {
@@ -21,7 +21,7 @@ describe('Orders screen', () => {
       { id: 'abcdef1234', status: 'CONFIRMED', currency: 'TRY', totalAmount: 100, createdAt: '2026-01-01T00:00:00Z' },
     ]);
     await render(<Orders />);
-    await waitFor(() => expect(screen.getByText('Onaylandi')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Onaylandı')).toBeTruthy());
     expect(screen.getByText('#abcdef12')).toBeTruthy();
   });
 
@@ -29,7 +29,7 @@ describe('Orders screen', () => {
     const { ApiError } = require('../src/api/client');
     jest.spyOn(ordersApi, 'list').mockRejectedValue(new ApiError('x', 0, 'NETWORK'));
     await render(<Orders />);
-    await waitFor(() => expect(screen.getByText(/Cevrimdisisiniz/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Çevrimdışısınız/)).toBeTruthy());
     expect(screen.getByLabelText('Tekrar dene')).toBeTruthy();
   });
 
@@ -43,7 +43,7 @@ describe('Orders screen', () => {
     first.unmount();
     jest.spyOn(ordersApi, 'list').mockRejectedValue(new ApiError('x', 0, 'NETWORK'));
     await render(<Orders />);
-    await waitFor(() => expect(screen.getByText(/^Cevrimdisi: .*kayitli liste/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/^Çevrimdışı: .*kayıtlı liste/)).toBeTruthy());
     expect(screen.getByText('#cached12')).toBeTruthy();
   });
 });

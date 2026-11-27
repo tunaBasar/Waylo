@@ -25,17 +25,17 @@ function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: Or
   const [msg, setMsg] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
   if (!item.flight) return null;
-  if (checkin) return <Text style={[type.labelLg, { color: color.success }]}>{checkin.seatNumber ?? item.flight.seatNumber ? `Check-in yapildi, koltuk ${checkin.seatNumber ?? item.flight.seatNumber}` : 'Check-in yapildi'}</Text>;
+  if (checkin) return <Text style={[type.labelLg, { color: color.success }]}>{checkin.seatNumber ?? item.flight.seatNumber ? `Check-in yapıldı, koltuk ${checkin.seatNumber ?? item.flight.seatNumber}` : 'Check-in yapıldı'}</Text>;
   const win = checkinWindow(item.flight.departureAt ?? '', now, item.flight.supplier, !!item.cancelOutcome);
   async function run() {
     setBusy(true); setMsg(null);
     try { await checkinApi.checkIn(item.id); onDone(); }
-    catch (e) { setMsg(e instanceof ApiError ? e.message : 'Check-in yapilamadi'); }
+    catch (e) { setMsg(e instanceof ApiError ? e.message : 'Check-in yapılamadı'); }
     finally { setBusy(false); }
   }
   return (
     <>
-      <Button title={busy ? 'Isleniyor...' : 'Online check-in'} disabled={!win.open || busy} onPress={run} />
+      <Button title={busy ? 'İşleniyor...' : 'Online check-in'} disabled={!win.open || busy} onPress={run} />
       {!win.open && win.reason ? <Muted>{win.reason}</Muted> : null}
       <ErrorBanner message={msg} />
     </>
@@ -45,7 +45,7 @@ function FlightCheckin({ item, checkin, onDone }: { item: OrderItem; checkin: Or
 function Vouchers({ orderId, checkedInItemIds, freeCancel }: { orderId: string; checkedInItemIds: Set<string>; freeCancel: Record<string, string> }) {
   const state = useAsync(() => ordersApi.vouchers(orderId), [orderId]);
   return (
-    <AsyncView<Voucher[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Kupon henuz olusmadi.">
+    <AsyncView<Voucher[]> state={state} isEmpty={(d) => d.length === 0} emptyText="Kupon henüz oluşmadı.">
       {(list) => list.map((v) => (
         <Card key={v.voucherId}>
           <View style={st.top}>
@@ -55,7 +55,7 @@ function Vouchers({ orderId, checkedInItemIds, freeCancel }: { orderId: string; 
           {v.payload ? <View style={st.qr}><QRCode value={v.payload} size={200} /></View> : null}
           <Text style={[type.monoSm, { color: color.onSurfaceVariant }]}>{`Geçerlilik: ${fmtLocal(v.validFrom)} - ${fmtLocal(v.validUntil)}`}</Text>
           {v.orderItemId && freeCancel[v.orderItemId] ? <Muted>{freeCancel[v.orderItemId]}</Muted> : null}
-          {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={[type.labelLg, { color: color.success }]}>Binis karti (QR)</Text> : null}
+          {v.orderItemId && checkedInItemIds.has(v.orderItemId) ? <Text style={[type.labelLg, { color: color.success }]}>Biniş kartı (QR)</Text> : null}
         </Card>
       ))}
     </AsyncView>
@@ -81,21 +81,21 @@ export default function OrderDetail() {
     try {
       const o = await paySandbox(id, token);
       // Only the backend's order status decides success.
-      if (o.status !== 'CONFIRMED') setMsg(token === 'TEST_DECLINE' ? 'Test odemesi reddedildi.' : `Odeme onaylanmadi (durum: ${ORDER_STATUS_TR[o.status] ?? o.status}).`);
+      if (o.status !== 'CONFIRMED') setMsg(token === 'TEST_DECLINE' ? 'Test ödemesi reddedildi.' : `Ödeme onaylanmadı (durum: ${ORDER_STATUS_TR[o.status] ?? o.status}).`);
       state.reload();
-    } catch (e) { setMsg(e instanceof ApiError ? checkoutErrorMessage(e) : 'Odeme basarisiz'); }
+    } catch (e) { setMsg(e instanceof ApiError ? checkoutErrorMessage(e) : 'Ödeme başarısız'); }
     finally { setBusy(false); }
   }
   async function loadPreview() {
     setBusy(true); setMsg(null);
     try { setPreview(await ordersApi.cancelPreview(id)); }
-    catch (e) { setMsg(e instanceof ApiError ? e.message : 'Iptal bilgisi alinamadi'); }
+    catch (e) { setMsg(e instanceof ApiError ? e.message : 'İptal bilgisi alınamadı'); }
     finally { setBusy(false); }
   }
   async function confirmCancel() {
     setBusy(true); setMsg(null);
     try { await ordersApi.cancel(id); setPreview(null); state.reload(); }
-    catch (e) { setMsg(e instanceof ApiError ? e.message : 'Iptal edilemedi'); }
+    catch (e) { setMsg(e instanceof ApiError ? e.message : 'İptal edilemedi'); }
     finally { setBusy(false); }
   }
 
@@ -105,7 +105,7 @@ export default function OrderDetail() {
     <AppHeader title={`Sipariş #${(id ?? '').slice(0, 8)}`} onBack={() => router.back()}
       right={state.data ? <StatusPill tone={ORDER_TONE[state.data.status] ?? 'neutral'} text={orderStatusInfo(state.data.status).label} /> : undefined} />
     <Screen>
-      <AsyncView<Order> state={state} emptyText="Siparis bulunamadi.">
+      <AsyncView<Order> state={state} emptyText="Sipariş bulunamadı.">
         {(o) => (
           <>
             {o.status === 'PENDING' && o.holdExpiresAt ? <CountdownBanner until={o.holdExpiresAt} label="Ödeme için kalan süre" /> : null}
@@ -123,30 +123,30 @@ export default function OrderDetail() {
                   ) : null}
                 </View>
               ))}
-              {o.status === 'PENDING' && o.holdExpiresAt ? <Muted>{`Odeme son zamani: ${fmtLocal(o.holdExpiresAt)}`}</Muted> : null}
+              {o.status === 'PENDING' && o.holdExpiresAt ? <Muted>{`Ödeme son zamanı: ${fmtLocal(o.holdExpiresAt)}`}</Muted> : null}
             </Card>
             <ErrorBanner message={msg} />
             {o.status === 'PENDING' && (
               <>
                 <TestBanner />
-                <Button title={busy ? 'Isleniyor...' : 'Ode (TEST ODEME)'} disabled={busy || !online} onPress={() => pay('TEST_OK')} />
-                <Button kind="secondary" title="Reddedilen test odemesi" disabled={busy || !online} onPress={() => pay('TEST_DECLINE')} />
+                <Button title={busy ? 'İşleniyor...' : 'Öde (TEST ÖDEME)'} disabled={busy || !online} onPress={() => pay('TEST_OK')} />
+                <Button kind="secondary" title="Reddedilen test ödemesi" disabled={busy || !online} onPress={() => pay('TEST_DECLINE')} />
               </>
             )}
             <Button kind="secondary" title="Destek talebi aç" onPress={() => router.push(`/support/new?orderId=${o.id}` as Href)} />
             {o.status === 'CONFIRMED' && <Vouchers orderId={o.id} checkedInItemIds={new Set((checkins.data ?? []).map((c) => c.orderItemId))} freeCancel={Object.fromEntries((o.items ?? []).map((i) => [i.id, orderPolicyText(i.cancellationPolicy, i.cancelFreeHoursBefore, i.freeCancellationUntil)]))} />}
             {(o.status === 'PENDING' || o.status === 'CONFIRMED') && !preview && canOfferCancel(o, vouchers.data) && (
-              <Button kind="secondary" title="Siparisi iptal et" disabled={busy} onPress={loadPreview} />
+              <Button kind="secondary" title="Siparişi iptal et" disabled={busy} onPress={loadPreview} />
             )}
             {preview && (
               <Card>
                 {preview.cancellable ? (
                   <>
-                    <Text style={[type.titleMd, { color: color.onSurface }]}>{o.status === 'PENDING' ? 'Odeme yapilmadi, tutar cekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
-                    <Button kind="danger" title="Iptali onayla" disabled={busy || !online} onPress={confirmCancel} />
+                    <Text style={[type.titleMd, { color: color.onSurface }]}>{o.status === 'PENDING' ? 'Ödeme yapılmadı, tutar çekilmeyecek.' : refundText(preview.totalRefund, preview.currency)}</Text>
+                    <Button kind="danger" title="İptali onayla" disabled={busy || !online} onPress={confirmCancel} />
                   </>
-                ) : <Text>{`Bu siparis iptal edilemez (${preview.blockedReason}).`}</Text>}
-                <Button kind="secondary" title="Vazgec" onPress={() => setPreview(null)} />
+                ) : <Text>{`Bu sipariş iptal edilemez (${preview.blockedReason}).`}</Text>}
+                <Button kind="secondary" title="Vazgeç" onPress={() => setPreview(null)} />
               </Card>
             )}
           </>

@@ -78,7 +78,7 @@ function SeatPicker({ offer, search, onBar, register }: {
   function toggle(seatNo: number) {
     setErr(null); setMsg(null);
     if (picked.some((p) => p.seatNo === seatNo)) { setPicked(picked.filter((p) => p.seatNo !== seatNo)); return; }
-    if (picked.length >= MAX_SEATS) { setErr('Tek seferde en fazla 5 koltuk secilebilir.'); return; }
+    if (picked.length >= MAX_SEATS) { setErr('Tek seferde en fazla 5 koltuk seçilebilir.'); return; }
     setPicked([...picked, { seatNo, name: '', gender: defaultGender }]);
   }
   const patch = (seatNo: number, d: Partial<Picked>) => setPicked(picked.map((p) => (p.seatNo === seatNo ? { ...p, ...d } : p)));
@@ -200,7 +200,7 @@ export default function Bus() {
   // dependencies during render, and q is null until the first search (crashed the tab on Expo web, 27.11).
   const trips = useAsync(
     () => (q ? busApi.search(q.from, q.to, q.date) : Promise.resolve([] as TripOffer[]))
-      .catch((e: unknown) => { throw new Error(busErrorMessage(e, 'Seferler yuklenemedi.')); }),
+      .catch((e: unknown) => { throw new Error(busErrorMessage(e, 'Seferler yüklenemedi.')); }),
     [q], q !== null && status.data?.enabled === true);
   const showBar = bar !== null && selected !== null;
   return (
@@ -214,8 +214,8 @@ export default function Bus() {
       <ModeTabs active="bus" />
       <View style={{ flex: 1 }}>
         <Screen>
-          <AsyncView<{ enabled: boolean }> state={status} emptyText="Durum alinamadi.">
-            {(s) => !s.enabled ? <Muted>Otobus satisi su an kapali.</Muted> : (
+          <AsyncView<{ enabled: boolean }> state={status} emptyText="Durum alınamadı.">
+            {(s) => !s.enabled ? <Muted>Otobüs satışı şu an kapalı.</Muted> : (
               <>
                 <Card>
                   <Field label="Nereden (şehir)" value={from} onChangeText={setFrom} autoCapitalize="words" />

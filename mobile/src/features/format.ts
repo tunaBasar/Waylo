@@ -1,4 +1,4 @@
-export const VERTICAL_TR: Record<string, string> = { HOTEL: 'Otel', CAR: 'Arac', FLIGHT: 'Ucus', BUS: 'Otobus' };
+export const VERTICAL_TR: Record<string, string> = { HOTEL: 'Otel', CAR: 'Araç', FLIGHT: 'Uçuş', BUS: 'Otobüs' };
 export const verticalText = (v: string) => VERTICAL_TR[v] ?? v;
 
 export const money = (v: number, currency: string) => {
@@ -26,12 +26,12 @@ export function fmtLocal(iso: string | null | undefined): string {
 
 /** Same labels as the web order page. */
 export const VOUCHER_STATUS_TR: Record<string, string> = {
-  ACTIVE: 'Gecerli', REDEEMED: 'Kullanildi', VOID: 'Iptal edildi', NO_SHOW: 'Gelinmedi',
+  ACTIVE: 'Geçerli', REDEEMED: 'Kullanıldı', VOID: 'İptal edildi', NO_SHOW: 'Gelinmedi',
 };
 export const voucherStatusText = (s: string) => VOUCHER_STATUS_TR[s] ?? s;
 
 export const ORDER_STATUS_TR: Record<string, string> = {
-  PENDING: 'Odeme bekleniyor', CONFIRMED: 'Onaylandi', CANCELLED: 'Iptal edildi', EXPIRED: 'Süresi doldu',
+  PENDING: 'Ödeme bekleniyor', CONFIRMED: 'Onaylandı', CANCELLED: 'İptal edildi', EXPIRED: 'Süresi doldu',
 };
 
 export const ORDER_EXPIRED_NOTE = 'Ödeme süresi içinde tamamlanmadığı için rezervasyon tutmaları sona erdi. Ödeme yapılamaz, lütfen yeniden arama yapın.';
@@ -79,11 +79,11 @@ export function offerPolicyText(
   checkIn: string | null | undefined,
   now: Date = new Date(),
 ): string {
-  if (policy === 'NON_REFUNDABLE') return 'Iade edilmez';
-  if (daysBefore == null || !checkIn) return 'Ucretsiz iptal kosulu icin giris tarihi secin';
+  if (policy === 'NON_REFUNDABLE') return 'İade edilmez';
+  if (daysBefore == null || !checkIn) return 'Ücretsiz iptal koşulu için giriş tarihi seçin';
   const deadline = shiftIso(checkIn, daysBefore);
-  if (deadline <= localTodayIso(now)) return 'Iade edilmez (ucretsiz iptal suresi gecti)';
-  return `${prevDayDmy(deadline)} gun sonuna kadar ucretsiz iptal`;
+  if (deadline <= localTodayIso(now)) return 'İade edilmez (ücretsiz iptal süresi geçti)';
+  return `${prevDayDmy(deadline)} gün sonuna kadar ücretsiz iptal`;
 }
 
 /** Order card (after booking), from the stored snapshot. No Turkish suffix is ever appended to a time. */
@@ -93,22 +93,22 @@ export function orderPolicyText(
   freeCancellationUntil: string | null | undefined,
   now: Date = new Date(),
 ): string {
-  if (policy === 'NON_REFUNDABLE') return 'Iade edilmez';
+  if (policy === 'NON_REFUNDABLE') return 'İade edilmez';
   if (freeCancellationUntil) {
-    if (new Date(freeCancellationUntil).getTime() <= now.getTime()) return 'Iade edilmez (ucretsiz iptal suresi gecti)';
+    if (new Date(freeCancellationUntil).getTime() <= now.getTime()) return 'İade edilmez (ücretsiz iptal süresi geçti)';
     const stamp = fmtIstanbul(freeCancellationUntil); // "dd.MM.yyyy HH:mm"
     if (stamp.endsWith(' 00:00')) {
       const [d, m, y] = stamp.slice(0, 10).split('.');
-      return `${prevDayDmy(`${y}-${m}-${d}`)} gun sonuna kadar ucretsiz iptal`;
+      return `${prevDayDmy(`${y}-${m}-${d}`)} gün sonuna kadar ücretsiz iptal`;
     }
-    return `Ucretsiz iptal son an: ${stamp}`;
+    return `Ücretsiz iptal son an: ${stamp}`;
   }
-  if (policy === 'FREE_UNTIL' && hours != null) return `Baslangica ${hours} saat kalaya kadar ucretsiz iptal`;
-  return 'Hizmet baslangicina kadar ucretsiz iptal';
+  if (policy === 'FREE_UNTIL' && hours != null) return `Başlangıca ${hours} saat kalaya kadar ücretsiz iptal`;
+  return 'Hizmet başlangıcına kadar ücretsiz iptal';
 }
 
 export function refundText(amount: number, currency: string): string {
-  return amount > 0 ? `${money(amount, currency)} iade edilecek` : 'Iade yapilmayacak';
+  return amount > 0 ? `${money(amount, currency)} iade edilecek` : 'İade yapılmayacak';
 }
 
 /** Display only: old hotel orders stored "2026-11-27-2026-11-29, 2 gece, 1 oda". Shows the leading ISO range as dd.MM.yyyy-dd.MM.yyyy. */

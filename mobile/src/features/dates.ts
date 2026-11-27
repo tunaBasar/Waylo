@@ -24,14 +24,14 @@ export const fmtTime = (d: Date) => `${p2(d.getHours())}:${p2(d.getMinutes())}`;
 export function validateStayDates(checkIn: string, checkOut: string, today: Date = new Date()): string | null {
   const a = parseIsoDate(checkIn);
   const b = parseIsoDate(checkOut);
-  if (!a || !b) return 'Gecerli tarih secin.';
-  if (a < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return 'Giris tarihi gecmiste olamaz.';
-  if (b <= a) return 'Cikis tarihi giris tarihinden sonra olmali.';
+  if (!a || !b) return 'Geçerli tarih seçin.';
+  if (a < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return 'Giriş tarihi geçmişte olamaz.';
+  if (b <= a) return 'Çıkış tarihi giriş tarihinden sonra olmalı.';
   return null;
 }
 
 export function validateRentalTimes(pickupAt: Date, returnAt: Date, now: Date = new Date()): string | null {
-  if (pickupAt.getTime() < now.getTime()) return 'Alis zamani gecmiste olamaz.';
-  if (returnAt.getTime() <= pickupAt.getTime()) return 'Teslim zamani alistan sonra olmali.';
+  if (pickupAt.getTime() < now.getTime()) return 'Alış zamanı geçmişte olamaz.';
+  if (returnAt.getTime() <= pickupAt.getTime()) return 'Teslim zamanı alıştan sonra olmalı.';
   return null;
 }
