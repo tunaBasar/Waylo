@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Branch, CarOffer } from '@/api';
 import { useAuth } from '@/features/auth/AuthContext';
 import { setReturnTo } from '@/features/auth/gate';
@@ -11,6 +11,7 @@ import { AsyncView, Button, Card, ErrorBanner, Field, Muted, Screen, Title } fro
 import { DateField } from '@/components/DateField';
 import { addDays, isoLocalDateTime, validateRentalTimes } from '@/features/dates';
 import { carErrorMessage, defaultPickup, pickupLeadError } from '@/features/cars/lead';
+import { buildCarsReturn, parseCarsReturn } from '@/features/returnState';
 import { money } from '@/features/format';
 
 type Q = { pickupBranchId: string; returnBranchId: string; pickupAt: string; returnAt: string; driverAge: number };
@@ -20,12 +21,16 @@ export default function Cars() {
   const router = useRouter();
   const { user } = useAuth();
   const branches = useAsync(() => carsApi.branches(), []);
-  const [pickup, setPickup] = useState<string | null>(null);
-  const [ret, setRet] = useState<string | null>(null);
-  const [pAt, setPAt] = useState(() => defaultPickup(new Date()));
-  const [rAt, setRAt] = useState(() => { const d = addDays(new Date(), 10); d.setHours(10, 0, 0, 0); return d; });
-  const [age, setAge] = useState('30');
-  const [q, setQ] = useState<Q | null>(null);
+  const params = useLocalSearchParams<{ pickup?: string; ret?: string; pickupAt?: string; returnAt?: string; age?: string }>();
+  // State restored after the login detour (see features/returnState.ts). Read once on mount.
+  const [restored] = useState(() => parseCarsReturn(params));
+  const [pickup, setPickup] = useState<string | null>(restored?.pickupBranchId ?? null);
+  const [ret, setRet] = useState<string | null>(restored?.returnBranchId ?? null);
+  const [pAt, setPAt] = useState(() => restored?.pickupAt ?? defaultPickup(new Date()));
+  const [rAt, setRAt] = useState(() => restored?.returnAt ?? (restored?.pickupAt ? addDays(restored.pickupAt, 1) : (() => { const d = addDays(new Date(), 10); d.setHours(10, 0, 0, 0); return d; })()));
+  const [age, setAge] = useState(restored?.driverAge ? String(restored.driverAge) : '30');
+  const [q, setQ] = useState<Q | null>(() => (restored?.pickupAt && restored.returnAt && restored.driverAge
+    ? { pickupBranchId: restored.pickupBranchId, returnBranchId: restored.returnBranchId, pickupAt: isoLocalDateTime(restored.pickupAt), returnAt: isoLocalDateTime(restored.returnAt), driverAge: restored.driverAge } : null));
   const [msg, setMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const offers = useAsync(() => carsApi.offers(q!).catch((e: unknown) => { throw new Error(carErrorMessage(e)); }), [q], q !== null);
@@ -69,7 +74,7 @@ export default function Cars() {
               <Muted>{`${o.category} · ${o.transmission} · ${o.seatCount} koltuk · ${o.chargeableDays} gun`}</Muted>
               <Text style={{ fontWeight: '700' }}>{money(o.totalAmount, o.currency)}</Text>
               <Button kind="secondary" title="Sepete ekle" onPress={() => {
-                if (!user) { setReturnTo('/cars'); router.navigate('/(auth)/login'); return; }
+                if (!user) { setReturnTo(buildCarsReturn({ pickupBranchId: q.pickupBranchId, returnBranchId: q.returnBranchId, pickupAt: new Date(q.pickupAt), returnAt: new Date(q.returnAt), driverAge: q.driverAge })); router.navigate('/(auth)/login'); return; }
                 const ok = cart.add({
                   vertical: 'CAR', label: `${o.exampleModel}, ${q.pickupAt.slice(0, 16)}`, amount: o.totalAmount, currency: o.currency,
                   request: { pickupBranchId: o.pickupBranchId, returnBranchId: o.returnBranchId, category: o.category, transmission: o.transmission, pickupAt: q.pickupAt, returnAt: q.returnAt, driverAge: q.driverAge },

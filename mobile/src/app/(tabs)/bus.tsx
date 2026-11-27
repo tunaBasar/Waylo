@@ -1,26 +1,28 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Gender, SeatMap, TripOffer } from '@/api';
 import { busApi } from '@/features/bus/api';
 import { busCartRequest, busErrorMessage, conflictSeats, GENDER_LABEL, GENDER_RULE_TEXT, MAX_SEATS, passengersReady, seatRows, type Picked } from '@/features/bus/seats';
+import { saveBusDraft, takeBusDraft } from '@/features/bus/draft';
+import { buildBusReturn, busTripKey, parseBusReturn } from '@/features/returnState';
 import { useAuth } from '@/features/auth/AuthContext';
 import { setReturnTo } from '@/features/auth/gate';
 import { useCart } from '@/features/cart/CartContext';
 import { useAsync } from '@/features/useAsync';
 import { AsyncView, Button, Card, colors, ErrorBanner, Field, Muted, Screen, Title } from '@/components/ui';
 import { DateField } from '@/components/DateField';
-import { addDays, isoDate } from '@/features/dates';
+import { addDays, isoDate, parseIsoDate } from '@/features/dates';
 import { fmtLocal, money } from '@/features/format';
 
 const GENDERS: Gender[] = ['MALE', 'FEMALE'];
 
-function SeatPicker({ offer }: { offer: TripOffer }) {
+function SeatPicker({ offer, search }: { offer: TripOffer; search: { from: string; to: string; date: string } }) {
   const router = useRouter();
   const { user } = useAuth();
   const cart = useCart();
   const map = useAsync<SeatMap>(() => busApi.seats(offer.tripId, offer.fromSeq, offer.toSeq), [offer.tripId, offer.fromSeq, offer.toSeq]);
-  const [picked, setPicked] = useState<Picked[]>([]);
+  const [picked, setPicked] = useState<Picked[]>(() => takeBusDraft(busTripKey(offer)) ?? []);
   const [defaultGender, setDefaultGender] = useState<Gender>('MALE');
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -39,7 +41,7 @@ function SeatPicker({ offer }: { offer: TripOffer }) {
 
   function addToCart() {
     if (!ready) return;
-    if (!user) { setReturnTo('/bus'); router.navigate('/(auth)/login'); return; }
+    if (!user) { saveBusDraft(busTripKey(offer), picked); setReturnTo(buildBusReturn({ ...search, tripKey: busTripKey(offer) })); router.navigate('/(auth)/login'); return; }
     const ok = cart.add({
       vertical: 'BUS', label: `${offer.fromCity} - ${offer.toCity} koltuk ${picked.map((p) => p.seatNo).join(', ')}`,
       amount: total, currency: offer.currency, request: busCartRequest(offer, picked),
@@ -98,11 +100,14 @@ function SeatPicker({ offer }: { offer: TripOffer }) {
 
 export default function Bus() {
   const status = useAsync(() => busApi.salesStatus(), []);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [date, setDate] = useState(() => addDays(new Date(), 7));
-  const [q, setQ] = useState<{ from: string; to: string; date: string } | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ from?: string; to?: string; date?: string; trip?: string }>();
+  // State restored after the login detour (see features/returnState.ts). Read once on mount.
+  const [restored] = useState(() => parseBusReturn(params));
+  const [from, setFrom] = useState(restored?.from ?? '');
+  const [to, setTo] = useState(restored?.to ?? '');
+  const [date, setDate] = useState(() => (restored ? parseIsoDate(restored.date) : null) ?? addDays(new Date(), 7));
+  const [q, setQ] = useState<{ from: string; to: string; date: string } | null>(restored ? { from: restored.from, to: restored.to, date: restored.date } : null);
+  const [selected, setSelected] = useState<string | null>(restored?.trip ? busTripKey(restored.trip) : null);
   // No `q!.x` inside the closure: the React Compiler (app.json reactCompiler) reads non-null access paths as memo
   // dependencies during render, and q is null until the first search (crashed the tab on Expo web, 27.11).
   const trips = useAsync(
@@ -131,7 +136,7 @@ export default function Bus() {
                         <Text style={{ fontWeight: '700' }}>{money(t.price, t.currency)}</Text>
                         <Button kind="secondary" title={selected === key ? 'Koltuk secimini kapat' : 'Koltuk sec'} onPress={() => setSelected(selected === key ? null : key)} />
                       </Card>
-                      {selected === key ? <SeatPicker offer={t} /> : null}
+                      {selected === key ? <SeatPicker offer={t} search={{ from: q.from, to: q.to, date: q.date }} /> : null}
                     </View>
                   );
                 })}
