@@ -23,7 +23,8 @@ import java.util.Map;
 public class KafkaConsumerConfig {
 
     private static final String TYPE_MAPPINGS =
-            "flightCancelled:com.waylo.flightseatinventoryservice.event.FlightCancelledEvent";
+            "flightCreated:com.waylo.flightseatinventoryservice.event.FlightCreatedEvent,"
+          + "flightCancelled:com.waylo.flightseatinventoryservice.event.FlightCancelledEvent";
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;

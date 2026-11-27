@@ -2,6 +2,7 @@ package com.waylo.flightservice.service;
 
 import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
+import com.waylo.flightservice.event.FlightCabinSpec;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -11,6 +12,12 @@ import java.util.UUID;
 public interface FlightService {
 
     FlightResponse create(FlightRequest request);
+
+    /**
+     * Same path as {@link #create(FlightRequest)} (validation, duplicate check, FlightCreatedEvent), for a
+     * departure generated from a schedule: sets schedule_id and carries the cabins in the event.
+     */
+    FlightResponse createScheduled(FlightRequest request, UUID scheduleId, List<FlightCabinSpec> cabins);
 
     FlightResponse getById(UUID id);
 

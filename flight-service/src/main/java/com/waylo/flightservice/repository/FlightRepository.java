@@ -32,4 +32,7 @@ public interface FlightRepository extends JpaRepository<Flight, UUID> {
                                 @Param("end") Instant end,
                                 @Param("includeCancelled") boolean includeCancelled,
                                 @Param("cancelledStatus") FlightStatus cancelledStatus);
+
+    List<Flight> findTop5ByScheduleIdAndStatusNotAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAsc(
+            UUID scheduleId, FlightStatus status, Instant from);
 }

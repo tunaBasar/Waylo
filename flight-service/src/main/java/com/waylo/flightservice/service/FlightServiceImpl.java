@@ -6,6 +6,7 @@ import com.waylo.flightservice.domain.FlightStatus;
 import com.waylo.flightservice.dto.FlightMapper;
 import com.waylo.flightservice.dto.FlightRequest;
 import com.waylo.flightservice.dto.FlightResponse;
+import com.waylo.flightservice.event.FlightCabinSpec;
 import com.waylo.flightservice.event.FlightCancelledEvent;
 import com.waylo.flightservice.event.FlightCreatedEvent;
 import com.waylo.flightservice.event.FlightEventPublisher;
@@ -56,11 +57,24 @@ public class FlightServiceImpl implements FlightService {
 
     @Override
     public FlightResponse create(FlightRequest request) {
+        return doCreate(request, null, null);
+    }
+
+    @Override
+    public FlightResponse createScheduled(FlightRequest request, UUID scheduleId, List<FlightCabinSpec> cabins) {
+        return doCreate(request, scheduleId, cabins);
+    }
+
+    private FlightResponse doCreate(FlightRequest request, UUID scheduleId, List<FlightCabinSpec> cabins) {
         String normalizedFlightNumber = normalize(request.flightNumber());
         String normalizedFrom = normalize(request.departureAirportCode());
         String normalizedTo = normalize(request.arrivalAirportCode());
 
-        validateFlightNumber(normalizedFlightNumber);
+        // Scheduled numbers (code + yy + day of year, up to 10 chars) are built by the generator and may
+        // have more digits than the manual pattern allows.
+        if (scheduleId == null) {
+            validateFlightNumber(normalizedFlightNumber);
+        }
         validateSchedule(request.departureTime(), request.arrivalTime(), true);
 
         if (flightRepository.existsByFlightNumber(normalizedFlightNumber)) {
@@ -75,12 +89,13 @@ public class FlightServiceImpl implements FlightService {
         flight.setDepartureAirport(departure);
         flight.setArrivalAirport(arrival);
         flight.setStatus(FlightStatus.SCHEDULED);
+        flight.setScheduleId(scheduleId);
 
         flight = flightRepository.saveAndFlush(flight);
         eventPublisher.publishFlightCreated(new FlightCreatedEvent(
                 flight.getId(), flight.getFlightNumber(),
                 flight.getDepartureAirport().getIataCode(), flight.getArrivalAirport().getIataCode(),
-                flight.getDepartureTime(), flight.getArrivalTime(), flight.getAirline()));
+                flight.getDepartureTime(), flight.getArrivalTime(), flight.getAirline(), cabins));
         return flightMapper.toResponse(flight);
     }
 

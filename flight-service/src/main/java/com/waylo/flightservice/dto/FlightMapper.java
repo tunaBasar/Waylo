@@ -25,6 +25,7 @@ public interface FlightMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "scheduleId", ignore = true)
     Flight toEntity(FlightRequest request);
 
     @Mapping(target = "id", ignore = true)
@@ -34,5 +35,6 @@ public interface FlightMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "scheduleId", ignore = true)
     void updateEntity(FlightRequest request, @MappingTarget Flight flight);
 }

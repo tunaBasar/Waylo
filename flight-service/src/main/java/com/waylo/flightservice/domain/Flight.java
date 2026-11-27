@@ -51,6 +51,9 @@ public class Flight {
     @Column(name = "status", nullable = false, length = 20)
     private FlightStatus status = FlightStatus.SCHEDULED;
 
+    @Column(name = "schedule_id")
+    private UUID scheduleId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -90,6 +93,9 @@ public class Flight {
 
     public FlightStatus getStatus() { return status; }
     public void setStatus(FlightStatus status) { this.status = status; }
+
+    public UUID getScheduleId() { return scheduleId; }
+    public void setScheduleId(UUID scheduleId) { this.scheduleId = scheduleId; }
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }

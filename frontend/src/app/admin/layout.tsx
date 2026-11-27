@@ -9,6 +9,7 @@ const nav: NavItem[] = [
   { href: '/admin/hotel-publications', label: 'Otel Yayinlari', icon: 'storefront' },
   { href: '/admin/users', label: 'Kullanicilar', icon: 'manage_accounts' },
   { href: '/admin/flights', label: 'Ucuslar', icon: 'flight' },
+  { href: '/admin/flight-schedules', label: 'Ucus Planlari', icon: 'event_repeat' },
   { href: '/admin/airports', label: 'Havalimanlari', icon: 'flight_takeoff' },
   { href: '/admin/seats', label: 'Koltuklar', icon: 'airline_seat_recline_normal' },
   { href: '/admin/supplier-balance', label: 'Tedarikci Bakiyesi', icon: 'account_balance_wallet' },

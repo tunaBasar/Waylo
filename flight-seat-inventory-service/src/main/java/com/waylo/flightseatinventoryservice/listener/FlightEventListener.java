@@ -1,6 +1,7 @@
 package com.waylo.flightseatinventoryservice.listener;
 
 import com.waylo.flightseatinventoryservice.event.FlightCancelledEvent;
+import com.waylo.flightseatinventoryservice.event.FlightCreatedEvent;
 import com.waylo.flightseatinventoryservice.service.FlightSeatService;
 import com.waylo.flightseatinventoryservice.service.IdempotencyService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -30,6 +31,12 @@ public class FlightEventListener {
                 // Record as processed only AFTER success, so a retried record is not skipped as a duplicate.
                 if (!idempotencyService.isProcessed(event.getEventId())) {
                     flightSeatService.closeFlightSeats(event.getFlightNumber());
+                    idempotencyService.markProcessed(event.getEventId());
+                }
+            } else if (record.value() instanceof FlightCreatedEvent event) {
+                if (event.getCabins() != null && !event.getCabins().isEmpty()
+                        && !idempotencyService.isProcessed(event.getEventId())) {
+                    flightSeatService.createMissingSeats(event.getFlightNumber(), event.getCabins());
                     idempotencyService.markProcessed(event.getEventId());
                 }
             } else {

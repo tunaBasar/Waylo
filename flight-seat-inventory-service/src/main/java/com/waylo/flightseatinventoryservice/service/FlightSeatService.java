@@ -10,6 +10,7 @@ import com.waylo.flightseatinventoryservice.dto.FlightInfo;
 import com.waylo.flightseatinventoryservice.dto.FlightSeatRequest;
 import com.waylo.flightseatinventoryservice.dto.FlightSeatResponse;
 import com.waylo.flightseatinventoryservice.dto.SeatReservationResponse;
+import com.waylo.flightseatinventoryservice.event.FlightCreatedEvent;
 import com.waylo.flightseatinventoryservice.exception.BusinessRuleException;
 import com.waylo.flightseatinventoryservice.exception.ConflictException;
 import com.waylo.flightseatinventoryservice.exception.DuplicateResourceException;
@@ -174,6 +175,41 @@ public class FlightSeatService {
         flightSeatRepository.saveAll(seats);
         log.info("Bulk seats created: flight={}, count={}", flightNumber, seats.size());
         return new BulkSeatResponse(flightNumber, seats.size());
+    }
+
+    /**
+     * Creates the seats of the given cabins for a flight, skipping seat numbers that already exist
+     * (never an error, unlike {@link #createSeatsBulk}). Returns the number of seats created.
+     */
+    @Transactional
+    public int createMissingSeats(String rawFlightNumber, List<FlightCreatedEvent.Cabin> cabins) {
+        String flightNumber = normalize(rawFlightNumber);
+        Set<String> existing = new HashSet<>();
+        flightSeatRepository.findByFlightNumber(flightNumber)
+                .forEach(s -> existing.add(s.getSeatNumber()));
+
+        List<FlightSeat> seats = new ArrayList<>();
+        for (FlightCreatedEvent.Cabin cabin : cabins) {
+            String seatType = validSeatType(cabin.seatType());
+            if (cabin.fromRow() < 1 || cabin.toRow() > 999 || cabin.fromRow() > cabin.toRow()) {
+                throw new IllegalArgumentException("Rows must satisfy 1 <= fromRow <= toRow <= 999");
+            }
+            String letters = normalize(cabin.letters());
+            for (int row = cabin.fromRow(); row <= cabin.toRow(); row++) {
+                for (char letter : letters.toCharArray()) {
+                    String seatNumber = row + String.valueOf(letter);
+                    if (existing.add(seatNumber)) {
+                        seats.add(newSeat(flightNumber, seatNumber, seatType, cabin.price()));
+                    }
+                }
+            }
+        }
+        if (seats.size() > MAX_BULK_SEATS * 4) {
+            throw new IllegalArgumentException("Too many seats in one flight event");
+        }
+        flightSeatRepository.saveAll(seats);
+        log.info("Missing seats created: flight={}, count={}", flightNumber, seats.size());
+        return seats.size();
     }
 
     @Transactional

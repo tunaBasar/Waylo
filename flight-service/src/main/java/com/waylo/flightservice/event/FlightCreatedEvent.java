@@ -1,6 +1,7 @@
 package com.waylo.flightservice.event;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public class FlightCreatedEvent extends BaseEvent {
@@ -11,6 +12,8 @@ public class FlightCreatedEvent extends BaseEvent {
     private Instant departureTime;
     private Instant arrivalTime;
     private String airline;
+    /** Null for flights created by hand. */
+    private List<FlightCabinSpec> cabins;
 
     public FlightCreatedEvent() { super("FLIGHT_CREATED", "flight-service"); }
 
@@ -24,6 +27,13 @@ public class FlightCreatedEvent extends BaseEvent {
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
         this.airline = airline;
+    }
+
+    public FlightCreatedEvent(UUID flightId, String flightNumber, String departureAirportCode,
+                              String arrivalAirportCode, Instant departureTime, Instant arrivalTime, String airline,
+                              List<FlightCabinSpec> cabins) {
+        this(flightId, flightNumber, departureAirportCode, arrivalAirportCode, departureTime, arrivalTime, airline);
+        this.cabins = cabins;
     }
 
     public UUID getFlightId() { return flightId; }
@@ -40,4 +50,6 @@ public class FlightCreatedEvent extends BaseEvent {
     public void setArrivalTime(Instant arrivalTime) { this.arrivalTime = arrivalTime; }
     public String getAirline() { return airline; }
     public void setAirline(String airline) { this.airline = airline; }
+    public List<FlightCabinSpec> getCabins() { return cabins; }
+    public void setCabins(List<FlightCabinSpec> cabins) { this.cabins = cabins; }
 }
