@@ -143,14 +143,13 @@ class HotelServiceImplTest {
         Hotel hotel = buildHotel(testId, "Grand Hotel", "Istanbul", "Turkey");
         HotelResponse response = buildResponse(testId);
 
-        when(hotelRepository.findByCityAndCountry("Istanbul", "Turkey"))
-                .thenReturn(List.of(hotel));
+        when(hotelRepository.findAll()).thenReturn(List.of(hotel));
         when(hotelMapper.toResponse(hotel)).thenReturn(response);
 
         List<HotelResponse> result = hotelService.search("Istanbul", "Turkey", null);
 
         assertThat(result).hasSize(1);
-        verify(hotelRepository).findByCityAndCountry("Istanbul", "Turkey");
+        verify(hotelRepository).findAll();
     }
 
     @Test
@@ -158,13 +157,13 @@ class HotelServiceImplTest {
         Hotel hotel = buildHotel(testId, "Grand Hotel", "Istanbul", "Turkey");
         HotelResponse response = buildResponse(testId);
 
-        when(hotelRepository.findByCity("Istanbul")).thenReturn(List.of(hotel));
+        when(hotelRepository.findAll()).thenReturn(List.of(hotel));
         when(hotelMapper.toResponse(hotel)).thenReturn(response);
 
         List<HotelResponse> result = hotelService.search("Istanbul", null, null);
 
         assertThat(result).hasSize(1);
-        verify(hotelRepository).findByCity("Istanbul");
+        verify(hotelRepository).findAll();
     }
 
     @Test
@@ -172,13 +171,67 @@ class HotelServiceImplTest {
         Hotel hotel = buildHotel(testId, "Grand Hotel", "Istanbul", "Turkey");
         HotelResponse response = buildResponse(testId);
 
-        when(hotelRepository.findByCountry("Turkey")).thenReturn(List.of(hotel));
+        when(hotelRepository.findAll()).thenReturn(List.of(hotel));
         when(hotelMapper.toResponse(hotel)).thenReturn(response);
 
         List<HotelResponse> result = hotelService.search(null, "Turkey", null);
 
         assertThat(result).hasSize(1);
-        verify(hotelRepository).findByCountry("Turkey");
+        verify(hotelRepository).findAll();
+    }
+
+    @Test
+    void search_cityIgnoresCaseAndTurkishLetters() {
+        Hotel ist = buildHotel(testId, "A", "Istanbul", "Turkey");
+        Hotel gor = buildHotel(UUID.randomUUID(), "B", "G\u00f6reme", "Turkey");
+        HotelResponse r1 = buildResponse(testId);
+        HotelResponse r2 = buildResponse(gor.getId());
+        when(hotelRepository.findAll()).thenReturn(List.of(ist, gor));
+        when(hotelMapper.toResponse(ist)).thenReturn(r1);
+        when(hotelMapper.toResponse(gor)).thenReturn(r2);
+
+        for (String q : List.of("\u0130stanbul", "istanbul", "ISTANBUL", "Istanbul", " istanbul ")) {
+            assertThat(hotelService.search(q, null, null)).containsExactly(r1);
+        }
+        assertThat(hotelService.search("Goreme", null, null)).containsExactly(r2);
+        assertThat(hotelService.search("g\u00f6reme", null, null)).containsExactly(r2);
+        assertThat(hotelService.search("Ankara", null, null)).isEmpty();
+    }
+
+    @Test
+    void search_countryIgnoresCaseAndTurkishLetters() {
+        Hotel hotel = buildHotel(testId, "A", "Istanbul", "Turkey");
+        HotelResponse r = buildResponse(testId);
+        when(hotelRepository.findAll()).thenReturn(List.of(hotel));
+        when(hotelMapper.toResponse(hotel)).thenReturn(r);
+
+        assertThat(hotelService.search("\u0130stanbul", "TURKEY", null)).containsExactly(r);
+        assertThat(hotelService.search(null, "turkey", null)).containsExactly(r);
+        assertThat(hotelService.search(null, "T\u00fcrkey", null)).containsExactly(r);
+
+        Hotel tr = buildHotel(UUID.randomUUID(), "B", "Istanbul", "T\u00fcrkiye");
+        HotelResponse r2 = buildResponse(tr.getId());
+        when(hotelRepository.findAll()).thenReturn(List.of(tr));
+        when(hotelMapper.toResponse(tr)).thenReturn(r2);
+        assertThat(hotelService.search(null, "TURKIYE", null)).containsExactly(r2);
+        assertThat(hotelService.search(null, "turkiye", null)).containsExactly(r2);
+        assertThat(hotelService.search(null, "T\u00dcRK\u0130YE", null)).containsExactly(r2);
+        assertThat(hotelService.search(null, "Turkey", null)).isEmpty();
+        assertThat(hotelService.search("Istanbul", "France", null)).isEmpty();
+    }
+
+    @Test
+    void search_blankFilterMeansNoFilter_andMinStarsApplies() {
+        Hotel low = buildHotel(testId, "Low", "Istanbul", "Turkey");
+        low.setStarRating(2);
+        Hotel high = buildHotel(UUID.randomUUID(), "High", "Istanbul", "Turkey");
+        high.setStarRating(5);
+        HotelResponse r = buildResponse(high.getId());
+        when(hotelRepository.findAll()).thenReturn(List.of(low, high));
+        when(hotelMapper.toResponse(high)).thenReturn(r);
+
+        assertThat(hotelService.search("  ", "", 4)).containsExactly(r);
+        assertThat(hotelService.search("istanbul", null, 4)).containsExactly(r);
     }
 
     @Test
@@ -226,7 +279,7 @@ class HotelServiceImplTest {
                 null, null, true, 0, null, null
         );
 
-        when(hotelRepository.findByCityAndCountry("Istanbul", "Turkey")).thenReturn(List.of(hotel));
+        when(hotelRepository.findAll()).thenReturn(List.of(hotel));
         when(hotelMapper.toResponse(hotel)).thenReturn(response);
 
         List<HotelResponse> result = hotelService.search("Istanbul", "Turkey", 4);
@@ -410,7 +463,7 @@ class HotelServiceImplTest {
         hidden.setOrganizationId(suspendedOrgId);
         HotelResponse response = buildResponse(testId);
 
-        when(hotelRepository.findByCity("Istanbul")).thenReturn(List.of(visible, hidden));
+        when(hotelRepository.findAll()).thenReturn(List.of(visible, hidden));
         when(hotelMapper.toResponse(visible)).thenReturn(response);
 
         List<HotelResponse> result = hotelService.search("Istanbul", null, null);
@@ -517,7 +570,7 @@ class HotelServiceImplTest {
         assertThat(hotelService.isPublic(testId)).isTrue();
 
         draft.setPublicationStatus(com.waylo.hotelservice.domain.PublicationStatus.REJECTED);
-        when(hotelRepository.findByCity("Istanbul")).thenReturn(List.of(draft));
+        when(hotelRepository.findAll()).thenReturn(List.of(draft));
         when(hotelRepository.findByOrganizationId(orgId)).thenReturn(List.of(draft));
         assertThat(hotelService.search("Istanbul", null, null)).isEmpty();
         assertThat(hotelService.getPublicByOrganization(orgId)).isEmpty();

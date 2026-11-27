@@ -8,6 +8,7 @@ import com.waylo.hotelservice.dto.HotelRequest;
 import com.waylo.hotelservice.dto.HotelResponse;
 import com.waylo.hotelservice.exception.ResourceNotFoundException;
 import com.waylo.hotelservice.repository.HotelRepository;
+import com.waylo.hotelservice.util.PlaceNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -76,16 +77,9 @@ public class HotelServiceImpl implements HotelService {
     @Override
     @Transactional(readOnly = true)
     public List<HotelResponse> search(String city, String country, Integer minStars) {
-        Stream<Hotel> stream;
-        if (city != null && country != null) {
-            stream = hotelRepository.findByCityAndCountry(city, country).stream();
-        } else if (city != null) {
-            stream = hotelRepository.findByCity(city).stream();
-        } else if (country != null) {
-            stream = hotelRepository.findByCountry(country).stream();
-        } else {
-            stream = hotelRepository.findAll().stream();
-        }
+        Stream<Hotel> stream = hotelRepository.findAll().stream()
+                .filter(h -> PlaceNames.matches(h.getCity(), city))
+                .filter(h -> PlaceNames.matches(h.getCountry(), country));
         List<Hotel> visible = filterPublic(stream.toList());
         Stream<Hotel> result = visible.stream();
         if (minStars != null) {
