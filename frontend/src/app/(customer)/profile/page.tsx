@@ -64,6 +64,8 @@ export default function ProfilePage() {
     // Loyalty is optional: hidden unless crm-service reports the feature as enabled.
     api.get<MyLoyalty>('/api/customers/me')
       .then(r => { if (r.success && r.data?.loyaltyEnabled) setLoyalty(r.data); })
+      // Safe to stay silent: loyalty is off by default (CRM_LOYALTY_POINTS_PER_TRY=0) and the card is only shown when
+      // crm-service reports it enabled; a failure must not mention a feature the customer never sees.
       .catch(() => {});
   }, []);
 

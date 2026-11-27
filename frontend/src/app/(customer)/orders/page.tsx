@@ -276,13 +276,22 @@ function CancelPanel({ order, onChanged }: { order: Order; onChanged: () => void
 
 interface FlightCheckin { orderItemId: string; seatNumber: string | null; status: string }
 
-function FlightCheckinPanel({ item, checkin, onDone }: { item: OrderItem; checkin: FlightCheckin | undefined; onDone: () => void }) {
+function FlightCheckinPanel({ item, checkin, unknown, onDone }: { item: OrderItem; checkin: FlightCheckin | undefined; unknown?: boolean; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
   if (!item.flight) return null;
   if (checkin) {
     return <p className="font-semibold text-secondary" data-testid="checkin-done">{checkinDoneText(checkin.seatNumber ?? item.flight.seatNumber)}</p>;
+  }
+  // The check-in list could not be loaded: never offer a fresh check-in as if none existed (it may already be done).
+  if (unknown) {
+    return (
+      <div className="mt-1 space-y-1" data-testid="checkin-unknown">
+        <p className="text-xs text-on-surface-variant">Check-in durumu yuklenemedi.</p>
+        <button type="button" onClick={onDone} className="text-xs font-medium text-primary underline">Tekrar dene</button>
+      </div>
+    );
   }
   const win = checkinWindow(item.flight.departureAt ?? '', now, item.flight.supplier, !!item.cancelOutcome);
   const run = async () => {
@@ -373,11 +382,12 @@ function SupportCasePanel({ order }: { order: Order }) {
 
 function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order; onChanged: () => void; reviewable: ReviewableItem[]; onReviewed: () => void }) {
   const [testMode, setTestMode] = useState(false);
+  const [testModeUnknown, setTestModeUnknown] = useState(false);
   const [vouchers, setVouchers] = useState<Voucher[] | null>(null);
   const [reviewedScores, setReviewedScores] = useState<Record<string, number>>({});
-  const [checkins, setCheckins] = useState<FlightCheckin[]>([]);
+  const [checkins, setCheckins] = useState<FlightCheckin[] | null>([]);
   const loadCheckins = useCallback(() => {
-    api.get<FlightCheckin[]>('/api/checkins/me').then(r => setCheckins(r.data)).catch(() => setCheckins([]));
+    api.get<FlightCheckin[]>('/api/checkins/me').then(r => setCheckins(r.data)).catch(() => setCheckins(null));
   }, []);
 
   useEffect(() => {
@@ -388,8 +398,8 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
   useEffect(() => {
     if (order.status !== 'CONFIRMED') return;
     api.get<OrderPayment>(`/api/payments/orders/${encodeURIComponent(order.id)}`)
-      .then(r => setTestMode(!!r.data.intent?.testMode))
-      .catch(() => setTestMode(false));
+      .then(r => { setTestMode(!!r.data.intent?.testMode); setTestModeUnknown(false); })
+      .catch(() => setTestModeUnknown(true));
   }, [order.id, order.status]);
 
   return (
@@ -419,7 +429,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
               <p>Yolcu: {item.flight.passengerFirstName} {item.flight.passengerLastName}</p>
               {item.flight.pnr && item.flight.ticketNumber && <p>PNR: {item.flight.pnr} · E-bilet: {item.flight.ticketNumber}</p>}
               {order.status === 'CONFIRMED' && (
-                <FlightCheckinPanel item={item} checkin={checkins.find(c => c.orderItemId === item.id)} onDone={loadCheckins} />
+                <FlightCheckinPanel item={item} checkin={checkins?.find(c => c.orderItemId === item.id)} unknown={checkins === null} onDone={loadCheckins} />
               )}
             </>
           )}
@@ -448,6 +458,7 @@ function OrderCard({ order, onChanged, reviewable, onReviewed }: { order: Order;
       {order.status === 'PENDING' && <PayPanel order={order} onPaid={onChanged} />}
       {(order.status === 'PENDING' || order.status === 'CONFIRMED') && canOfferCancel(order, vouchers) && <CancelPanel order={order} onChanged={onChanged} />}
       <SupportCasePanel order={order} />
+      {testModeUnknown && <p className="text-xs text-on-surface-variant" data-testid="side-data-note">Odeme modu dogrulanamadi.</p>}
       {order.status === 'CONFIRMED' && <VoucherList orderId={order.id} testMode={testMode} onLoaded={setVouchers} />}
     </div>
   );
@@ -459,8 +470,9 @@ function OrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reviewable, setReviewable] = useState<ReviewableItem[]>([]);
+  const [reviewableFailed, setReviewableFailed] = useState(false);
   const loadReviewable = useCallback(() => {
-    reviewApi.reviewable().then(r => setReviewable(r.data)).catch(() => setReviewable([]));
+    reviewApi.reviewable().then(r => { setReviewable(r.data); setReviewableFailed(false); }).catch(() => setReviewableFailed(true));
   }, []);
   useEffect(() => { loadReviewable(); }, [loadReviewable]);
 
@@ -477,6 +489,7 @@ function OrdersContent() {
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Siparislerim</h2>
       {showCreatedBanner(createdId, orders) && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container">Siparisiniz olusturuldu. 15 dakika icinde odeme yapin.</p>}
       {error && <p className="rounded-xl bg-error-container p-3 text-sm text-on-error-container">{error}</p>}
+      {reviewableFailed && <p className="text-xs text-on-surface-variant" data-testid="side-data-note">Degerlendirme secenekleri su an yuklenemedi.</p>}
       {orders.some(o => o.status === 'CONFIRMED' && (o.items ?? []).some(i => i.vertical === 'HOTEL')) && (
         <p className="text-xs text-on-surface-variant" data-testid="review-when-hint">{REVIEW_WHEN_HINT}</p>
       )}

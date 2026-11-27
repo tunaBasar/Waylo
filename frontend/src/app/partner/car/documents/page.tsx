@@ -203,6 +203,7 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclesFailed, setVehiclesFailed] = useState(false);
 
   const reload = () => {
     if (!organizationId) return;
@@ -228,7 +229,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!organizationId) return;
-    partnerCarApi.vehicles(organizationId).then(res => setVehicles(res.data ?? [])).catch(() => {});
+    partnerCarApi.vehicles(organizationId).then(res => setVehicles(res.data ?? [])).catch(() => setVehiclesFailed(true));
   }, [organizationId]);
 
   if (workspaceLoading || loading) return <LoadingRows />;
@@ -244,6 +245,7 @@ export default function DocumentsPage() {
         )}
       />
 
+      {showForm && vehiclesFailed && <p className="text-xs text-on-surface-variant" data-testid="side-data-note">Arac listesi yuklenemedi, araca bagli belge secenegi gorunmeyebilir.</p>}
       {showForm && (
         <UploadForm
           organizationId={organizationId!}

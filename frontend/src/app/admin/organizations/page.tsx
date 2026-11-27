@@ -103,6 +103,7 @@ export default function AdminOrganizationsPage() {
       setPercent(current => keepTypedPercent(current, suggestion));
     } catch {
       setRateRows([]);
+      setApproveError('Mevcut komisyon oranlari yuklenemedi, oran alani otomatik doldurulmadi.');
     }
   }
 

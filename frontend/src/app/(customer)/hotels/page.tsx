@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -41,12 +41,15 @@ function HotelsContent() {
   const [activeQuery, setActiveQuery] = useState<StayQuery | null>(null);
 
   // Load all hotels on mount
-  useEffect(() => {
-    api.get<Hotel[]>('/api/hotels').then(res => {
-      setHotels(res.data);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const fetchHotels = useCallback(() => {
+    api.get<Hotel[]>('/api/hotels')
+      .then(res => { setHotels(res.data); setLoadError(null); })
+      .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'Oteller yuklenemedi'))
+      .finally(() => setLoading(false));
   }, []);
+  const loadHotels = () => { setLoading(true); fetchHotels(); };
+  useEffect(() => { fetchHotels(); }, [fetchHotels]);
 
   const clearSearch = () => {
     setSearchActive(false);
@@ -110,7 +113,7 @@ function HotelsContent() {
     });
   };
 
-  const headerCount = searchActive ? `${list.length} Tesis` : `${hotels.length} Tesis`;
+  const headerCount = searchActive ? `${list.length} Tesis` : loadError ? null : `${hotels.length} Tesis`;
 
   return (
     <div className="space-y-space-md">
@@ -118,9 +121,11 @@ function HotelsContent() {
       <div className="flex items-center justify-between gap-space-sm">
         <div className="flex items-center gap-space-xs min-w-0">
           <h2 className="text-xl font-semibold text-on-surface tracking-tight">{headerLabel}</h2>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-primary text-xs font-semibold">
-            {headerCount}
-          </span>
+          {headerCount && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-primary text-xs font-semibold">
+              {headerCount}
+            </span>
+          )}
         </div>
       </div>
 
@@ -276,6 +281,12 @@ function HotelsContent() {
               </div>
             </div>
           ))}
+        </div>
+      ) : !searchActive && loadError ? (
+        <div className="text-center py-12" data-testid="load-error">
+          <span className="material-symbols-outlined text-error text-5xl mb-3 block">error</span>
+          <p className="text-error text-sm mb-3">{loadError}</p>
+          <button onClick={loadHotels} className="px-4 py-2 rounded-full bg-primary text-on-primary text-sm font-medium">Tekrar dene</button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">

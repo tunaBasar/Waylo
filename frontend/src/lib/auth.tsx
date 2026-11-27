@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
-      }).catch(() => {});
+      }).catch(() => {}); // best-effort server-side logout: the local session is cleared right below regardless, nothing to show
     }
     clearCart(); // before waylo_user goes away: the cart is keyed by it
     setUser(null);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OrderCheckin, OrderCheckinPage } from '@/lib/types';
@@ -31,12 +31,20 @@ export default function CheckinsPage() {
   const [page, setPage] = useState(0);;
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPage = useCallback(() => {
+    api.get<OrderCheckinPage>(`/api/admin/checkins?page=${page}&size=20`)
+      .then(r => { setCheckins(r.data.items); setTotal(r.data.total); setError(null); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Check-in kayitlari yuklenemedi'))
+      .finally(() => setLoading(false));
+  }, [page]);
+  const load = () => { setLoading(true); fetchPage(); };
+
   useEffect(() => {
     if (!isAdmin) return;
-    api.get<OrderCheckinPage>(`/api/admin/checkins?page=${page}&size=20`)
-      .then(r => { setCheckins(r.data.items); setTotal(r.data.total); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [isAdmin, page]);
+    fetchPage();
+  }, [isAdmin, fetchPage]);
 
   if (!isAdmin) return <AdminOnly />;
 
@@ -66,6 +74,8 @@ export default function CheckinsPage() {
 
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-surface-container-lowest rounded-xl shadow-sm p-4 animate-pulse"><div className="h-5 bg-surface-container rounded w-1/3 mb-2"/><div className="h-4 bg-surface-container rounded w-1/2"/></div>)}</div>
+      ) : error ? (
+        <div className="text-center py-12" data-testid="load-error"><span className="material-symbols-outlined text-error text-5xl mb-3 block">error</span><p className="text-error text-sm mb-3">{error}</p><button onClick={load} className="px-4 py-2 rounded-full bg-primary text-on-primary text-sm font-medium">Tekrar dene</button></div>
       ) : checkins.length === 0 ? (
         <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">airplane_ticket</span><p className="text-on-surface-variant text-sm">Check-in bulunamadi</p></div>
       ) : (

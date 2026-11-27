@@ -1,4 +1,4 @@
-import { ApiError, createApiClient } from '../src/api/client';
+import { ApiError, createApiClient, SERVICE_UNAVAILABLE_MESSAGE } from '../src/api/client';
 import { createMemoryTokenStore } from '../src/api/tokenStore';
 
 const json = (status: number, body: unknown) =>
@@ -72,5 +72,18 @@ describe('api client', () => {
     const client = createApiClient({ baseUrl: 'http://x', tokens, fetchImpl: (async () => { throw new TypeError('fail'); }) as unknown as typeof fetch });
     const err = (await client.get("/x").catch((e: unknown) => e)) as ApiError;
     expect(err.isNetwork).toBe(true);
+  });
+
+  it('maps a gateway 502/503/504 without a backend message to the Turkish text, never the English phrase', async () => {
+    // Body the gateway really sends while a service restarts (2026-11-27, flight-service stopped).
+    for (const [status, phrase] of [[502, 'Bad Gateway'], [503, 'Service Unavailable'], [504, 'Gateway Timeout']] as const) {
+      const { client } = setup(() => json(status, { timestamp: '2026-11-27T10:04:01.457Z', path: '/api/flights', status, error: phrase, requestId: 'b801c890-259' }));
+      await expect(client.get('/api/flights/search')).rejects.toMatchObject({ status, code: 'SERVICE_UNAVAILABLE', message: SERVICE_UNAVAILABLE_MESSAGE });
+    }
+  });
+
+  it('keeps the backend message and code on a 503 that has one', async () => {
+    const { client } = setup(() => json(503, { message: 'Odeme servisi su an kullanilamiyor', error: 'PAYMENT_SERVICE_UNAVAILABLE' }));
+    await expect(client.get('/api/orders')).rejects.toMatchObject({ status: 503, code: 'PAYMENT_SERVICE_UNAVAILABLE', message: 'Odeme servisi su an kullanilamiyor' });
   });
 });

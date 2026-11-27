@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { Customer } from '@/lib/types';
@@ -30,10 +30,20 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<string | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(() => {
+    api.get<Customer[]>('/api/customers')
+      .then(r => { setCustomers(r.data); setError(null); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Musteriler yuklenemedi'))
+      .finally(() => setLoading(false));
+  }, []);
+  const load = () => { setLoading(true); fetchAll(); };
+
   useEffect(() => {
     if (!isAdmin) return;
-    api.get<Customer[]>('/api/customers').then(r => { setCustomers(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, [isAdmin]);
+    fetchAll();
+  }, [isAdmin, fetchAll]);
 
   const filtered = customers.filter(c => {
     const matchSearch = !search || `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase());
@@ -71,6 +81,8 @@ export default function CustomersPage() {
 
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-surface-container-lowest rounded-xl shadow-sm p-4 animate-pulse"><div className="h-5 bg-surface-container rounded w-1/3 mb-2"/><div className="h-4 bg-surface-container rounded w-1/2"/></div>)}</div>
+      ) : error ? (
+        <div className="text-center py-12" data-testid="load-error"><span className="material-symbols-outlined text-error text-5xl mb-3 block">error</span><p className="text-error text-sm mb-3">{error}</p><button onClick={load} className="px-4 py-2 rounded-full bg-primary text-on-primary text-sm font-medium">Tekrar dene</button></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12"><span className="material-symbols-outlined text-outline text-5xl mb-3 block">people</span><p className="text-on-surface-variant text-sm">Musteri bulunamadi</p></div>
       ) : (

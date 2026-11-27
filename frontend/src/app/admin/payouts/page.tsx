@@ -120,6 +120,7 @@ export default function AdminPayoutsPage() {
   }
 
   function runPayoutAction(p: AdminPayout, action: AdminPayoutAction) {
+    // Safe: act() already toasts via handleError before rethrowing; this only stops an unhandled rejection.
     if (action === 'approve' || action === 'processing') { void act(p, action).catch(() => undefined); return; }
     setDialog({ kind: action, payout: p });
   }
@@ -156,6 +157,7 @@ export default function AdminPayoutsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusPill tone={BANK_STATUS_TONE[a.status]}>{BANK_STATUS_LABEL[a.status]}</StatusPill>
+                  {/* Safe: bankAction already toasts via handleError before rethrowing. */}
                   <Button disabled={busy === a.id} onClick={() => { void bankAction(a).catch(() => undefined); }}>Onayla</Button>
                   <Button variant="danger" onClick={() => setDialog({ kind: 'reject-bank', account: a })}>Reddet</Button>
                 </div>

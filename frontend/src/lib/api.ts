@@ -61,10 +61,11 @@ function getAuthHeaders(json = true): Record<string, string> {
   return headers;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+/** Sends with the auth headers; a 401 refreshes the token once and retries. Non-2xx answers throw ApiError. */
+async function send(path: string, options?: RequestInit): Promise<Response> {
   // Multipart bodies must not carry the JSON Content-Type: the browser sets multipart/form-data with the boundary.
   const json = !(typeof FormData !== 'undefined' && options?.body instanceof FormData);
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await safeFetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       ...getAuthHeaders(json),
@@ -78,7 +79,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     if (refreshed) {
       // Retry the original request once with the new token
-      const retryRes = await fetch(`${API_BASE}${path}`, {
+      const retryRes = await safeFetch(`${API_BASE}${path}`, {
         ...options,
         headers: {
           ...getAuthHeaders(json),
@@ -97,7 +98,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         throw await toApiError(retryRes);
       }
 
-      return parseBody<T>(retryRes);
+      return retryRes;
     }
 
     // Refresh failed - clear session and redirect
@@ -111,7 +112,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw await toApiError(res);
   }
 
-  return parseBody<T>(res);
+  return res;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  return parseBody<T>(await send(path, options));
 }
 
 /**
@@ -132,6 +137,9 @@ export const ADMIN_CANNOT_PURCHASE_MESSAGE = 'Platform yoneticisi hesabi ile sat
 /** Shown for COMMISSION_RATE_MISSING: customers must never see internal commission wording. */
 export const SALES_CLOSED_MESSAGE = 'Bu urun su anda satisa kapali. Lutfen daha sonra tekrar deneyin veya destek ile iletisime gecin.';
 
+/** Gateway 502/503/504 without a backend message (a service is down or restarting): never show the English reason phrase. */
+export const SERVICE_UNAVAILABLE_MESSAGE = 'Servis su an yanit vermiyor (yeniden basliyor olabilir). Biraz sonra tekrar deneyin.';
+
 async function toApiError(res: Response): Promise<ApiError> {
   const body = await res.json().catch(() => null) as { message?: string; error?: string } | null;
   if (res.status === 403 && body?.error === 'ADMIN_CANNOT_PURCHASE') {
@@ -140,17 +148,46 @@ async function toApiError(res: Response): Promise<ApiError> {
   if (body?.error === 'COMMISSION_RATE_MISSING') {
     return new ApiError(SALES_CLOSED_MESSAGE, res.status, 'COMMISSION_RATE_MISSING');
   }
+  if ((res.status === 502 || res.status === 503 || res.status === 504) && !body?.message) {
+    return new ApiError(SERVICE_UNAVAILABLE_MESSAGE, res.status, 'SERVICE_UNAVAILABLE', body as Record<string, unknown> | null);
+  }
   return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.error ?? null, body as Record<string, unknown> | null);
 }
 
 /** 204 No Content (e.g. DELETE) has no body; res.json() would throw on it. */
 async function parseBody<T>(res: Response): Promise<T> {
   const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  const body = text ? JSON.parse(text) : undefined;
+  // A 2xx envelope with success=false is a failure, never a success.
+  if (body && typeof body === 'object' && (body as { success?: unknown }).success === false) {
+    const b = body as { message?: string; error?: string } & Record<string, unknown>;
+    throw new ApiError(b.message || 'Islem tamamlanamadi', res.status, b.error ?? 'UNSUCCESSFUL', b);
+  }
+  return body as T;
+}
+
+/** fetch that turns a thrown network failure into a typed ApiError. */
+async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ApiError('Sunucuya ulasilamadi. Baglantinizi kontrol edip tekrar deneyin.', 0, 'NETWORK');
+  }
 }
 
 export const api = {
   get: <T>(path: string) => request<ApiResponse<T>>(path),
+  /**
+   * GET of a paged list plus its X-Total-Count header (flight list). Same auth, refresh and error handling as get();
+   * total is null when the header is missing or not a number. The gateway exposes the header to the browser (CORS).
+   */
+  getWithTotal: async <T>(path: string): Promise<{ body: ApiResponse<T[]> | undefined; total: number | null }> => {
+    const res = await send(path);
+    const header = res.headers.get('X-Total-Count');
+    const body = await parseBody<ApiResponse<T[]> | undefined>(res);
+    const total = header === null || header.trim() === '' ? NaN : Number(header);
+    return { body, total: Number.isFinite(total) ? total : null };
+  },
   post: <T>(path: string, body: unknown, headers?: Record<string, string>) =>
     request<ApiResponse<T>>(path, { method: 'POST', body: JSON.stringify(body), ...(headers ? { headers } : {}) }),
   /**
@@ -161,7 +198,7 @@ export const api = {
     request<ApiResponse<T>>(path, { method: 'POST', body: form }),
   /** Binary download (documents, files). api.get() parses JSON and would break on PDF bytes. */
   getBlob: async (path: string): Promise<Blob> => {
-    const res = await fetch(`${API_BASE}${path}`, { headers: getAuthHeaders(false) });
+    const res = await safeFetch(`${API_BASE}${path}`, { headers: getAuthHeaders(false) });
     if (!res.ok) throw await toApiError(res);
     return res.blob();
   },

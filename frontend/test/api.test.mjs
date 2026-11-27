@@ -79,14 +79,40 @@ test('typed errors retain backend status/code without message guessing', async (
 
 test('non-JSON error responses still produce a typed error', async () => {
   await withBrowser(async ({ api, ApiError }) => {
-    globalThis.fetch = async () => new Response('upstream unavailable', { status: 503, statusText: 'Service Unavailable' });
+    globalThis.fetch = async () => new Response('upstream unavailable', { status: 500, statusText: 'Internal Server Error' });
     await assert.rejects(api.get('/api/example'), error => {
       assert.ok(error instanceof ApiError);
-      assert.equal(error.status, 503);
+      assert.equal(error.status, 500);
       assert.equal(error.code, null);
-      assert.equal(error.message, 'Service Unavailable');
+      assert.equal(error.message, 'Internal Server Error');
       return true;
     });
+  });
+});
+
+test('gateway 502/503/504 without a backend message gets the Turkish service-unavailable text, never the English phrase', async () => {
+  await withBrowser(async ({ api, ApiError, SERVICE_UNAVAILABLE_MESSAGE }) => {
+    // What the gateway really sends while a service restarts (2026-11-27 live: flight-service stopped).
+    const gatewayBody = { timestamp: '2026-11-27T10:04:01.457Z', path: '/api/flights', status: 503, error: 'Service Unavailable', requestId: 'b801c890-259' };
+    for (const [status, statusText] of [[502, 'Bad Gateway'], [503, 'Service Unavailable'], [504, 'Gateway Timeout']]) {
+      globalThis.fetch = async () => new Response(JSON.stringify({ ...gatewayBody, status, error: statusText }), { status, statusText, headers: { 'Content-Type': 'application/json' } });
+      await assert.rejects(api.get('/api/flights'), error => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, status);
+        assert.equal(error.code, 'SERVICE_UNAVAILABLE');
+        assert.equal(error.message, SERVICE_UNAVAILABLE_MESSAGE);
+        return true;
+      });
+    }
+    globalThis.fetch = async () => new Response('upstream unavailable', { status: 503, statusText: 'Service Unavailable' });
+    await assert.rejects(api.get('/api/flights'), e => e instanceof ApiError && e.status === 503 && e.message === SERVICE_UNAVAILABLE_MESSAGE);
+  });
+});
+
+test('a 503 that carries a backend message keeps that message and code', async () => {
+  await withBrowser(async ({ api, ApiError }) => {
+    globalThis.fetch = async () => json({ success: false, error: 'PAYMENT_SERVICE_UNAVAILABLE', message: 'Odeme servisi su an kullanilamiyor' }, 503);
+    await assert.rejects(api.get('/api/example'), e => e instanceof ApiError && e.code === 'PAYMENT_SERVICE_UNAVAILABLE' && e.message === 'Odeme servisi su an kullanilamiyor');
   });
 });
 
@@ -203,5 +229,97 @@ test('getBlob returns the bytes of a PDF download instead of JSON-parsing them',
     };
     const blob = await api.getBlob('/api/partner/organizations/o1/documents/d1/file');
     assert.equal(await blob.text(), '%PDF-1.4 demo');
+  });
+});
+
+test('network failure becomes ApiError status 0 NETWORK', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await assert.rejects(() => api.get('/api/example'), err => err.status === 0 && err.code === 'NETWORK' && err.name === 'ApiError');
+    await assert.rejects(() => api.getBlob('/api/example'), err => err.status === 0 && err.code === 'NETWORK');
+  });
+});
+
+test('network failure on the retry after refresh becomes NETWORK', async () => {
+  await withBrowser(async ({ api }) => {
+    let calls = 0;
+    globalThis.fetch = async (url) => {
+      calls++;
+      if (url.endsWith('/api/auth/refresh')) return json({ success: true, data: { token: 'n', refreshToken: 'r' } });
+      if (calls === 1) return json({ message: 'x' }, 401);
+      throw new TypeError('Failed to fetch');
+    };
+    await assert.rejects(() => api.get('/api/example'), err => err.status === 0 && err.code === 'NETWORK');
+  });
+});
+
+test('2xx with success=false throws with the backend code', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async () => json({ success: false, message: 'Olmadi', error: 'SOME_CODE' });
+    await assert.rejects(() => api.get('/api/example'), err => err.status === 200 && err.code === 'SOME_CODE' && err.message === 'Olmadi');
+    globalThis.fetch = async () => json({ success: false });
+    await assert.rejects(() => api.post('/api/example', {}), err => err.code === 'UNSUCCESSFUL' && err.message === 'Islem tamamlanamadi');
+  });
+});
+
+test('204 and empty body return undefined', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async () => new Response(null, { status: 204 });
+    assert.equal(await api.get('/api/example'), undefined);
+    globalThis.fetch = async () => new Response('', { status: 200 });
+    assert.equal(await api.get('/api/example'), undefined);
+  });
+});
+
+const paged = (data, total) => new Response(JSON.stringify({ success: true, data }), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json', ...(total === undefined ? {} : { 'X-Total-Count': total }) },
+});
+
+test('getWithTotal returns the list and the X-Total-Count header (admin flight paging)', async () => {
+  await withBrowser(async ({ api }) => {
+    let seen;
+    globalThis.fetch = async (url, options) => { seen = { url, auth: options.headers.Authorization }; return paged([{ id: 'f1' }], '510'); };
+    const r = await api.getWithTotal('/api/flights?size=50&upcoming=true');
+    assert.deepEqual(r.body.data, [{ id: 'f1' }]);
+    assert.equal(r.total, 510);
+    assert.ok(seen.url.endsWith('/api/flights?size=50&upcoming=true'));
+    assert.equal(seen.auth, 'Bearer old-access');
+  });
+});
+
+test('getWithTotal gives total null when the header is missing or not a number', async () => {
+  await withBrowser(async ({ api }) => {
+    globalThis.fetch = async () => paged([{ id: 'f1' }]);
+    assert.equal((await api.getWithTotal('/api/flights')).total, null);
+    globalThis.fetch = async () => paged([], 'abc');
+    assert.equal((await api.getWithTotal('/api/flights')).total, null);
+    globalThis.fetch = async () => paged([], '');
+    assert.equal((await api.getWithTotal('/api/flights')).total, null);
+  });
+});
+
+test('getWithTotal refreshes an expired token once and reads the header of the retry', async () => {
+  await withBrowser(async ({ api }, storage) => {
+    let refreshes = 0;
+    globalThis.fetch = async (url, options) => {
+      if (url.endsWith('/api/auth/refresh')) { refreshes++; return json({ success: true, data: { token: 'new-access', refreshToken: 'new-refresh' } }); }
+      if (options.headers.Authorization === 'Bearer old-access') return json({}, 401);
+      return paged([{ id: 'f2' }], '7');
+    };
+    const r = await api.getWithTotal('/api/flights');
+    assert.equal(refreshes, 1);
+    assert.equal(r.total, 7);
+    assert.deepEqual(r.body.data, [{ id: 'f2' }]);
+    assert.equal(storage.get('waylo_token'), 'new-access');
+  });
+});
+
+test('getWithTotal keeps the typed errors of get()', async () => {
+  await withBrowser(async ({ api, ApiError }) => {
+    globalThis.fetch = async () => json({ success: false, error: 'FORBIDDEN', message: 'Yetkiniz yok' }, 403);
+    await assert.rejects(api.getWithTotal('/api/flights'), e => e instanceof ApiError && e.status === 403 && e.code === 'FORBIDDEN');
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await assert.rejects(api.getWithTotal('/api/flights'), e => e instanceof ApiError && e.status === 0 && e.code === 'NETWORK');
   });
 });

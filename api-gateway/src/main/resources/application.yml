@@ -53,6 +53,7 @@ spring:
                   - OPTIONS
                   - PATCH
                 allowed-headers: "*"
+                exposed-headers: X-Total-Count
                 allow-credentials: true
                 max-age: 3600
           routes:
@@ -68,7 +69,7 @@ spring:
             - id: hotel-service
               uri: lb://hotel-service
               predicates:
-                - Path=/api/hotels/**,/api/rooms/**,/api/quotes/**,/api/me/hotel-reviews,/api/me/reviewable-hotel-items,/api/partner/organizations/*/hotel-reviews,/api/partner/organizations/*/hotel-reviews/**,/api/admin/hotel-reviews,/api/admin/hotel-reviews/**,/api/admin/hotel-publications,/api/admin/hotel-publications/**,/api/admin/hotels/*/publication-status,/api/admin/hotel-media,/api/admin/hotel-media/**
+                - Path=/api/hotels/**,/api/quotes/**,/api/me/hotel-reviews,/api/me/reviewable-hotel-items,/api/partner/organizations/*/hotel-reviews,/api/partner/organizations/*/hotel-reviews/**,/api/admin/hotel-reviews,/api/admin/hotel-reviews/**,/api/admin/hotel-publications,/api/admin/hotel-publications/**,/api/admin/hotels/*/publication-status,/api/admin/hotel-media,/api/admin/hotel-media/**
             - id: car-rental-service
               uri: lb://car-rental-service
               predicates:
@@ -92,7 +93,7 @@ spring:
             - id: crm-service
               uri: lb://crm-service
               predicates:
-                - Path=/api/customers/**,/api/loyalty/**,/api/me/support-cases,/api/me/support-cases/**,/api/partner/organizations/*/support-cases,/api/partner/organizations/*/support-cases/**,/api/admin/support-cases,/api/admin/support-cases/**,/api/support/**
+                - Path=/api/customers/**,/api/me/support-cases,/api/me/support-cases/**,/api/partner/organizations/*/support-cases,/api/partner/organizations/*/support-cases/**,/api/admin/support-cases,/api/admin/support-cases/**,/api/support/**
             - id: checkin-service
               uri: lb://checkin-service
               predicates:

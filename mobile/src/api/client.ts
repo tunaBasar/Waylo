@@ -31,8 +31,14 @@ export interface ApiClient {
   tokens: TokenStore;
 }
 
+/** Gateway 502/503/504 without a backend message (a service is down or restarting): never show the English reason phrase. */
+export const SERVICE_UNAVAILABLE_MESSAGE = 'Servis su an yanit vermiyor (yeniden basliyor olabilir). Biraz sonra tekrar deneyin.';
+
 async function toError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => null)) as { message?: string; error?: string; code?: string } | null;
+  if ((res.status === 502 || res.status === 503 || res.status === 504) && !body?.message) {
+    return new ApiError(SERVICE_UNAVAILABLE_MESSAGE, res.status, 'SERVICE_UNAVAILABLE');
+  }
   return new ApiError(body?.message || res.statusText || `HTTP ${res.status}`, res.status, body?.code ?? body?.error ?? null);
 }
 

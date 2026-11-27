@@ -10,6 +10,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 
 
 export default function CustomerSupportPage() {
   const [cap, setCap] = useState<SupportCapabilities | null>(null);
+  const [capFailed, setCapFailed] = useState(false);
   const [cases, setCases] = useState<SupportCase[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<SupportCase | null>(null);
@@ -21,7 +22,7 @@ export default function CustomerSupportPage() {
   }, []);
 
   useEffect(() => {
-    supportApi.capabilities().then(r => setCap(r.data)).catch(() => setCap(null));
+    supportApi.capabilities().then(r => setCap(r.data)).catch(() => setCapFailed(true));
     loadList();
   }, [loadList]);
 
@@ -38,6 +39,7 @@ export default function CustomerSupportPage() {
   return (
     <div className="space-y-space-md">
       <h2 className="text-xl font-semibold text-on-surface tracking-tight">Destek taleplerim</h2>
+      {capFailed && <p className="text-xs text-on-surface-variant" data-testid="side-data-note">Destek kapsami bilgisi su an yuklenemedi.</p>}
       {cap && <p className="rounded-xl bg-tertiary-container p-3 text-sm text-on-tertiary-container" data-testid="support-capabilities">{capabilitiesText(cap)}</p>}
       {error && <p className="rounded-xl bg-error-container p-3 text-sm text-on-error-container">{error}</p>}
       {cases && cases.length === 0 && !error && (
