@@ -347,7 +347,7 @@ export default function CalendarPage() {
     <div className="space-y-space-md">
       <PageHeader
         title="Musaitlik ve fiyat takvimi"
-        subtitle={`Fiyatlar odanin tam kapasitesi (${roomType?.maxOccupancy ?? ''} kisi) icindir; 1-${roomType?.maxOccupancy ?? ''} kisilik konaklamalarda da bu fiyat uygulanir. Para birimi ${currency}`}
+        subtitle={`Takvim odanin tam kapasitesi (${roomType?.maxOccupancy ?? ''} kisi) icin fiyati gosterir. Daha az kisinin fiyati varsa o uygulanir; yoksa bu fiyat gecerlidir (kisi basi fiyatlar: Otomatik takvim). Para birimi ${currency}`}
         actions={
           <>
             {changeCount > 0 && <StatusPill tone="warning">{changeCount} kaydedilmemis degisiklik</StatusPill>}

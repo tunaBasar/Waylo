@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePartner } from '@/lib/partner-context';
 import {
-  busErrorMessage, partnerBusApi, formatTripTime, formatMoney, tripBadge, validateFares,
+  busErrorMessage, partnerBusApi, formatTripTime, formatMoney, tripBadge, validateFares, sortTripsForPartner, istanbulNowLocal,
   type BusUnit, type Terminal, type Trip, type TripFareInput,
 } from '@/lib/bus';
 import { useToast } from '@/components/Toast';
@@ -130,7 +130,7 @@ export default function TripsPage() {
     Promise.all([partnerBusApi.trips(organizationId), partnerBusApi.buses(organizationId), partnerBusApi.terminals(organizationId)])
       .then(([t, b, term]) => {
         if (!alive) return;
-        setTrips(t.data ?? []);
+        setTrips(sortTripsForPartner(t.data ?? [], istanbulNowLocal()));
         setBuses((b.data ?? []).filter(x => x.active));
         setBusSellable(Object.fromEntries((b.data ?? []).map(x => [x.id, x.sellable && x.active])));
         setTerminals(term.data ?? []);

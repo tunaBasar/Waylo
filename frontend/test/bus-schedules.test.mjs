@@ -47,3 +47,22 @@ test('schedule error codes map to Turkish text', () => {
   assert.match(m.busErrorMessage(new m.ApiError('m', 422, 'SCHEDULE_CODE_TAKEN'), 'f'), /plan kodu/i);
   assert.match(m.busErrorMessage(new m.ApiError('m', 422, 'INVALID_SCHEDULE'), 'f'), /gecersiz/i);
 });
+
+test('sortTripsForPartner: next departure first, then cancelled/past newest first, input untouched', () => {
+  const trip = (id, status, departureAt) => ({ id, status, stops: [{ departureAt }] });
+  const trips = [
+    trip('far', 'PUBLISHED', '2026-12-26T22:30:00'),
+    trip('past', 'PUBLISHED', '2026-11-20T22:30:00'),
+    trip('next', 'PUBLISHED', '2026-11-27T22:30:00'),
+    trip('cancelled', 'CANCELLED', '2026-11-28T22:30:00'),
+    trip('soon', 'PUBLISHED', '2026-11-28T22:30:00'),
+  ];
+  const copy = JSON.stringify(trips);
+  const got = m.sortTripsForPartner(trips, '2026-11-27T11:00:00').map(t => t.id);
+  assert.deepEqual(got, ['next', 'soon', 'far', 'cancelled', 'past']);
+  assert.equal(JSON.stringify(trips), copy);
+});
+
+test('istanbulNowLocal: UTC+3 wall time without offset', () => {
+  assert.equal(m.istanbulNowLocal(Date.parse('2026-11-27T21:30:00Z')), '2026-11-28T00:30:00');
+});

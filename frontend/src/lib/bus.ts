@@ -311,3 +311,25 @@ export function busErrorMessage(err: unknown, fallback: string): string {
   const rule = message ? TRIP_RULE_TEXT.find(([re]) => re.test(message)) : undefined;
   return rule?.[1] || message || fallback;
 }
+
+/**
+ * Partner trip list order: upcoming published trips first, soonest first (with a weekly timetable the next departure
+ * must be on top, not 30 days away), then cancelled or past trips, most recent first. Does not mutate the input.
+ * Departure times are offsetless Europe/Istanbul local times, compared as strings (same format for every trip).
+ */
+export function sortTripsForPartner<T extends { status: string; stops: { departureAt: string | null }[] }>(
+  trips: T[], nowLocal: string,
+): T[] {
+  const dep = (t: T) => t.stops[0]?.departureAt ?? '';
+  const upcoming = (t: T) => t.status === 'PUBLISHED' && dep(t) >= nowLocal;
+  return [...trips].sort((a, b) => {
+    const ua = upcoming(a), ub = upcoming(b);
+    if (ua !== ub) return ua ? -1 : 1;
+    return ua ? dep(a).localeCompare(dep(b)) : dep(b).localeCompare(dep(a));
+  });
+}
+
+/** Current Europe/Istanbul wall time as "yyyy-MM-ddTHH:mm:ss" (fixed UTC+3, no DST), for sortTripsForPartner. */
+export function istanbulNowLocal(nowMs: number = Date.now()): string {
+  return new Date(nowMs + 3 * 3600_000).toISOString().slice(0, 19);
+}
