@@ -73,7 +73,9 @@ public class FlightScheduleService {
         schedule.setActive(true);
         fill(schedule, request);
         FlightSchedule saved = scheduleRepository.save(schedule);
-        return new ScheduleResult(toResponse(saved), generator.apply(saved));
+        // Generate first: the response lists the next flights, which only exist after apply.
+        GenerationSummary summary = generator.apply(saved);
+        return new ScheduleResult(toResponse(saved), summary);
     }
 
     public ScheduleResult update(UUID id, ScheduleRequest request) {
@@ -97,7 +99,8 @@ public class FlightScheduleService {
         FlightSchedule schedule = find(id);
         schedule.setActive(true);
         FlightSchedule saved = scheduleRepository.save(schedule);
-        return new ScheduleResult(toResponse(saved), generator.apply(saved));
+        GenerationSummary summary = generator.apply(saved);
+        return new ScheduleResult(toResponse(saved), summary);
     }
 
     public ScheduleResult deactivate(UUID id) {

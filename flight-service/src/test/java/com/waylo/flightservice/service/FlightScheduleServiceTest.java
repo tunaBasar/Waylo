@@ -147,4 +147,16 @@ class FlightScheduleServiceTest {
         assertThat(result.schedule().cabins()).hasSize(2);
         verify(generator).apply(any(com.waylo.flightservice.domain.FlightSchedule.class));
     }
+
+    @Test
+    void createBuildsTheResponseAfterGenerating() {
+        // Live run 27.11: nextFlights was empty because the response was read before apply created the flights.
+        airportsExist();
+        when(scheduleRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(generator, flightRepo);
+        service.create(request("WD1", "IST", "ADB", List.of(business(), economy())));
+        order.verify(generator).apply(any(com.waylo.flightservice.domain.FlightSchedule.class));
+        order.verify(flightRepo).findTop5ByScheduleIdAndStatusNotAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAsc(
+                any(), any(), any());
+    }
 }

@@ -227,10 +227,23 @@ def bus_part():
 
     # ---- customer search ----
     if exp:
-        q = f'/api/bus-trips?fromCity={ca}&toCity={cc}&date={exp[0]}'
+        # Search a departure that is still PUBLISHED: the partner list order decides which trip was cancelled above.
+        live = sorted(t['stops'][0]['departureAt'][:10] for t in (data(call('GET', P + '/trips', token=pa)) or [])
+                      if t['code'] == code and t['status'] == 'PUBLISHED')
+        day = live[0] if live else exp[0]
+        q = f'/api/bus-trips?fromCity={ca}&toCity={cc}&date={day}'
         offers = data(call('GET', q)) or []
+        why = ''
+        if not any(o['code'] == code for o in offers):
+            # Diagnose the miss from the database: status, departure, org approval, documents (no secrets).
+            why = {
+                'trips': psql('bus_db', f"SELECT status, departure_at FROM trips WHERE code = '{code}' ORDER BY departure_at LIMIT 3"),
+                'docs': psql('bus_db', f"SELECT type, status, valid_until FROM documents WHERE organization_id = '{oid}' AND bus_id IS NULL"),
+                'org': psql('auth_db', f"SELECT status, business_type FROM organizations WHERE id = '{oid}'"),
+                'query': q,
+            }
         check('customer search finds the generated trip (needs BUS_SALES_ENABLED=true)',
-              any(o['code'] == code and float(o['price']) == 500 for o in offers), offers)
+              any(o['code'] == code and float(o['price']) == 500 for o in offers), (offers, why))
 
     # ---- validation errors ----
     r = call('POST', P + '/trip-schedules', dict(body), pa)
