@@ -44,3 +44,16 @@ describe('displayItemText', () => {
     expect(displayItemText(null)).toBe('');
   });
 });
+
+import { mealPlanText, offerSubtitle } from '@/features/format';
+describe('meal plan text', () => {
+  it('translates known codes and keeps unknown', () => {
+    expect(mealPlanText('BREAKFAST')).toBe('Kahvaltı dahil');
+    expect(mealPlanText('ALL_INCLUSIVE')).toBe('Her şey dahil');
+    expect(mealPlanText('X')).toBe('X');
+  });
+  it('does not repeat the meal when the rate plan says it', () => {
+    expect(offerSubtitle('Kahvalti dahil, esnek iptal', 'BREAKFAST', 2)).toBe('Kahvalti dahil, esnek iptal · 2 gece');
+    expect(offerSubtitle('Esnek iptal', 'BREAKFAST', 2)).toBe('Esnek iptal · Kahvaltı dahil · 2 gece');
+  });
+});

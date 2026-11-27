@@ -16,7 +16,7 @@ import { fmtDate, parseIsoDate } from '@/features/dates';
 import { MIN_TOUCH, space } from '@/theme/theme';
 import type { Theme } from '@/theme/theme';
 import { useStyles, useTheme } from '@/theme/ThemeContext';
-import { money, offerPolicyText } from '@/features/format';
+import { money, offerPolicyText, offerSubtitle } from '@/features/format';
 import { reviewsApi, scoreText, type HotelReviewPage } from '@/features/reviews/api';
 import { ApiError } from '@/api';
 import { checkoutErrorMessage } from '@/features/orders/api';
@@ -123,7 +123,7 @@ export default function HotelDetail() {
               <View style={s.offerFoot}>
                 <View style={{ flex: 1, gap: space.xs }}>
                   <Text style={[type.titleMd, { color: color.onSurface }]}>{o.roomTypeName}</Text>
-                  <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{`${o.ratePlanName} · ${o.mealPlan} · ${o.nights} gece`}</Text>
+                  <Text style={[type.bodyMd, { color: color.onSurfaceVariant }]}>{offerSubtitle(o.ratePlanName, o.mealPlan, o.nights)}</Text>
                 </View>
                 <Price amount={o.totalAmount} currency={o.currency} />
                 <MaterialCommunityIcons name={busy === key ? 'loading' : 'chevron-right'} size={24} color={color.onSurfaceVariant} accessibilityElementsHidden importantForAccessibility="no" />

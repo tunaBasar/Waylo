@@ -3,13 +3,7 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from '@expo-google-fonts/crimson-pro/useFonts';
-import { CrimsonPro_600SemiBold } from '@expo-google-fonts/crimson-pro/600SemiBold';
-import { Lato_400Regular } from '@expo-google-fonts/lato/400Regular';
-import { Lato_700Bold } from '@expo-google-fonts/lato/700Bold';
-import { SourceCodePro_500Medium } from '@expo-google-fonts/source-code-pro/500Medium';
-import { SourceCodePro_600SemiBold } from '@expo-google-fonts/source-code-pro/600SemiBold';
-import { AlegreyaSans_700Bold } from '@expo-google-fonts/alegreya-sans/700Bold';
-import { Alegreya_400Regular } from '@expo-google-fonts/alegreya/400Regular';
+import { THEME_FONTS } from '@/theme/fonts';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import * as Linking from 'expo-linking';
@@ -104,11 +98,7 @@ function Shell() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    CrimsonPro_600SemiBold, Lato_400Regular, Lato_700Bold,
-    SourceCodePro_500Medium, SourceCodePro_600SemiBold,
-    AlegreyaSans_700Bold, Alegreya_400Regular,
-  });
+  const [fontsLoaded, fontError] = useFonts(THEME_FONTS);
   const fontsReady = fontsLoaded || !!fontError; // on error continue with system fonts
   useEffect(() => { if (fontsReady) SplashScreen.hideAsync().catch(() => {}); }, [fontsReady]);
   if (!fontsReady) return null;

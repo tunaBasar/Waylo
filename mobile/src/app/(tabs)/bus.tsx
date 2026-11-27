@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,7 +30,9 @@ const GENDERS: Gender[] = ['FEMALE', 'MALE'];
 type Bar = { amount: number; currency: string; ready: boolean; count: number };
 type TripQ = { from: string; to: string; date: string };
 
-const SEAT = 40;
+const WEB_FRAME_MAX = 480;
+/** Seat edge from the available width: 4 seats + aisle column (32) + gaps inside page (20x2) and card (16x2) paddings, min 44 pt touch target. */
+const seatSize = (width: number) => Math.max(MIN_TOUCH, Math.min(52, Math.floor((Math.min(width, WEB_FRAME_MAX) - 72 - 32 - 2 * space.xs) / 4)));
 const GENDER_LETTER: Record<Gender, string> = { FEMALE: 'K', MALE: 'E' };
 const GENDER_WORD: Record<Gender, string> = { FEMALE: 'kadın', MALE: 'erkek' };
 const hhmm = (iso: string) => fmtLocal(iso).slice(-5);
@@ -75,6 +77,7 @@ function SeatPicker({ offer, search, onBar, register }: {
   const { color } = useTheme();
   const s = useStyles(makeStyles);
   const { user } = useAuth();
+  const seat = seatSize(useWindowDimensions().width);
   const cart = useCart();
   const map = useAsync<SeatMap>(() => busApi.seats(offer.tripId, offer.fromSeq, offer.toSeq), [offer.tripId, offer.fromSeq, offer.toSeq]);
   const [picked, setPicked] = useState<Picked[]>(() => takeBusDraft(busTripKey(offer)) ?? []);
@@ -141,7 +144,7 @@ function SeatPicker({ offer, search, onBar, register }: {
                   {row.map((block, k) => (
                     <View key={k} style={s.block}>
                       {k === 1 ? <Text style={s.rowNo}>{i + 1}</Text> : null}
-                      <View style={[s.blockSeats, { minWidth: k === 0 ? 2 * SEAT + space.xs : SEAT }]}>
+                      <View style={[s.blockSeats, { minWidth: k === 0 ? 2 * seat + space.xs : seat }]}>
                         {block.map((st) => {
                           const isPicked = picked.some((p) => p.seatNo === st.seatNo);
                           const taken = !st.available;
@@ -155,7 +158,7 @@ function SeatPicker({ offer, search, onBar, register }: {
                           return (
                             <Pressable key={st.seatNo} disabled={taken} onPress={() => toggle(st.seatNo)} accessibilityRole="button"
                               accessibilityLabel={label} accessibilityState={{ selected: isPicked, disabled: taken }}
-                              style={[s.seat, { backgroundColor: bg, borderWidth: conflict ? 2 : 1, borderColor: conflict ? color.error : taken ? bg : isPicked ? color.seatSelectedBg : color.seatEmptyBorder }]}>
+                              style={[s.seat, { width: seat, height: seat, backgroundColor: bg, borderWidth: conflict ? 2 : 1, borderColor: conflict ? color.error : taken ? bg : isPicked ? color.seatSelectedBg : color.seatEmptyBorder }]}>
                               {isPicked
                                 ? <MaterialCommunityIcons name="check" size={20} color={fg} accessibilityElementsHidden importantForAccessibility="no" />
                                 : (
@@ -328,7 +331,7 @@ const makeStyles = ({ color, type, radius, card }: Theme) => StyleSheet.create({
   block: { flexDirection: 'row', alignItems: 'center' },
   blockSeats: { flexDirection: 'row', gap: space.xs },
   rowNo: { ...type.monoSm, color: color.onSurfaceVariant, width: 32, textAlign: 'center' },
-  seat: { width: SEAT, height: SEAT, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  seat: { borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   seatNo: { ...type.monoSm },
   seatLetter: { ...type.labelSm, fontSize: 10, lineHeight: 12 },
   passHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

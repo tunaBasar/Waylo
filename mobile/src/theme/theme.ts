@@ -72,7 +72,7 @@ const darkColor: ThemeColor = {
 };
 
 const lightFont: ThemeFont = {
-  display: 'CrimsonPro_600SemiBold', body: 'Lato_400Regular', bodyBold: 'Lato_700Bold',
+  display: 'CrimsonPro_600SemiBold', body: 'Carlito_400Regular', bodyBold: 'Carlito_700Bold',
   mono: 'SourceCodePro_500Medium', monoSemi: 'SourceCodePro_600SemiBold',
 };
 const darkFont: ThemeFont = {
@@ -106,16 +106,16 @@ export const darkTheme: Theme = {
   color: darkColor,
   font: darkFont,
   type: {
-    displayLgMobile: t(darkFont.display, 28, 34),
-    headlineLg: t(darkFont.display, 22, 28),
+    displayLgMobile: t(darkFont.display, 28, 34, -0.2),
+    headlineLg: t(darkFont.display, 22, 28, -0.1),
     headlineMd: t(darkFont.display, 18, 24),
     titleMd: t(darkFont.bodyBold, 16, 22),
     bodyLg: t(darkFont.body, 16, 24),
     bodyMd: t(darkFont.body, 15, 21),
-    labelLg: t(darkFont.bodyBold, 14, 20),
-    labelSm: t(darkFont.bodyBold, 12, 16),
+    labelLg: t(darkFont.bodyBold, 14, 20, 0.2),
+    labelSm: t(darkFont.bodyBold, 12, 16, 0.3),
     monoMd: t(darkFont.monoSemi, 14, 20, 0, tab),
-    monoSm: t(darkFont.mono, 12, 16, 0, tab),
+    monoSm: t(darkFont.mono, 12, 16, 0.1, tab),
   },
   radius: { sm: 8, md: 14, lg: 20, xl: 24, full: 9999 },
   card: { backgroundColor: darkColor.surfaceLow, borderWidth: 0, borderColor: 'transparent' },

@@ -5,9 +5,9 @@
   "dependencies": {
     "@expo-google-fonts/alegreya": "^0.4.2",
     "@expo-google-fonts/alegreya-sans": "^0.4.2",
+    "@expo-google-fonts/carlito": "^0.4.1",
     "@expo-google-fonts/crimson-pro": "^0.4.2",
     "@expo-google-fonts/instrument-sans": "^0.4.2",
-    "@expo-google-fonts/lato": "^0.4.1",
     "@expo-google-fonts/source-code-pro": "^0.4.2",
     "@expo-google-fonts/spline-sans-mono": "^0.4.2",
     "@expo-google-fonts/wix-madefor-display": "^0.4.2",

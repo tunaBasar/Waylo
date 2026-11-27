@@ -116,3 +116,21 @@ export function displayItemText(text: string | null | undefined): string {
   if (!text) return '';
   return text.replace(/^(\d{4})-(\d{2})-(\d{2})-(\d{4})-(\d{2})-(\d{2})(?=\D|$)/, '$3.$2.$1-$6.$5.$4');
 }
+
+export const MEAL_PLAN_TR: Record<string, string> = {
+  ROOM_ONLY: 'Sadece oda', BREAKFAST: 'Kahvaltı dahil', HALF_BOARD: 'Yarım pansiyon',
+  FULL_BOARD: 'Tam pansiyon', ALL_INCLUSIVE: 'Her şey dahil',
+};
+export const mealPlanText = (code: string) => MEAL_PLAN_TR[code] ?? code;
+
+const fold = (v: string) => v.replace(/İ/g, 'i').replace(/I/g, 'ı').toLocaleLowerCase('tr-TR').replace(/ı/g, 'i')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ç/g, 'c').replace(/ö/g, 'o').replace(/ü/g, 'u');
+
+/** "Rate plan · meal plan · N gece", skipping the meal text when the rate plan name already says it. */
+export function offerSubtitle(ratePlanName: string, mealPlan: string, nights: number): string {
+  const meal = mealPlanText(mealPlan);
+  const parts = [ratePlanName];
+  if (!fold(ratePlanName).includes(fold(meal))) parts.push(meal);
+  parts.push(`${nights} gece`);
+  return parts.join(' · ');
+}
