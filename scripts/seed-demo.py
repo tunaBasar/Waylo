@@ -1,28 +1,38 @@
 #!/usr/bin/env python3
-"""Rolling, idempotent demo data. Run it as often as you like (daily is fine): every run only adds what is missing,
-so the hotel window always starts TODAY (Europe/Istanbul) and flights start tomorrow.
+"""Rolling, idempotent demo data driven by the automation rules (INVENTORY-AUTOMATION-CONTRACT.md). Run it as often
+as you like (daily is fine): nothing is written row by row any more, the rules open the dates (and the server also
+applies them every night).
 
   python3 scripts/seed-demo.py [--dry-run] [--only hotels|flights|cars] [--hide-others]
 
   hotels   : a dedicated demo PARTNER user (SEED_HOTEL_PARTNER_EMAIL, default seed-otel@waylo.test) owns the org
              "Waylo Demo Hotels" and does every hotel write. The admin only approves the org and decides the publication
              (an admin cannot review an organization they belong to: 409 SELF_REVIEW_NOT_ALLOWED).
-             Per hotel: two room types, one rate plan, daily stock and a nightly price for EVERY occupancy for SEED_HOTEL_DAYS.
+             Per hotel: two room types, one rate plan, then via /api/hotels/{id}/automation: an inventory rule per room
+             type (5 rooms, SEED_HOTEL_DAYS horizon, default 365), one default rate rule per (room type, rate plan)
+             (base occupancy 2 at the 2-person price, extra/reduced person amounts, weekend base amount), then
+             reset (today .. today + horizon, this org's hotels only) and apply. Existing rules are updated (PUT), never
+             duplicated. No daily_inventory / daily_rates rows are written by hand.
   cars     : runs seed-car-partner.py (generates SEED_CAR_PARTNER_PASSWORD into .env when missing).
-  flights  : airports, one flight per route per day from tomorrow 00:00 for SEED_FLIGHT_DAYS plus today's remaining
-             departures that are >= 3 h away (WD<route><day-of-year>), seats per flight. Reuses the existing flight seller
-             org ('Waylo Ucus Satis' / FLIGHT_SELLER_ORGANIZATION_ID) and ensures its FLIGHT commission rate.
+  flights  : airports, then ONE recurring schedule per route (code WD<route>, every day, horizon SEED_FLIGHT_DAYS, default
+             60) via /api/flights/schedules, then /api/flights/schedules/apply; flights and seats come from the server
+             (flightCreated event). validFrom is the day after the last old-style flight WD<route><day-of-year> of that
+             route (or today), so no departure exists twice. Existing schedules are updated only when fields differ.
+             Reuses the existing flight seller org ('Waylo Ucus Satis' / FLIGHT_SELLER_ORGANIZATION_ID) and ensures its
+             FLIGHT commission rate.
   --hide-others (opt-in): SUSPENDs other PUBLISHED hotels, never E2E/PubProj/Media/Cancel test fixtures, hotels
              created in the last 2 hours or legacy hotels without an organization.
 
 Credentials come from the environment or .env, never printed. Generated passwords are appended to .env (mode kept).
-SEED_BASE (default http://localhost:8080), SEED_HOTEL_DAYS (60), SEED_FLIGHT_DAYS (30), SEED_FLIGHT_COMMISSION (0.0800).
+SEED_BASE (default http://localhost:8080), SEED_HOTEL_DAYS (365, 30..730), SEED_FLIGHT_DAYS (60, 1..120),
+SEED_FLIGHT_COMMISSION (0.0800).
 """
 import argparse
 import datetime
 import json
 import os
 import pathlib
+import re
 import secrets
 import subprocess
 import sys
@@ -33,8 +43,8 @@ import zoneinfo
 
 BASE = os.environ.get('SEED_BASE', 'http://localhost:8080')
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-HOTEL_DAYS = min(int(os.environ.get('SEED_HOTEL_DAYS', '60')), 366)
-FLIGHT_DAYS = int(os.environ.get('SEED_FLIGHT_DAYS', '30'))
+HOTEL_DAYS = max(30, min(int(os.environ.get('SEED_HOTEL_DAYS', '365')), 730))
+FLIGHT_DAYS = max(1, min(int(os.environ.get('SEED_FLIGHT_DAYS', '60')), 120))
 FLIGHT_COMMISSION = float(os.environ.get('SEED_FLIGHT_COMMISSION', '0.0800'))
 HOTEL_COMMISSION = float(os.environ.get('SEED_HOTEL_COMMISSION', '0.1000'))
 HOTEL_ORG = 'Waylo Demo Hotels'
@@ -59,7 +69,7 @@ ROOM_TYPES = [  # code, name, maxAdults, maxChildren, maxOccupancy, price multip
     ('DEMO_FAM', 'Aile odasi', 4, 2, 4, 1.6),
 ]
 OCC_FACTOR = {1: 0.8, 2: 1.0, 3: 1.25, 4: 1.45}
-STOCK = {'DEMO_STD': 8, 'DEMO_FAM': 4}
+ALLOTMENT = 5
 RATE_PLAN = ('DEMO_FLEX', 'Kahvalti dahil, esnek iptal')
 
 AIRPORTS = [
@@ -192,11 +202,6 @@ def ensure_org(name, partner, admin):
     return org
 
 
-def chunks(items, n):
-    for i in range(0, len(items), n):
-        yield items[i:i + n]
-
-
 def publish(hotel_id, partner, admin):
     s, b = call('POST', f'/api/hotels/{hotel_id}/publication-requests', {}, partner)
     if s in (200, 201):
@@ -223,28 +228,63 @@ def ensure_commission(vertical, org, rate, admin):
         must('POST', '/api/admin/commission-rates', {'vertical': vertical, 'supplierOrganizationId': org, 'rate': rate}, admin)
 
 
+def as_list(data):
+    if isinstance(data, dict):
+        data = data.get('items') or data.get('content') or []
+    return data or []
+
+
+def num(v):
+    return None if v is None else round(float(v), 2)
+
+
+def rate_rule_body(rt, plan, tname, base, mult, max_occ):
+    """Default rate rule from the old per-occupancy prices: OCC_FACTOR 0.8/1.0/1.25 -> reduced = 0.2 * 2p price,
+    extra = 0.25 * 2p price; weekend factor 1.15 -> weekendBaseAmount."""
+    b2 = base * mult
+    return {'roomTypeId': rt, 'ratePlanId': plan, 'name': f'{tname} varsayilan fiyat', 'validFrom': None, 'validTo': None,
+            'currency': 'TRY', 'baseOccupancy': min(2, max_occ), 'baseAmount': round(b2, -1),
+            'weekendBaseAmount': round(b2 * 1.15, -1),
+            'extraPersonAmount': round(b2 * (OCC_FACTOR[3] - OCC_FACTOR[2]), -1),
+            'reducedPersonAmount': round(b2 * (OCC_FACTOR[2] - OCC_FACTOR[1]), -1), 'active': True}
+
+
+RATE_KEYS = ('name', 'currency', 'baseOccupancy', 'baseAmount', 'weekendBaseAmount', 'extraPersonAmount',
+             'reducedPersonAmount', 'active')
+
+
+def same_rule(old, body):
+    for k in RATE_KEYS:
+        a, b = old.get(k), body[k]
+        if isinstance(b, float) or isinstance(a, (float, int)) and not isinstance(a, bool) and k.endswith('Amount'):
+            a, b = num(a), num(b)
+        if a != b:
+            return False
+    return True
+
+
 def seed_hotels(admin):
     partner = ensure_partner()
     today = datetime.datetime.now(TZ).date()
-    days = [today + datetime.timedelta(days=i) for i in range(HOTEL_DAYS)]
     if not partner:
-        print(f'hotels : [dry] org "{HOTEL_ORG}", {len(DEMO_HOTELS)} otel, {len(ROOM_TYPES)} oda tipi, {HOTEL_DAYS} gun stok/fiyat olusturulacak')
+        print(f'hotels : [dry] org "{HOTEL_ORG}", {len(DEMO_HOTELS)} otel, {len(ROOM_TYPES)} oda tipi, {HOTEL_DAYS} gun icin stok ve fiyat kurali olusturulacak')
         return
     if DRY and not find_org(HOTEL_ORG, partner):
-        print(f'hotels : [dry] org "{HOTEL_ORG}" olusturulacak, {len(DEMO_HOTELS)} otel, {HOTEL_DAYS} gun stok/fiyat')
+        print(f'hotels : [dry] org "{HOTEL_ORG}" olusturulacak, {len(DEMO_HOTELS)} otel, {HOTEL_DAYS} gun icin stok ve fiyat kurali')
         return
     org = find_org(HOTEL_ORG, partner)['organizationId'] if DRY else ensure_org(HOTEL_ORG, partner, admin)
     ensure_commission('HOTEL', org, HOTEL_COMMISSION, admin)
     if not DRY:
         partner = login(*partner_creds())  # fresh token after org creation
     existing = {h['name']: h for h in (call('GET', f'/api/hotels?organizationId={org}', token=partner)[1].get('data') or [])}
-    new_h = new_stock = new_rates = 0
+    new_h = inv_rules = rate_rules = 0
+    total = {'created': 0, 'updated': 0, 'skippedExisting': 0, 'skippedManual': 0, 'skippedPast': 0}
     for name, city, country, addr, stars, desc, base in DEMO_HOTELS:
         h = existing.get(name)
         if not h:
             new_h += 1
             if DRY:
-                print(f'  [dry] otel olusturulacak: {name} (+{len(days) * len(ROOM_TYPES)} stok gunu, tum fiyatlar, yayin)')
+                print(f'  [dry] otel olusturulacak: {name} ({len(ROOM_TYPES)} stok kurali, {len(ROOM_TYPES)} fiyat kurali, sifirla+uygula, yayin)')
                 continue
             h = must('POST', '/api/hotels', {'name': name, 'city': city, 'country': country, 'address': addr,
                                             'starRating': stars, 'description': desc, 'organizationId': org}, partner)
@@ -265,32 +305,37 @@ def seed_hotels(admin):
             print(f'  [dry] {name}: eksik oda tipi/rate plan olusturulacak')
             continue
         plan = plans[RATE_PLAN[0]]['id']
-        frm, to = days[0].isoformat(), days[-1].isoformat()
-        have_inv = {(i['roomTypeId'], i['stayDate']) for i in
-                    (call('GET', f'/api/hotels/{hid}/inventory?from={frm}&to={to}', token=partner)[1].get('data') or [])}
-        have_rate = {(r['roomTypeId'], r['stayDate'], r['occupancy']) for r in
-                     (call('GET', f'/api/hotels/{hid}/rates?from={frm}&to={to}', token=partner)[1].get('data') or [])}
-        inv, rates = [], []
-        for code, _n, _a, _k, occ, mult in ROOM_TYPES:
+        auto = call('GET', f'/api/hotels/{hid}/automation', token=partner)[1].get('data') or {}
+        old_inv = {str(r['roomTypeId']): r for r in auto.get('inventoryRules') or []}
+        old_rate = {(str(r['roomTypeId']), str(r['ratePlanId'])): r for r in auto.get('rateRules') or []
+                    if not r.get('validFrom') and not r.get('validTo')}
+        for code, tname, _a, _k, occ, mult in ROOM_TYPES:
             rt = types[code]['id']
-            for d in days:
-                ds = d.isoformat()
-                weekend = d.weekday() in (4, 5)
-                if (rt, ds) not in have_inv:
-                    inv.append({'roomTypeId': rt, 'stayDate': ds, 'allotment': STOCK[code], 'expectedVersion': None})
-                for o in range(1, occ + 1):
-                    if (rt, ds, o) in have_rate:
-                        continue
-                    amount = round(base * mult * OCC_FACTOR.get(o, 1.45) * (1.15 if weekend else 1.0), -1)
-                    rates.append({'roomTypeId': rt, 'ratePlanId': plan, 'stayDate': ds, 'occupancy': o,
-                                  'currency': 'TRY', 'amount': amount, 'expectedVersion': None})
+            want = {'defaultAllotment': ALLOTMENT, 'horizonDays': HOTEL_DAYS, 'active': True}
+            o = old_inv.get(str(rt))
+            if not (o and all(o.get(k) == v for k, v in want.items())):
+                inv_rules += 1
+                if not DRY:
+                    must('PUT', f'/api/hotels/{hid}/automation/inventory-rules/{rt}', want, partner)
+            body = rate_rule_body(rt, plan, tname, base, mult, occ)
+            o = old_rate.get((str(rt), str(plan)))
+            if o and same_rule(o, body):
+                continue
+            rate_rules += 1
+            if DRY:
+                continue
+            if o:  # idempotent re-run: update the rule found in GET /automation
+                if o.get('version') is not None:
+                    body['expectedVersion'] = o['version']
+                must('PUT', f'/api/hotels/{hid}/automation/rate-rules/{o["id"]}', body, partner)
+            else:
+                must('POST', f'/api/hotels/{hid}/automation/rate-rules', body, partner)
         if not DRY:
-            for part in chunks(inv, 400):  # InventoryUpdateRequest: items max 400
-                must('PUT', f'/api/hotels/{hid}/inventory', {'items': part, 'reason': 'demo seed'}, partner)
-            for part in chunks(rates, 500):  # RateUpdateRequest: items max 500
-                must('PUT', f'/api/hotels/{hid}/rates', {'items': part}, partner)
-        new_stock += len(inv)
-        new_rates += len(rates)
+            rng = {'from': today.isoformat(), 'to': (today + datetime.timedelta(days=HOTEL_DAYS)).isoformat()}
+            for step, body in (('reset', rng), ('apply', None)):  # this org's own hotels only
+                summ = must('POST', f'/api/hotels/{hid}/automation/{step}', body, partner) or {}
+                for k in total:
+                    total[k] += int(summ.get(k) or 0)
         status = h.get('publicationStatus')
         if status != 'PUBLISHED':
             if DRY:
@@ -300,7 +345,10 @@ def seed_hotels(admin):
                      {'decision': 'REINSTATE', 'reason': 'demo seed reinstate'}, admin)
             else:
                 publish(hid, partner, admin)
-    print(f'hotels : {"[dry] " if DRY else ""}+{new_h} otel, +{new_stock} stok gunu, +{new_rates} fiyat satiri ({HOTEL_DAYS} gun, {today} baslangic)')
+    print(f'hotels : {"[dry] " if DRY else ""}+{new_h} otel, {inv_rules} stok kurali, {rate_rules} fiyat kurali yazildi/guncellendi ({HOTEL_DAYS} gun, {today} baslangic)')
+    if not DRY:
+        print(f'  sifirla+uygula: {total["created"]} olusturuldu, {total["updated"]} guncellendi, {total["skippedExisting"]} mevcut atlandi, '
+              f'{total["skippedManual"]} manuel atlandi, {total["skippedPast"]} gecmis atlandi')
 
 
 def hide_other_hotels(admin, demo_org=None):
@@ -356,6 +404,28 @@ def flight_seller_org():
     return psql('auth_db', f"SELECT id FROM organizations WHERE name = '{FLIGHT_ORG}' LIMIT 1") or None
 
 
+WEEKDAYS = ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')
+
+
+def schedule_differs(old, body):
+    """Compare only the fields the response echoes; a missing field never counts as a difference."""
+    for k, v in body.items():
+        if k == 'cabins' or k not in old:
+            continue
+        a = sorted(old[k]) if k == 'weekdays' else old[k]
+        b = sorted(v) if k == 'weekdays' else v
+        if k == 'departureTime':
+            a = str(a)[:5]
+        if a != b:
+            return True
+    oc = {c.get('seatType'): c for c in old.get('cabins') or []}
+    for c in body['cabins']:
+        o = oc.get(c['seatType'])
+        if not o or any(o.get(k) != c[k] for k in ('fromRow', 'toRow', 'letters')) or num(o.get('price')) != num(c['price']):
+            return True
+    return False
+
+
 def seed_flights(admin):
     org = flight_seller_org()
     if not org:
@@ -372,36 +442,44 @@ def seed_flights(admin):
             if not DRY:
                 must('POST', '/api/airports', {'iataCode': code, 'name': name, 'city': city, 'country': country,
                                                'timezone': tz, 'latitude': lat, 'longitude': lon}, admin)
-    now = datetime.datetime.now(TZ)
-    earliest_today = now + datetime.timedelta(hours=3)
-    new_f = new_seats = 0
-    for off in range(0, FLIGHT_DAYS + 1):  # 0 = today's remaining departures, 1.. = from tomorrow 00:00
-        date = now.date() + datetime.timedelta(days=off)
-        doy = date.timetuple().tm_yday
-        for r, frm, to, hh, mm, dur, eco, biz in ROUTES:
-            dep_local = datetime.datetime(date.year, date.month, date.day, hh, mm, tzinfo=TZ)
-            if off == 0 and dep_local < earliest_today:
+    today = datetime.datetime.now(TZ).date()
+    old_last = {}  # route digit -> last local departure date of old-style flights WD<route><day-of-year>
+    for f in as_list(call('GET', '/api/flights', token=admin)[1].get('data')):
+        m = re.fullmatch(r'WD(\d)(\d{3})', f.get('flightNumber') or '')
+        if m and f.get('departureTime'):
+            try:
+                d = datetime.datetime.fromisoformat(f['departureTime'].replace('Z', '+00:00')).astimezone(TZ).date()
+            except ValueError:
                 continue
-            no = f'WD{r}{doy:03d}'
-            if call('GET', f'/api/flights/number/{no}')[0] != 200:
-                dep = dep_local.astimezone(datetime.timezone.utc)
-                arr = dep + datetime.timedelta(minutes=dur)
-                new_f += 1
-                if not DRY:
-                    must('POST', '/api/flights', {'flightNumber': no, 'departureAirportCode': frm, 'arrivalAirportCode': to,
-                                                  'airline': 'Waylo Air', 'departureTime': dep.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                                  'arrivalTime': arr.strftime('%Y-%m-%dT%H:%M:%SZ')}, admin)
-            have_cabins = {s.get('seatType') for s in (call('GET', f'/api/seat-inventory/seats/{no}')[1].get('data') or [])}
-            weekend = 1.1 if date.weekday() in (4, 6) else 1.0
-            for cabin, price, rows, letters in (('BUSINESS', biz, (1, 2), 'AC'), ('ECONOMY', eco, (3, 7), 'ABCD')):
-                if cabin in have_cabins:
-                    continue
-                new_seats += (rows[1] - rows[0] + 1) * len(letters)
-                if not DRY:
-                    must('POST', '/api/seat-inventory/seats/bulk', {'flightNumber': no, 'seatType': cabin,
-                                                                    'price': round(price * weekend, -1), 'fromRow': rows[0],
-                                                                    'toRow': rows[1], 'letters': letters}, admin)
-    print(f'flights: {"[dry] " if DRY else ""}+{new_f} ucus, +{new_seats} koltuk (bugunun kalani + {FLIGHT_DAYS} gun, {len(ROUTES)} hat/gun)')
+            old_last[int(m.group(1))] = max(old_last.get(int(m.group(1)), d), d)
+    scheds = {x.get('code'): x for x in as_list(call('GET', '/api/flights/schedules', token=admin)[1].get('data'))}
+    created = updated = 0
+    for r, frm, to, hh, mm, dur, eco, biz in ROUTES:
+        code = f'WD{r}'
+        after_old = old_last[r] + datetime.timedelta(days=1) if r in old_last else None
+        body = {'code': code, 'airline': 'Waylo Air', 'departureAirportCode': frm, 'arrivalAirportCode': to,
+                'weekdays': list(WEEKDAYS), 'departureTime': f'{hh:02d}:{mm:02d}', 'durationMinutes': dur,
+                'validFrom': max(today, after_old or today).isoformat(), 'validTo': None, 'horizonDays': FLIGHT_DAYS,
+                'cabins': [{'seatType': 'BUSINESS', 'price': biz, 'fromRow': 1, 'toRow': 2, 'letters': 'AC'},
+                           {'seatType': 'ECONOMY', 'price': eco, 'fromRow': 3, 'toRow': 7, 'letters': 'ABCD'}]}
+        old = scheds.get(code)
+        if not old:
+            created += 1
+            if not DRY:
+                must('POST', '/api/flights/schedules', body, admin)
+            continue
+        if old.get('validFrom') and not (after_old and old['validFrom'] < after_old.isoformat()):
+            body['validFrom'] = old['validFrom']  # keep the start of an existing schedule (stable re-runs)
+        if schedule_differs(old, body):
+            updated += 1
+            if old.get('version') is not None:
+                body['expectedVersion'] = old['version']
+            if not DRY:
+                must('PUT', f'/api/flights/schedules/{old["id"]}', body, admin)
+    summ = {} if DRY else (must('POST', '/api/flights/schedules/apply', None, admin) or {})
+    print(f'flights: {"[dry] " if DRY else ""}+{created} ucus plani, {updated} plan guncellendi ({len(ROUTES)} hat, her gun, {FLIGHT_DAYS} gun ileri)')
+    if not DRY:
+        print(f'  uygula: {summ.get("created", 0)} ucus olusturuldu, {summ.get("skippedExisting", 0)} mevcut atlandi, {summ.get("skippedPast", 0)} gecmis atlandi')
     same = env('FLIGHT_SELLER_ORGANIZATION_ID') == org
     print('  .env FLIGHT_SELLER_ORGANIZATION_ID ' + ('dogru' if same else 'FARKLI/EKSIK: .env guncellenip package-booking-service yeniden baslatilmali'))
 
